@@ -46,7 +46,8 @@ const server = createServer(async (request, response) => {
       const readPdf = request.method === 'POST' && (pathname === '/api/v1/output-recon/inspect' || /^\/api\/v1\/output-recon\/uploads\/[0-9a-f-]{36}\/read$/i.test(pathname));
       const preview = request.method === 'GET' && /^\/api\/v1\/output-recon\/uploads\/[0-9a-f-]{36}\/preview$/i.test(pathname);
       const financialPdf = request.method === 'POST' && (pathname.startsWith('/api/v1/invoices/') || /\/(finalize|signed-preview)$/.test(pathname));
-      const bodyLimit = upload ? 7 * 1024 * 1024 : 32768;
+      const manualRevenueUpload = request.method === 'POST' && ['/api/v1/manual-revenue/import-preview', '/api/v1/manual-revenue/drafts'].includes(pathname);
+      const bodyLimit = manualRevenueUpload ? 8 * 1024 * 1024 : upload ? 7 * 1024 * 1024 : 32768;
       const chunks = []; let size = 0;
       for await (const chunk of request) {
         size += chunk.length;
