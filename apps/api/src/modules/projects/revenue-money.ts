@@ -2,6 +2,7 @@ import {Prisma} from '@erp/db';
 import {CommandError} from './commands.js';
 
 export const D=(v:string|number|Prisma.Decimal)=>new Prisma.Decimal(v);
+export const reportingRate=(period:string,original:string|null|undefined,rates:Map<string,{rate:string}>)=>rates.get(period)?.rate??original??null;
 export function nativeAmount(v:string|Prisma.Decimal,currency:string){return D(v).toDecimalPlaces(currency==='VND'?0:2,Prisma.Decimal.ROUND_HALF_UP).toFixed(currency==='VND'?0:2);}
 export function revenueAmounts(row:{currency?:string;netAmount?:Prisma.Decimal;calculationJson:unknown}){
  const j=row.calculationJson as any;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import AdmZip from 'adm-zip';
 import {Prisma} from '@erp/db';
-import {equivalents,nativeAmount} from '../dist/modules/projects/revenue-money.js';
+import {equivalents,nativeAmount,reportingRate} from '../dist/modules/projects/revenue-money.js';
 import {spreadsheetRows,csvRows} from '../dist/modules/projects/revenue-import.js';
 import {dashboardSummary} from '../dist/modules/projects/dashboard-summary.js';
 import {nativeVndPayment} from '../dist/modules/projects/invoice-payments.js';
@@ -11,6 +11,11 @@ eq(equivalents('25000000','VND','25000'),{usd:'1000.00',vnd:'25000000'});
 eq(equivalents('1000','USD','25000'),{usd:'1000.00',vnd:'25000000'});
 eq(equivalents('1000','USD'),{usd:'1000.00',vnd:null});
 eq(equivalents('25000000','VND'),{usd:null,vnd:'25000000'});
+const sharedRates=new Map([['2026-01',{rate:'25000'}]]);
+eq(reportingRate('2026-01','24000',sharedRates),'25000');
+eq(reportingRate('2026-02','24000',sharedRates),'24000');
+eq(reportingRate('2026-03',null,sharedRates),null);
+eq(equivalents('25000000','VND',reportingRate('2026-01',null,sharedRates)),{usd:'1000.00',vnd:'25000000'});
 const input={period:'2026-03',serviceId:'00000000-0000-4000-8000-000000000001',contractId:'00000000-0000-4000-8000-000000000002',currency:'VND',amount:'15904315',deduction:'0',note:''};
 for(const fxRate of ['',null,undefined]){const v=normalizeManualRevenueInput({...input,fxRate});eq({usd:v.usd,vnd:v.vnd,fxRate:v.fxRate},{usd:null,vnd:'15904315',fxRate:null});}
 reject(()=>normalizeManualRevenueInput({...input,fxRate:'0'}));

@@ -6,7 +6,7 @@ import {audit,CommandError,date,parse,writeGuard} from './commands.js';
 import {financialPeriodLock} from './recon-finalize.js';
 import {derivedBytes,sha} from './financial-documents.js';
 import {assertManualRevenue} from './manual-revenue.js';
-import {revenueAmounts,equivalents,reportingRates,nativeAmount} from './revenue-money.js';
+import {revenueAmounts,equivalents,reportingRates,nativeAmount,reportingRate} from './revenue-money.js';
 import {dashboardSummary} from './dashboard-summary.js';
 
 const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v);
@@ -110,7 +110,7 @@ export async function financeLedgerRoutes(app:FastifyInstance,config:AuthConfig)
    const listWhere=q.details==='true'?where:totalsWhere;
    const [items,count,totals]=await Promise.all([tx.revenue.findMany({where:listWhere,include:{partner:{select:{legalName:true}},service:{select:{serviceName:true}},contract:{select:{contractCode:true}},reconciliation:{select:{reconCode:true}}},orderBy:[{periodStart:'desc'},{revenueCode:'asc'}],take:50,skip:(q.page-1)*50}),tx.revenue.count({where:listWhere}),tx.revenue.aggregate({where:{...totalsWhere,currency:'USD'},_sum:{netAmount:true}})]);
    const rates=await reportingRates(tx,companyId);
-   return {items:items.map(v=>{const a=revenueAmounts(v),fxRate=a.fxRate??rates.get(v.periodStart.toISOString().slice(0,7))?.rate??null;return {currency:v.currency,nativeRevenue:a.revenue,nativeWht:a.wht,nativePayable:a.payable,fxRate,equivalents:equivalents(a.revenue,v.currency,fxRate),payableEquivalents:equivalents(v.netAmount,v.currency,fxRate),id:v.id,revenueCode:v.revenueCode,period:v.periodStart.toISOString().slice(0,7),status:v.status,partner:v.partner.legalName,service:v.service.serviceName,contract:v.contract.contractCode,reconciliation:v.reconciliation.reconCode,rowType:(v.calculationJson as any)?.rowType,invoiceRevenueUsd:(v.calculationJson as any)?.invoiceRevenueUsd,invoiceWhtUsd:(v.calculationJson as any)?.invoiceWhtUsd,invoicePayableUsd:(v.calculationJson as any)?.invoicePayableUsd,uploadId:(v.calculationJson as any)?.uploadId};}),total:count,page:q.page,monthlyPayableUsd:fixed(totals._sum.netAmount??D('0'))};
+   return {items:items.map(v=>{const a=revenueAmounts(v),fxRate=reportingRate(v.periodStart.toISOString().slice(0,7),a.fxRate,rates);return {currency:v.currency,nativeRevenue:a.revenue,nativeWht:a.wht,nativePayable:a.payable,fxRate,equivalents:equivalents(a.revenue,v.currency,fxRate),payableEquivalents:equivalents(v.netAmount,v.currency,fxRate),id:v.id,revenueCode:v.revenueCode,period:v.periodStart.toISOString().slice(0,7),status:v.status,partner:v.partner.legalName,service:v.service.serviceName,contract:v.contract.contractCode,reconciliation:v.reconciliation.reconCode,rowType:(v.calculationJson as any)?.rowType,invoiceRevenueUsd:(v.calculationJson as any)?.invoiceRevenueUsd,invoiceWhtUsd:(v.calculationJson as any)?.invoiceWhtUsd,invoicePayableUsd:(v.calculationJson as any)?.invoicePayableUsd,uploadId:(v.calculationJson as any)?.uploadId};}),total:count,page:q.page,monthlyPayableUsd:fixed(totals._sum.netAmount??D('0'))};
   },{isolationLevel:'RepeatableRead'});
  });
  app.get('/api/v1/receivables',{preHandler:requirePermission('AR_VIEW')},async request=>{
