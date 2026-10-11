@@ -11,3 +11,8 @@ The owner clarified on 2026-10-08 that ERP Core must inherit the full existing E
 - Keep raw donor source in ignored artifacts/dgc-reference; never execute it or publish configuration/authentication material. The catalog is safe metadata, not raw records.
 - The revised roadmap takes precedence over older incremental project-first plans. Pause new deployment work until the inherited scope and target feature behavior are grounded in the donor. Do not push documentation-only audit changes just to trigger auto-deployment.
 - Synced ChatGPT project sources are read-only.
+
+## Owner UI rule (2026-10-11)
+
+- Every data table displayed to users must provide pagination. Use 10 results per page by default, with previous/next controls and page/total counts. Apply this consistently to new and revised list views.
+
