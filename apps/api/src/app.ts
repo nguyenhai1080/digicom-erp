@@ -3,6 +3,7 @@ import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import { healthRoutes } from './modules/health/health.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { userRoutes } from './modules/auth/users.routes.js';
 import { loadAuthConfig, type AuthConfig } from './modules/auth/access.js';
 import { PasswordBusyError } from './modules/auth/password.js';
 import { projectRoutes } from './modules/projects/project.routes.js';
@@ -25,6 +26,7 @@ export async function buildApp(options: { auth?: AuthConfig; logger?: boolean } 
   await app.register(cookie);
   await app.register(healthRoutes);
   await app.register(authRoutes, auth);
+  await app.register(userRoutes, auth);
   await app.register(projectRoutes, auth);
   await app.register(serviceRoutes, auth);
   await app.register(companyAssetRoutes, auth);
