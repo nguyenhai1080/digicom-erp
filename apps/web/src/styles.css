@@ -37,3 +37,5 @@ h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:20px;line-height:1
 .invoice-preview article { border-top: 1px solid #d9e2ed; margin: 24px 0; padding: 16px 0; }
 .check-label { display: flex; align-items: center; gap: 10px; margin: 18px 0; }
 .check-label input { width: auto; margin: 0; }
+.manual-revenue-table td > small,
+.manual-revenue-table td > a { display: block; margin-top: 6px; }
