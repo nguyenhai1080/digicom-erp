@@ -25,8 +25,8 @@ export function Dashboard({request,permissions}:Props){
  const incomplete=rows.some(r=>currency==='USD'?r.missingUsd>0:r.missingVnd>0);
  const sum=values.reduce((s,v)=>s+Math.round(v*100),0)/100,max=Math.max(...values,1);
  return <div className="dashboard"><section className="cards dashboard-kpis">
-  <article><h3>Doanh thu lũy kế</h3>{(['USD','VND'] as const).map(c=><div className="dashboard-currency" key={c}><span>{c}</span><p className="dashboard-kpi" role="status">{!canRevenue?'Không có quyền':error?'Không tải được':!data?'Đang tải…':data.totals[c==='USD'?'usd':'vnd']===null?'Thiếu tỷ giá':money(data.totals[c==='USD'?'usd':'vnd']!,c)}</p></div>)}<small className="muted">Phần GST thực nhận · Quy đổi theo kỳ</small></article>
-  <article><h3>Phải thu</h3>{(['USD','VND'] as const).map(c=><div className="dashboard-currency" key={c}><span>{c}</span><p className="dashboard-kpi" role="status">{!canAR?'Không có quyền':arError?'Không tải được':ar?money(ar.find(v=>v.currency===c)?.outstanding??'0',c):'Đang tải…'}</p></div>)}<small className="muted">Công nợ theo tiền tệ gốc</small></article>
+  <article><h3>Doanh thu lũy kế</h3>{(['USD','VND'] as const).map(c=><div className="dashboard-currency" key={c}><span>{c}</span><p className="dashboard-kpi" role="status">{!canRevenue?'Không có quyền':error?'Không tải được':!data?'Đang tải…':data.totals[c==='USD'?'usd':'vnd']===null?'Thiếu tỷ giá':money(data.totals[c==='USD'?'usd':'vnd']!,c)}</p></div>)}</article>
+  <article><h3>Phải thu</h3>{(['USD','VND'] as const).map(c=><div className="dashboard-currency" key={c}><span>{c}</span><p className="dashboard-kpi" role="status">{!canAR?'Không có quyền':arError?'Không tải được':ar?money(ar.find(v=>v.currency===c)?.outstanding??'0',c):'Đang tải…'}</p></div>)}</article>
   <article><h3>Phải trả (VND)</h3><p className="dashboard-kpi unavailable">Chưa có dữ liệu</p><small className="muted">Chưa có sổ phải trả</small></article>
   <article><h3>Cash balance (VND)</h3><p className="dashboard-kpi unavailable">Chưa có dữ liệu</p><small className="muted">Chưa có sổ thu chi</small></article>
  </section>
