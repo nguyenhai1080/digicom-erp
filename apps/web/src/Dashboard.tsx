@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 type Props={request:(path:string)=>Promise<any>;permissions:string[]};
 type Series={period:string;serviceId:string;total:boolean;revenue:string;wht:string;payable:string;revenueVnd:string|null;whtVnd:string|null;payableVnd:string|null;missingUsd:number;missingVnd:number};
 type Data={totals:{usd:string|null;vnd:string|null;missingUsd:number;missingVnd:number};totalPayableUsd:string;services:{id:string;name:string}[];series:Series[]};
-const money=(v:string|number)=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v));
+const money=(v:string|number,c='USD')=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:c==='VND'?0:2,maximumFractionDigits:c==='VND'?0:2}).format(Number(v));
 const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 export function Dashboard({request,permissions}:Props){
  const canRevenue=permissions.includes('REVENUE_VIEW'),canAR=permissions.includes('AR_VIEW');
@@ -25,8 +25,8 @@ export function Dashboard({request,permissions}:Props){
  const incomplete=rows.some(r=>currency==='USD'?r.missingUsd>0:r.missingVnd>0);
  const sum=values.reduce((s,v)=>s+Math.round(v*100),0)/100,max=Math.max(...values,1);
  return <div className="dashboard"><section className="cards dashboard-kpis">
-  {(['USD','VND'] as const).map(c=><article key={'revenue'+c}><h3>Doanh thu lũy kế ({c})</h3><p className="dashboard-kpi" role="status">{!canRevenue?'Không có quyền':error?'Không tải được':!data?'Đang tải…':data.totals[c==='USD'?'usd':'vnd']===null?'Thiếu tỷ giá':money(data.totals[c==='USD'?'usd':'vnd']!)}</p><small className="muted">Phần GST được hưởng sau khấu trừ · Quy đổi theo kỳ</small></article>)}
-  {(['USD','VND'] as const).map(c=><article key={'ar'+c}><h3>Phải thu ({c})</h3><p className="dashboard-kpi" role="status">{!canAR?'Không có quyền':arError?'Không tải được':ar?money(ar.find(v=>v.currency===c)?.outstanding??'0'):'Đang tải…'}</p><small className="muted">Công nợ theo tiền tệ gốc</small></article>)}
+  <article><h3>Doanh thu lũy kế</h3>{(['USD','VND'] as const).map(c=><div className="dashboard-currency" key={c}><span>{c}</span><p className="dashboard-kpi" role="status">{!canRevenue?'Không có quyền':error?'Không tải được':!data?'Đang tải…':data.totals[c==='USD'?'usd':'vnd']===null?'Thiếu tỷ giá':money(data.totals[c==='USD'?'usd':'vnd']!,c)}</p></div>)}<small className="muted">Phần GST thực nhận · Quy đổi theo kỳ</small></article>
+  <article><h3>Phải thu</h3>{(['USD','VND'] as const).map(c=><div className="dashboard-currency" key={c}><span>{c}</span><p className="dashboard-kpi" role="status">{!canAR?'Không có quyền':arError?'Không tải được':ar?money(ar.find(v=>v.currency===c)?.outstanding??'0',c):'Đang tải…'}</p></div>)}<small className="muted">Công nợ theo tiền tệ gốc</small></article>
   <article><h3>Phải trả (VND)</h3><p className="dashboard-kpi unavailable">Chưa có dữ liệu</p><small className="muted">Chưa có sổ phải trả</small></article>
   <article><h3>Cash balance (VND)</h3><p className="dashboard-kpi unavailable">Chưa có dữ liệu</p><small className="muted">Chưa có sổ thu chi</small></article>
  </section>
@@ -36,7 +36,7 @@ export function Dashboard({request,permissions}:Props){
  <label>Tiền tệ<select aria-label="Tiền tệ báo cáo" value={currency} onChange={e=>setCurrency(e.target.value as 'USD'|'VND')}><option>USD</option><option>VND</option></select></label><button disabled={busy} onClick={()=>void load()}>{busy?'Đang tải…':'Refresh'}</button></div>
  {error&&<p className="notice" role="alert">{error}</p>}{arError&&<p className="notice" role="alert">{arError}</p>}
  {!canRevenue?<p>Không có quyền xem doanh thu.</p>:data&&<><div className="dashboard-summary"><span>Tổng: <b>{incomplete?'Chưa đủ tỷ giá':money(sum)} {currency}</b></span><span>Năm: <b>{year}</b></span></div>
- {incomplete&&<p className="notice">Thiếu tỷ giá cho một số khoản. Biểu đồ chỉ hiển thị phần có tỷ giá; chưa thể dùng làm tổng đầy đủ. Bổ sung tỷ giá trong Quản lý Doanh thu.</p>}<div className="dashboard-chart"><svg viewBox="0 0 1000 340" role="img" aria-label={'Biểu đồ doanh thu năm '+year}><title>{'Doanh thu theo tháng năm '+year}</title><line x1="30" y1="295" x2="980" y2="295" stroke="#d5e2ee"/>
+ {incomplete&&<p className="notice">Thiếu tỷ giá cho một số khoản. Biểu đồ chỉ hiển thị phần có tỷ giá; chưa thể dùng làm tổng đầy đủ. Bổ sung tỷ giá trong Cấu hình chung.</p>}<div className="dashboard-chart"><svg viewBox="0 0 1000 340" role="img" aria-label={'Biểu đồ doanh thu năm '+year}><title>{'Doanh thu theo tháng năm '+year}</title><line x1="30" y1="295" x2="980" y2="295" stroke="#d5e2ee"/>
  {values.map((v,i)=>{const x=35+i*79,h=Math.max(0,v/max*245);return <g key={i}><title>{months[i]+': '+money(v)+' '+currency}</title><rect x={x} y={295-h} width="62" height={h} rx="5" fill="#1f4e79"/>{v!==0&&<text x={x+31} y={285-h} textAnchor="middle" className="dashboard-chart-value">{Math.abs(v)>=1000?(v/1000).toFixed(1)+'K':money(v)}</text>}<text x={x+31} y="320" textAnchor="middle">{months[i]}</text></g>;})}</svg>
  <p className="muted">{rows.length?(service==='all'?'Tất cả dịch vụ chỉ tính doanh thu tổng, không cộng trùng các dịch vụ con.':'Doanh thu riêng của dịch vụ đã chọn, bao gồm dòng chi tiết nếu là dịch vụ con.'):'Không có dữ liệu phù hợp với bộ lọc.'}</p></div></>}
  </section></div>;

@@ -39,3 +39,5 @@ h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:20px;line-height:1
 .check-label input { width: auto; margin: 0; }
 .manual-revenue-table td > small,
 .manual-revenue-table td > a { display: block; margin-top: 6px; }
+
+.dashboard-currency{margin:14px 0}.dashboard-currency>span{font-size:12px;font-weight:700;color:var(--muted)}.dashboard-currency .dashboard-kpi{font-size:clamp(19px,1.7vw,28px);margin:4px 0;font-variant-numeric:tabular-nums}.bulk-review{margin:14px 0;padding:16px;border:1px solid var(--border);border-radius:12px}
