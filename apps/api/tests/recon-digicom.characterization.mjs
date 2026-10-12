@@ -38,3 +38,11 @@ const lines=invoiceParentLines([row],'2026-05');
 assert.equal(lines.length,1);assert.equal(lines[0].revenue,'375000');assert.equal(lines[0].payable,'375000');assert.equal(lines[0].wht,'0');
 assert.deepEqual(equivalents(revenueAmounts(row).payable,'VND',f.exchangeRate),{usd:'15.00',vnd:'375000'});
 console.log('PASS: DIGICOM identity, authoritative GST VND share, FX/totals guards, VND Invoice and reporting.');
+
+const vietnamese=source.replaceAll('100.00','100,00').replaceAll('2,500,000','2.500.000').replaceAll('2,125,000','2.125.000').replaceAll('375,000','375.000').replaceAll('25,000','25.000');
+const vi=parseReconFinancial(vietnamese);
+assert.equal(vi.ready,true);assert.deepEqual(vi.native,f.native);assert.deepEqual(vi.usd,f.usd);assert.equal(vi.exchangeRate,f.exchangeRate);
+assert.equal(parseReconFinancial(vietnamese.replace('VND 375.000','VND 370.000')).ready,false);
+assert.equal(parseReconFinancial(vietnamese.replace('USD1 = VND 25.000','USD1 = VND 25,000')).ready,false);
+assert.equal(parseReconFinancial(source.replace('VND 375,000','VND 375.000')).ready,false);
+console.log('PASS: Vietnamese and English separators agree; mixed formatting and changed totals remain blocked.');

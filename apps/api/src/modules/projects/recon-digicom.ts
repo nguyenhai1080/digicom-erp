@@ -5,15 +5,19 @@ import type {Amounts,Financial} from './recon-financial.js';
 export function parseDigicomStatement(raw:string):Financial|null{
  const text=raw.replace(/\s+/g,' ').trim();
  if(!/BẢNG XÁC NHẬN SẢN LƯỢNG\s*[-–]\s*DOANH THU/i.test(text)||! /DIGICOM/i.test(text))return null;
- const D=(v:string)=>new Prisma.Decimal(v.replace(/,/g,'')),whole=(v:Prisma.Decimal)=>v.toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP).toFixed(0),errors:string[]=[];
+ let vietnamese=false;
+ const D=(v:string)=>{const valid=vietnamese?/^(?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:,[0-9]{2})?$/:/^(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\.[0-9]{2})?$/;if(!valid.test(v)){errors.push('Định dạng số trong PDF DIGICOM không nhất quán.');return new Prisma.Decimal(0);}return new Prisma.Decimal(vietnamese?v.replace(/\./g,'').replace(',','.'):v.replace(/,/g,''));},whole=(v:Prisma.Decimal)=>v.toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP).toFixed(0),errors:string[]=[];
  const result:Financial={version:1,source:'DIGICOM_VND_STATEMENT',nativeCurrency:'VND',sourcePartnerKey:'DIGICOM',exchangeRate:null,details:[],native:null,mzn:null,usd:null,warnings:[],errors,ready:false};
- const num='(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\\.[0-9]{2})?';
+ const num='(?:[0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]+)(?:[.,][0-9]{2})?';
  const row=new RegExp('(?:^|\\s)([A-Z][A-Z0-9_-]{1,59})\\s+('+num+')\\s+('+num+')\\s+('+num+')\\s+(\\d+(?:\\.\\d+)?)%\\s+(\\d+(?:\\.\\d+)?)%\\s+('+num+')\\s+('+num+')(?=\\s|$)','g');
  const rows=[...text.matchAll(row)];
  // This verified template has one service; do not silently consume a partial
  // multi-service statement until its layout has been characterized.
  if(rows.length!==1){errors.push('Mẫu DIGICOM cần một dòng dịch vụ đầy đủ; kiểm tra bảng gốc.');return result;}
- const m=rows[0],upstream=D(m[2]),fx=D(m[3]),pool=D(m[4]),otherRate=D(m[5]),gstRate=D(m[6]),other=D(m[7]),gst=D(m[8]);
+ const m=rows[0];
+ // The upstream USD amount has cents, which disambiguate comma vs dot.
+ vietnamese=/,\d{2}$/.test(m[2]);
+ const upstream=D(m[2]),fx=D(m[3]),pool=D(m[4]),otherRate=new Prisma.Decimal(m[5]),gstRate=new Prisma.Decimal(m[6]),other=D(m[7]),gst=D(m[8]);
  const title=text.match(/DỊCH VỤ\s+([A-Z0-9_-]+)\s+TRÊN MẠNG DI ĐỘNG/i)?.[1];
  if(title!==m[1])errors.push('Dịch vụ dòng tiền không khớp tiêu đề DIGICOM.');
  if([pool,other,gst].some(v=>!v.isInteger()||v.lt(0)))errors.push('Số tiền VND phải là số nguyên không âm.');
