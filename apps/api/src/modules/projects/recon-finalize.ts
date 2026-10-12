@@ -8,7 +8,9 @@ import {audit,code,CommandError,money,parse,timestamp,unchanged,writeGuard} from
 import {assessment,sourceBytes,preflight} from './output-recon.js';
 import {parseReconIdentity,normalizeService} from './recon-identity.js';
 import {parseReconFinancial,correctFinancial,type Financial} from './recon-financial.js';
-import {asset,derivedBytes,persistPdf,placementSchema,rollbackFiles,sha,stampPdf} from './financial-documents.js';
+import {asset,derivedBytes,persistPdf,placementSchema,rollbackFiles,sha} from './financial-documents.js';
+
+import {reconSigningMode,prepareReconDocument} from './recon-signing.js';
 
 const idOf=(p:unknown)=>parse(z.object({id:z.uuid()}).strict(),p).id;
 const include={attachment:true,partner:true,service:true} as const;
@@ -46,11 +48,12 @@ async function review(tx:Prisma.TransactionClient,u:Upload){
   if(f.nativeCurrency&&candidates[0].c.currency!==f.nativeCurrency){errors.push('Hợp đồng DIGICOM phải dùng tiền tệ VND.');continue;}
   bindings.push({lineNo:d.lineNo,serviceId:s.id,serviceKey:s.serviceKey,contractId:candidates[0].c.id,contractServiceId:candidates[0].cs.id,contractCode:candidates[0].c.contractCode,contractUpdatedAt:candidates[0].c.updatedAt,contractServiceUpdatedAt:candidates[0].cs.updatedAt});
  }
- const assets=await tx.document.findMany({where:{companyId:u.companyId,entityType:'CompanyAsset',entityId:u.companyId,documentType:'SIGNING_COMPOSITE',status:'ACTIVE'},select:{id:true,versionNo:true,attachment:{select:{mimeType:true,checksumSha256:true}}},take:2});
- if(assets.length!==1)errors.push('Chưa có ảnh dấu/chữ ký/chức danh GST đang hiệu lực.');
+ const signingMode=reconSigningMode(u.partner.partnerKey);
+ const assets=signingMode==='EXTERNAL_DIGITAL'?[]:await tx.document.findMany({where:{companyId:u.companyId,entityType:'CompanyAsset',entityId:u.companyId,documentType:'SIGNING_COMPOSITE',status:'ACTIVE'},select:{id:true,versionNo:true,attachment:{select:{mimeType:true,checksumSha256:true}}},take:2});
+ if(signingMode==='IMAGE_STAMP'&&assets.length!==1)errors.push('Chưa có ảnh dấu/chữ ký/chức danh GST đang hiệu lực.');
  const signingAsset=assets.length===1?{id:assets[0].id,version:assets[0].versionNo,mime:assets[0].attachment.mimeType,checksum:assets[0].attachment.checksumSha256}:null;
- const digest=sha(JSON.stringify({updatedAt:u.updatedAt,checksum:u.attachment.checksumSha256,financial:f,assessment:a,bindings,signingAsset}));
- return {item:stored(u),financial:f,assessment:a,bindings,signingAsset,digest,errors:[...new Set(errors)],canFinalize:errors.length===0&&['OCR_EXTRACTED','UNDER_REVIEW'].includes(u.status)};
+ const digest=sha(JSON.stringify({updatedAt:u.updatedAt,checksum:u.attachment.checksumSha256,financial:f,assessment:a,bindings,signingMode,signingAsset}));
+ return {item:stored(u),financial:f,assessment:a,bindings,signingMode,signingAsset,digest,errors:[...new Set(errors)],canFinalize:errors.length===0&&['OCR_EXTRACTED','UNDER_REVIEW'].includes(u.status)};
 }
 let producing=false;
 export async function reconFinalizeRoutes(app:FastifyInstance,config:AuthConfig){
@@ -71,13 +74,16 @@ export async function reconFinalizeRoutes(app:FastifyInstance,config:AuthConfig)
    await audit(tx,user,'RECON_CORRECT_FINANCIAL','OutputReconUpload',id,old,next,body.reason);return review(tx,updated);
   },{timeout:15000});
  });
- const confirmation=z.object({expectedUpdatedAt:timestamp,digest:z.string().regex(/^[a-f0-9]{64}$/),signingAssetId:z.uuid(),placement:placementSchema,confirmed:z.literal(true)}).strict();
+ const confirmation=z.object({expectedUpdatedAt:timestamp,digest:z.string().regex(/^[a-f0-9]{64}$/),signingAssetId:z.uuid().optional(),placement:placementSchema.optional(),confirmed:z.literal(true)}).strict();
  app.post('/api/v1/output-recon/uploads/:id/signed-preview',{onRequest:writeGuard('RECON_APPROVE',config)},async(request,reply)=>{
   if(producing)throw new CommandError(429,'Đang tạo PDF khác. Thử lại sau vài giây.');producing=true;
   try{const id=idOf(request.params),body=parse(confirmation,request.body),user=request.auth!;
    const bytes=await prisma.$transaction(async tx=>{const u=await get(tx,user.companyId,id);unchanged(u,body.expectedUpdatedAt);const v=await review(tx,u);
     if(v.digest!==body.digest||(!v.canFinalize&&u.status!=='APPROVED'))throw new CommandError(409,v.errors.join(' ')||'Hồ sơ đã thay đổi. Tải lại trước khi xem PDF.');
-    const a=await asset(tx,user.companyId,'SIGNING_COMPOSITE',body.signingAssetId);return stampPdf(await sourceBytes(u),a.bytes,a.document.attachment.mimeType,body.placement);
+    const source=await sourceBytes(u);
+    if(v.signingMode==='EXTERNAL_DIGITAL')return prepareReconDocument(v.signingMode,source);
+    if(!body.signingAssetId||!body.placement)throw new CommandError(400,'Cần ảnh dấu/chữ ký và vị trí ảnh.');
+    const a=await asset(tx,user.companyId,'SIGNING_COMPOSITE',body.signingAssetId);return prepareReconDocument(v.signingMode,source,{bytes:a.bytes,mime:a.document.attachment.mimeType,placement:body.placement});
    },{timeout:30000});return reply.type('application/pdf').header('Cache-Control','no-store').send(bytes);
   }finally{producing=false;}
  });
@@ -91,7 +97,9 @@ export async function reconFinalizeRoutes(app:FastifyInstance,config:AuthConfig)
     const u=await get(tx,user.companyId,id);unchanged(u,body.expectedUpdatedAt);const v=await review(tx,u);
     if(v.digest!==body.digest)throw new CommandError(409,'Số liệu, hợp đồng hoặc tài sản đã thay đổi. Xem lại trước khi chốt.');
     const placementOnly=u.status==='APPROVED';if(!placementOnly&&!v.canFinalize)throw new CommandError(409,v.errors.join(' ')||'PDF chưa đủ điều kiện chốt.');
-    const a=await asset(tx,user.companyId,'SIGNING_COMPOSITE',body.signingAssetId),bytes=await stampPdf(await sourceBytes(u),a.bytes,a.document.attachment.mimeType,body.placement);
+    if(v.signingMode==='IMAGE_STAMP'&&(!body.signingAssetId||!body.placement))throw new CommandError(400,'Cần ảnh dấu/chữ ký và vị trí ảnh.');
+    const a=v.signingMode==='IMAGE_STAMP'?await asset(tx,user.companyId,'SIGNING_COMPOSITE',body.signingAssetId!):null;
+    const bytes=await prepareReconDocument(v.signingMode,await sourceBytes(u),a?{bytes:a.bytes,mime:a.document.attachment.mimeType,placement:body.placement!}:undefined);
     const metadata=u.extractionData as any,oldFinal=metadata?.finalization;
     let reconciliationId:string|undefined=oldFinal?.reconciliationId;
     if(!placementOnly){
@@ -117,10 +125,10 @@ export async function reconFinalizeRoutes(app:FastifyInstance,config:AuthConfig)
     }else if(!reconciliationId||!await tx.reconciliation.findFirst({where:{id:reconciliationId,companyId:user.companyId,isCurrent:true,status:'APPROVED'}}))throw new CommandError(409,'Đối soát nguồn đã bị thay thế. Không chèn lại dấu.');
     const version=(oldFinal?.documentVersion??0)+1,doc=await persistPdf(tx,user,'OutputReconUpload',id,'RECON_SIGNED',financialFilename('Reconciliation',[u.service.serviceName],u.period,u.uploadCode,version),bytes,version,rollback);
     if(oldFinal?.documentId)await tx.document.updateMany({where:{companyId:user.companyId,id:oldFinal.documentId},data:{status:'SUPERSEDED'}});
-    const finalization={reconciliationId,documentId:doc.id,documentVersion:version,signingAssetId:a.document.id,signingAssetVersion:a.document.versionNo,signingAssetChecksum:a.document.attachment.checksumSha256,placement:body.placement,sourceChecksum:u.attachment.checksumSha256,approvedById:user.userId,approvedAt:new Date().toISOString(),placementOnly};
+    const finalization={reconciliationId,documentId:doc.id,documentVersion:version,signingMode:v.signingMode,signingAssetId:a?.document.id??null,signingAssetVersion:a?.document.versionNo??null,signingAssetChecksum:a?.document.attachment.checksumSha256??null,placement:a?body.placement:null,sourceChecksum:u.attachment.checksumSha256,approvedById:user.userId,approvedAt:new Date().toISOString(),placementOnly};
     const updated=await tx.outputReconUpload.update({where:{id},data:{status:'APPROVED',extractionData:{...metadata,financial:v.financial,identityVerified:true,financialDataVerified:true,finalization}},include});
-    await audit(tx,user,placementOnly?'RECON_RESTAMP':'RECON_FINALIZE','OutputReconUpload',id,{status:u.status,finalization:oldFinal??null},{status:updated.status,finalization,financial:v.financial});
-    return {item:stored(updated),finalization,message:placementOnly?'Đã lưu bản PDF mới; số liệu đã chốt được giữ nguyên.':'Đã chốt đối soát, doanh thu và lưu PDF có dấu/chữ ký. Có thể tạo Invoice.'};
+    await audit(tx,user,placementOnly?(v.signingMode==='EXTERNAL_DIGITAL'?'RECON_RESTORE_SOURCE':'RECON_RESTAMP'):'RECON_FINALIZE','OutputReconUpload',id,{status:u.status,finalization:oldFinal??null},{status:updated.status,finalization,financial:v.financial});
+    return {item:stored(updated),finalization,message:placementOnly?'Đã lưu bản PDF mới; số liệu đã chốt được giữ nguyên.':v.signingMode==='EXTERNAL_DIGITAL'?'Đã chốt đối soát và doanh thu; PDF gốc được giữ nguyên để ký số bên ngoài ERP. Có thể tạo Invoice.':'Đã chốt đối soát, doanh thu và lưu PDF có dấu/chữ ký. Có thể tạo Invoice.'};
    },{timeout:30000});return reply.code(201).send(result);
   }catch(e){try{await rollbackFiles(rollback);}catch(cleanup){request.log.error({err:cleanup},'Financial file rollback failed');}throw e;}finally{producing=false;}
  });
