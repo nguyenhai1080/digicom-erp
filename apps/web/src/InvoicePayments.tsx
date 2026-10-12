@@ -1,6 +1,7 @@
+import {formatMoney,formatNumber} from './numbers';
 import React,{useEffect,useState} from 'react';
 type Props={invoiceId:string;csrf:string;permissions:string[];request:(path:string,body?:unknown,csrf?:string)=>Promise<any>;onClose:()=>void;onSaved:()=>Promise<void>};
-const money=(v:string)=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v));
+const money=formatMoney;
 export function InvoicePayments({invoiceId,csrf,permissions,request,onClose,onSaved}:Props){
  const [data,setData]=useState<any>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[confirmed,setConfirmed]=useState(false),[file,setFile]=useState<File|null>(null);
  const [form,setForm]=useState({paymentDate:new Date().toLocaleDateString('en-CA'),paidUsd:'',paidVnd:'',fxRate:'',swiftNo:'',bankAccount:'',paymentMethod:'Bank Transfer',note:''}),[requestId,setRequestId]=useState(()=>crypto.randomUUID());
@@ -18,7 +19,7 @@ export function InvoicePayments({invoiceId,csrf,permissions,request,onClose,onSa
  }
  const inv=data?.invoice,eligible=inv&&['ISSUED','OVERDUE','PARTIALLY_PAID'].includes(inv.status)&&Number(inv.outstanding)>0;
  return <section className="invoice-preview"><div className="panel-heading"><h3>Thanh toán Invoice {inv?.invoiceNumber}</h3><button disabled={busy} onClick={onClose}>Đóng</button></div>
- {message&&<p className="notice" role="alert">{message}</p>}{inv&&<><section className="cards"><article><b>Phải thu {inv.currency}</b><p>{money(inv.payable)}</p></article><article><b>Đã thu {inv.currency}</b><p>{money(inv.paid)}</p></article><article><b>Còn phải thu {inv.currency}</b><p>{inv.outstanding===null?'Chưa phát hành':money(inv.outstanding)}</p></article></section>
+ {message&&<p className="notice" role="alert">{message}</p>}{inv&&<><section className="cards"><article><b>Phải thu {inv.currency}</b><p>{money(inv.payable,inv.currency)}</p></article><article><b>Đã thu {inv.currency}</b><p>{money(inv.paid,inv.currency)}</p></article><article><b>Còn phải thu {inv.currency}</b><p>{inv.outstanding===null?'Chưa phát hành':money(inv.outstanding,inv.currency)}</p></article></section>
  {eligible&&canPost&&<><h4>Ghi nhận tiền đã nhận</h4><div className="partner-grid">
  <label>Ngày thanh toán<input type="date" disabled={busy} value={form.paymentDate} onChange={e=>change('paymentDate',e.target.value)}/></label>
  {inv.currency==='USD'&&<label>Số tiền đã thu USD<input type="number" min="0.01" step="0.01" max={inv.outstanding} disabled={busy} value={form.paidUsd} onChange={e=>change('paidUsd',e.target.value)}/></label>}
@@ -32,6 +33,6 @@ export function InvoicePayments({invoiceId,csrf,permissions,request,onClose,onSa
  <p className="muted">{inv.currency==='VND'?'Tiền thu VND giảm công nợ VND.':'USD giảm công nợ; VND ghi nhận tiền thực thu.'} Tỷ giá không thay đổi doanh thu đã chốt.</p>
  <label className="check-label"><input type="checkbox" disabled={busy} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>Tôi đã kiểm tra chứng từ và xác nhận đã nhận khoản tiền này.</label>
  <button className="action-primary" disabled={busy||!confirmed||(inv.currency==='USD'&&!form.paidUsd)||!form.paidVnd||!form.bankAccount.trim()} onClick={()=>void save()}>{busy?'Đang ghi nhận…':'Ghi nhận thanh toán'}</button></>}
- <h4>Lịch sử thanh toán</h4><div className="table-scroll"><table><thead><tr><th>Mã / ngày</th><th>Đã thu {inv.currency}</th><th>Thực nhận VND</th><th>Tỷ giá</th><th>SWIFT / tài khoản</th><th>Chứng từ</th></tr></thead><tbody>{data.items.map((p:any)=><tr key={p.id}><td>{p.paymentCode}<small>{p.paymentDate.slice(0,10)}</small></td><td className="number">{money(inv.currency==='VND'?p.paidVnd:p.paidUsd)}</td><td className="number">{new Intl.NumberFormat('vi-VN').format(Number(p.paidVnd))}</td><td className="number">{p.fxRate}</td><td>{p.swiftNo||'—'}<small>{p.bankAccount} · {p.paymentMethod}</small><small>{p.note}</small></td><td>{p.documentId?<a href={'/api/v1/invoice-payments/'+p.id+'/document'} target="_blank" rel="noreferrer">Mở chứng từ</a>:'—'}</td></tr>)}</tbody></table></div>{!data.items.length&&<p className="muted">Chưa có thanh toán.</p>}</>}
+ <h4>Lịch sử thanh toán</h4><div className="table-scroll"><table><thead><tr><th>Mã / ngày</th><th>Đã thu {inv.currency}</th><th>Thực nhận VND</th><th>Tỷ giá</th><th>SWIFT / tài khoản</th><th>Chứng từ</th></tr></thead><tbody>{data.items.map((p:any)=><tr key={p.id}><td>{p.paymentCode}<small>{p.paymentDate.slice(0,10)}</small></td><td className="number">{money(inv.currency==='VND'?p.paidVnd:p.paidUsd,inv.currency)}</td><td className="number">{formatMoney(p.paidVnd,'VND')}</td><td className="number">{formatNumber(p.fxRate,0,8)}</td><td>{p.swiftNo||'—'}<small>{p.bankAccount} · {p.paymentMethod}</small><small>{p.note}</small></td><td>{p.documentId?<a href={'/api/v1/invoice-payments/'+p.id+'/document'} target="_blank" rel="noreferrer">Mở chứng từ</a>:'—'}</td></tr>)}</tbody></table></div>{!data.items.length&&<p className="muted">Chưa có thanh toán.</p>}</>}
  </section>;
 }

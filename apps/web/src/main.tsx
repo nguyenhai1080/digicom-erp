@@ -15,7 +15,7 @@ import { Users } from './Users';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.44';
+const version = '0.6.45';
 document.title = `ERP Core Web · v${version}`;
 async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
@@ -91,10 +91,10 @@ function App() {
   </section></main>;
   return <div className="shell"><aside><h2>ERP Core</h2><p className="sidebar-subtitle">Hệ thống quản lý công việc và tài chính<br/>{session.user.companyCode}</p><div className="nav-title">QUẢN LÝ</div><nav className="sidebar-nav" aria-label="Quản lý ERP">
     <button className={'nav ' + (page === 'dashboard' ? 'active' : '')} aria-current={page==='dashboard'?'page':undefined} onClick={() => { setPage('dashboard'); setMessage(''); }}>Dashboard</button>
+    {session.user.permissions.includes('PROJECT_VIEW') && <button className={'nav ' + (page === 'projects' ? 'active' : '')} aria-current={page==='projects'?'page':undefined} onClick={() => setPage('projects')}>Quản lý Dự án</button>}
     {session.user.permissions.includes('SERVICE_VIEW') && <button className={'nav ' + (page === 'services' ? 'active' : '')} aria-current={page==='services'?'page':undefined} onClick={() => setPage('services')}>Quản lý Dịch vụ</button>}
     {session.user.permissions.includes('PARTNER_VIEW') && <button className={'nav ' + (page === 'partners' ? 'active' : '')} aria-current={page==='partners'?'page':undefined} onClick={() => setPage('partners')}>Quản lý Đối tác</button>}
     {session.user.permissions.includes('CONTRACT_VIEW') && <button className={'nav ' + (page === 'contracts' ? 'active' : '')} aria-current={page==='contracts'?'page':undefined} onClick={() => setPage('contracts')}>Quản lý Hợp đồng</button>}
-    {session.user.permissions.includes('PROJECT_VIEW') && <button className={'nav ' + (page === 'projects' ? 'active' : '')} aria-current={page==='projects'?'page':undefined} onClick={() => setPage('projects')}>Quản lý Dự án</button>}
     {session.user.permissions.includes('RECON_VIEW') && <button className={'nav ' + (page === 'output-recon' ? 'active' : '')} aria-current={page==='output-recon'?'page':undefined} onClick={() => setPage('output-recon')}>Đối soát đầu ra</button>}
     {session.user.permissions.includes('REVENUE_VIEW') && <button className={'nav ' + (page === 'revenues' ? 'active' : '')} onClick={() => setPage('revenues')}>Quản lý Doanh thu</button>}
     {session.user.permissions.includes('AR_VIEW') && <button className={'nav ' + (page === 'receivables' ? 'active' : '')} onClick={() => setPage('receivables')}>Quản lý Công nợ</button>}
