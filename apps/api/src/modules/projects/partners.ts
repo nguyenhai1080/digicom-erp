@@ -48,7 +48,7 @@ export async function partnerRoutes(app: FastifyInstance, config: AuthConfig) {
     const where: Prisma.PartnerWhereInput = {companyId:request.auth!.companyId,
       ...(query.status==='ALL'?{}:query.status?{status:query.status}:{status:{in:['ACTIVE','PROSPECT']}}),
       ...(query.search ? { OR:['legalName','partnerKey','partnerCode','taxCode','email','invoiceEmail'].map(key=>({[key]:{contains:query.search,mode:'insensitive'}})) } : {})};
-    const limit=query.page ? 50 : 100;
+    const limit=query.page ? 10 : 100;
     const [items,total] = await prisma.$transaction([
       prisma.partner.findMany({where,take:limit,skip:((query.page??1)-1)*limit,orderBy:[{legalName:'asc'},{id:'asc'}],
         select:{id:true,partnerKey:true,partnerCode:true,legalName:true,partnerType:true,partnerCategory:true,countryName:true,countryCode:true,taxCode:true,email:true,status:true}}),

@@ -90,8 +90,8 @@ export async function outputReconRoutes(app:FastifyInstance,config:AuthConfig){
  });
  app.get('/api/v1/output-recon/uploads',{preHandler:requirePermission('RECON_VIEW')},async request=>{
   const q=parse(z.object({page:z.coerce.number().int().min(1).max(100000).default(1),period:month.optional(),search:z.string().trim().max(200).optional()}).strict(),request.query);
-  const where:Prisma.OutputReconUploadWhereInput={companyId:request.auth!.companyId,status:{not:'CANCELLED'},...(q.period?{period:q.period}:{}),...(q.search?{OR:[{uploadCode:{contains:q.search,mode:'insensitive'}},{partner:{legalName:{contains:q.search,mode:'insensitive'}}},{service:{serviceName:{contains:q.search,mode:'insensitive'}}}]}:{})};
-  const [items,total]=await prisma.$transaction([prisma.outputReconUpload.findMany({where,include,take:50,skip:(q.page-1)*50,orderBy:[{createdAt:'desc'},{id:'asc'}]}),prisma.outputReconUpload.count({where})]);return {items:items.map(dto),total,page:q.page,limit:50};
+  const where:Prisma.OutputReconUploadWhereInput={companyId:request.auth!.companyId,status:{not:'CANCELLED'},...(q.period?{period:q.period}:{}),...(q.search?{OR:[{uploadCode:{contains:q.search,mode:'insensitive'}},{partner:{legalName:{contains:q.search,mode:'insensitive'}}},{partner:{partnerKey:{contains:q.search,mode:'insensitive'}}},{service:{serviceName:{contains:q.search,mode:'insensitive'}}}]}:{})};
+  const [items,total]=await prisma.$transaction([prisma.outputReconUpload.findMany({where,include,take:10,skip:(q.page-1)*10,orderBy:[{createdAt:'desc'},{id:'asc'}]}),prisma.outputReconUpload.count({where})]);return {items:items.map(dto),total,page:q.page,limit:10};
  });
  app.post('/api/v1/output-recon/uploads',{bodyLimit:7*1024*1024,onRequest:writeGuard('RECON_UPLOAD',config)},async(request,reply)=>{
   if(!request.auth!.permissions.includes('RECON_VIEW'))throw new CommandError(403,'Cần quyền xem đối soát để nhận PDF.');

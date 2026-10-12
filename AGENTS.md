@@ -16,3 +16,7 @@ The owner clarified on 2026-10-08 that ERP Core must inherit the full existing E
 
 - Every data table displayed to users must provide pagination. Use 10 results per page by default, with previous/next controls and page/total counts. Apply this consistently to new and revised list views.
 
+
+## Owner partner display rule (2026-10-12)
+
+- Display partner keys in data tables instead of full legal names. Keep legal names available in profiles, hover text and financial documents.

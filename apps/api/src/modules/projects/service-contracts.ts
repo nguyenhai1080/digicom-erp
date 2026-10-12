@@ -68,9 +68,9 @@ export async function serviceContractRoutes(app:FastifyInstance,config:AuthConfi
   app.get('/api/v1/service-contracts',{preHandler:requirePermission('CONTRACT_VIEW')},async request=>{
     const q=parse(z.object({search:z.string().trim().max(200).optional(),page:z.coerce.number().int().min(1).max(100000).default(1),status:z.enum(statuses).optional()}).strict(),request.query);
     const where:Prisma.ContractWhereInput={companyId:request.auth!.companyId,dgcDirection:{not:null},...(q.status?{status:q.status}:{}),
-      ...(q.search?{OR:[{contractCode:{contains:q.search,mode:'insensitive'}},{contractNumber:{contains:q.search,mode:'insensitive'}},{contractName:{contains:q.search,mode:'insensitive'}},{partner:{legalName:{contains:q.search,mode:'insensitive'}}}]}:{})};
-    const [items,total]=await prisma.$transaction([prisma.contract.findMany({where,include,orderBy:[{createdAt:'desc'},{id:'asc'}],take:50,skip:(q.page-1)*50}),prisma.contract.count({where})]);
-    return {items,total,page:q.page,limit:50};
+      ...(q.search?{OR:[{contractCode:{contains:q.search,mode:'insensitive'}},{contractNumber:{contains:q.search,mode:'insensitive'}},{contractName:{contains:q.search,mode:'insensitive'}},{partner:{legalName:{contains:q.search,mode:'insensitive'}}},{partner:{partnerKey:{contains:q.search,mode:'insensitive'}}}]}:{})};
+    const [items,total]=await prisma.$transaction([prisma.contract.findMany({where,include,orderBy:[{createdAt:'desc'},{id:'asc'}],take:10,skip:(q.page-1)*10}),prisma.contract.count({where})]);
+    return {items,total,page:q.page,limit:10};
   });
   app.get('/api/v1/service-contracts/references',{preHandler:requirePermission('CONTRACT_VIEW')},async request=>{
     const companyId=request.auth!.companyId;
