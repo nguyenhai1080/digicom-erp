@@ -39,7 +39,7 @@ export async function readReconPdf(data:Buffer,forceOcr=false){
    result.push({page,method,text,...(ocrRotation?{ocrRotation}:{})});if(result.reduce((n,p)=>n+p.text.length,0)>200000)throw new CommandError(422,'Nội dung PDF vượt giới hạn đọc.');
   }
   const text=result.map(p=>p.text).join('\n\f\n');if(text.trim().length<50)throw new CommandError(422,'Không đọc đủ chữ từ PDF. Cần kiểm tra chất lượng scan.');
-  return {text,pages:result.map(({page,method,text,ocrRotation})=>({page,method,characters:text.length,...(ocrRotation?{ocrRotation}:{})})),engine:'poppler+tesseract-eng+osd',readerVersion:'0.6.47',forceOcr};
+  return {text,pages:result.map(({page,method,text,ocrRotation})=>({page,method,characters:text.length,...(ocrRotation?{ocrRotation}:{})})),engine:'poppler+tesseract-eng+osd',readerVersion:'0.6.49',forceOcr};
  }finally{try{if(directory)await rm(directory,{recursive:true,force:true});}finally{reading=false;}}
 }
 

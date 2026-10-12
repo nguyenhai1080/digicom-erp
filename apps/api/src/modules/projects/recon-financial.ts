@@ -1,13 +1,14 @@
 import {Prisma} from '@erp/db';
 import {parseReconIdentity,normalizeService} from './recon-identity.js';
 import {CommandError} from './commands.js';
+import {parseDigicomStatement} from './recon-digicom.js';
 
 // Characterized from deployed DGC v61: 21_Recon_OCR and 22_Recon_PDF_Approval.
 // Values remain decimal strings across JSON; never round already-rounded USD intermediates.
 export const fields=['totalServiceRevenue','ivaTax','serviceRevenueForSharing','remunerationProvider','wht','partnerRevenue'] as const;
 export type Amounts=Record<typeof fields[number],string>;
 export type Detail=Amounts & {lineNo:number;serviceName:string;costDeduction:string;sharingRate:string;distributionRatio:string;ratesMissing?:boolean;usd:Amounts;rowType:'TOTAL'|'CHILD'};
-export type Financial={version:1;source:string;exchangeRate:string|null;details:Detail[];mzn:Amounts|null;usd:Amounts|null;warnings:string[];errors:string[];ready:boolean;manual?:{reason:string;changes:{lineNo:number;before:string;after:string}[]}};
+export type Financial={version:1;source:string;nativeCurrency?:'VND';sourcePartnerKey?:'DIGICOM';native?:Amounts|null;exchangeRate:string|null;details:Detail[];mzn:Amounts|null;usd:Amounts|null;warnings:string[];errors:string[];ready:boolean;manual?:{reason:string;changes:{lineNo:number;before:string;after:string}[]}};
 const D=(v:string|number)=>new Prisma.Decimal(v);
 const r=(v:Prisma.Decimal)=>v.toDecimalPlaces(2,Prisma.Decimal.ROUND_HALF_UP).toFixed(2);
 const n=(v:string)=>D(v.replace(/,/g,''));
@@ -90,6 +91,7 @@ function historical(text:string,errors:string[],warnings:string[]):{a:Amounts;fx
  return {a:{totalServiceRevenue:gross,ivaTax:r(D(received).minus(sharing)),serviceRevenueForSharing:sharing,remunerationProvider:revenue,wht,partnerRevenue:payable},fx:D(payable).div(dollars.at(-1)!).toFixed(12)};
 }
 export function parseReconFinancial(raw:string):Financial{
+ const digicom=parseDigicomStatement(raw);if(digicom)return digicom;
  const wrapped=unwrapServiceCells(raw),p=parseReconIdentity(raw),text=wrapped.text.replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim(),errors:string[]=[],warnings:string[]=[];
  if(wrapped.changed)warnings.push('Tên dịch vụ và ô tiền xuống dòng đã ghép theo cột trong PDF; kiểm tra lại trên bản gốc.');
  let fx=p.exchangeRate,source='EXACT_TABLE',details:Detail[]=[],s=summaries(text,errors);
@@ -155,6 +157,7 @@ export function parseReconFinancial(raw:string):Financial{
  return {version:1,source,exchangeRate:fx,details,mzn:s.MZN??null,usd:s.USD??null,warnings,errors:[...new Set(errors)],ready:errors.length===0};
 }
 export function correctFinancial(source:Financial,changes:{lineNo:number;revenueMzn:string}[],reason:string):Financial{
+ if(source.nativeCurrency)throw new CommandError(409,'Số liệu DIGICOM lấy từ PDF gốc; nhận lại PDF đúng để sửa, không tính WHT theo mẫu MOVITEL.');
  if(!source.ready||!source.exchangeRate)throw new CommandError(409,'Bảng gốc chưa đủ điều kiện sửa Revenue.');
  const result:Financial=structuredClone(source),editable=result.details.filter(d=>d.rowType==='CHILD'||result.details.length===1);
  if(new Set(changes.map(v=>v.lineNo)).size!==changes.length||changes.some(c=>!editable.some(d=>d.lineNo===c.lineNo)))throw new CommandError(400,'Chỉ sửa Revenue trên dòng dịch vụ; tổng gộp tự đồng bộ.');
