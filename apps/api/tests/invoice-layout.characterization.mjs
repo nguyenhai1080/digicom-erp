@@ -20,3 +20,13 @@ const vnd={...data,currency:'VND',lines:[{...data.lines[0],serviceName:'FILM CIN
 const vndPdf=await renderGstInvoice(vnd,profile,signing,{...placement,y:.82});assert.equal((await PDFDocument.load(vndPdf)).getPageCount(),1);
 if(process.env.FINANCE_PROOF_ROOT){await mkdir(process.env.FINANCE_PROOF_ROOT,{recursive:true});await writeFile(process.env.FINANCE_PROOF_ROOT+'/synthetic-vnd-invoice.pdf',vndPdf);}
 console.log('VND invoice: currency-labelled one-page PDF and native amounts passed.');
+
+// Suggested position follows the actual footer, for VND, USD and long invoices.
+for(const sample of [vnd,data,many]){
+ let suggested;
+ await renderGstInvoice(sample,profile,signing,placement,false,p=>{suggested=p;});
+ const pdf=await renderGstInvoice(sample,profile,signing,suggested);
+ assert.equal(suggested.page,(await PDFDocument.load(pdf)).getPageCount());
+ assert.ok(suggested.y<.77);
+}
+console.log('Adaptive invoice signing: actual footer position and final-page placement passed.');

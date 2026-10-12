@@ -53,7 +53,7 @@ function vndWorkbook(data:InvoiceData){
  const sheet='<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="30" customWidth="1"/><col min="2" max="2" width="65" customWidth="1"/><col min="3" max="5" width="25" customWidth="1"/></cols><sheetData>'+rows.map((r,i)=>'<row r="'+(i+1)+'">'+r.map((v,j)=>'<c r="'+String.fromCharCode(65+j)+(i+1)+'"'+(typeof v==='number'?'><v>'+v+'</v>':' t="inlineStr"><is><t xml:space="preserve">'+xml(v)+'</t></is>')+'</c>').join('')+'</row>').join('')+'</sheetData></worksheet>';
  zip.addFile('xl/worksheets/sheet1.xml',Buffer.from(sheet));return zip.toBuffer();
 }
-export async function renderGstInvoice(data:InvoiceData,template:ReturnType<typeof readGstTemplate>,signing:{bytes:Buffer;mime:string|null},placement:Placement,includeSigning=true){
+export async function renderGstInvoice(data:InvoiceData,template:ReturnType<typeof readGstTemplate>,signing:{bytes:Buffer;mime:string|null},placement:Placement,includeSigning=true,onLayout?:(placement:Placement)=>void){
  const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
  const unicode=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/NotoSans-Regular.ttf',import.meta.url))),{subset:true});
  const regular=await doc.embedFont(StandardFonts.TimesRoman),bold=await doc.embedFont(StandardFonts.TimesRomanBold),italic=await doc.embedFont(StandardFonts.TimesRomanItalic);
@@ -106,6 +106,10 @@ export async function renderGstInvoice(data:InvoiceData,template:ReturnType<type
  rule(y+5,.6);text('PAYMENT DETAILS',left+2,y-4,8.5,bold,accent);y-=18;
  for(const [label,value] of banks){text(label,left+2,y,7.5,bold);y=block(value,left+77,y,width-77,7.5)-3;}
  rule(y+4);
+ // Start the signature block directly below the payment footer. Derive this
+ // from actual wrapped text and the final page, rather than a fixed 77%.
+ const last=doc.getPage(doc.getPageCount()-1);
+ onLayout?.({page:doc.getPageCount(),x:.56,y:(last.getHeight()-y+34)/last.getHeight(),width:.28});
  if(doc.getPageCount()>12)throw new CommandError(422,'Invoice vượt giới hạn 12 trang. Tách theo dịch vụ.');
  if(placement.page>doc.getPageCount())throw new CommandError(400,'Trang ký Invoice không tồn tại.');
  const signaturePage=doc.getPage(doc.getPageCount()-1),signatureLabel='For and on behalf of GST',signatureLabelSize=8.5;
