@@ -21,7 +21,7 @@ const key=(s:string)=>normalizeService(s).replace(/[^A-Z0-9]/g,'');
 function summary(values:string[]):Amounts{return Object.fromEntries(fields.map((f,i)=>[f,values[i]])) as Amounts;}
 // Poppler -layout retains physical columns. A multiline service cell may put
 // its name above/below a numbered row whose money cells are on the middle line.
-// Join only standalone text wholly inside that row's service-name column.
+// Join service text and wrapped money only at their original physical columns.
 // Raw extracted text and the original PDF are never modified in storage.
 function unwrapServiceCells(raw:string){
  const lines=raw.replace(/\r/g,'').split('\n');let changed=false;
@@ -29,11 +29,26 @@ function unwrapServiceCells(raw:string){
   const row=lines[i],m=row.match(new RegExp('^(\\s*)(\\d{1,3})(\\s+)([A-Za-z][A-Za-z0-9_() /&+.-]{0,59}?\\s+)?(?='+moneyPattern+')'));
   if(!m||!/\bIn\s+MZN\b/i.test(lines.slice(i+1).join('\n')))continue;
   const start=m[1].length+m[2].length+1,end=m[0].length;
-  const cell=(line:string)=>{const name=line.slice(start,end).trim();return name&&name===line.trim()&&/^[A-Za-z][A-Za-z0-9_() /&+.-]{0,59}$/.test(name)?name:'';};
+  const cell=(line:string)=>{
+   const name=line.slice(start,end).trim(),tail=line.slice(end);
+   if(!name||line.slice(0,start).trim()||!/^[A-Za-z][A-Za-z0-9_() /&+.-]{0,59}$/.test(name)||!new RegExp('^(?:\\s*'+moneyPattern+')*\\s*$').test(tail))return null;
+   const money=[...tail.matchAll(new RegExp(moneyPattern,'g'))].map(v=>({index:end+v.index!,text:v[0]}));
+   return {name,money};
+  };
   const before=cell(lines[i-1]),after=cell(lines[i+1]),inline=m[4]?.trim()??'';
   if(!before&&!after)continue;
-  const name=[before,inline,after].filter(Boolean).join(' ');if(name.length>60)continue;
-  lines[i]=m[1]+m[2]+' '+name+' '+row.slice(end);
+  const name=[before?.name,inline,after?.name].filter(Boolean).join(' ');if(name.length>60)continue;
+  // Print-to-PDF can wrap the final Payable cell onto the name continuation
+  // line. Restore only numeric cells whose original column is vacant; never
+  // overwrite money already present or infer a missing amount from totals.
+  let merged=row,invalid=false;
+  for(const part of [before,after])for(const value of part?.money??[]){
+   if(merged.slice(value.index,value.index+value.text.length).trim()){invalid=true;break;}
+   merged=merged.padEnd(value.index+value.text.length,' ');
+   merged=merged.slice(0,value.index)+value.text+merged.slice(value.index+value.text.length);
+  }
+  if(invalid)continue;
+  lines[i]=m[1]+m[2]+' '+name+' '+merged.slice(end);
   if(before)lines[i-1]='';if(after)lines[i+1]='';changed=true;
  }
  return {text:lines.join('\n'),changed};
@@ -76,7 +91,7 @@ function historical(text:string,errors:string[],warnings:string[]):{a:Amounts;fx
 }
 export function parseReconFinancial(raw:string):Financial{
  const wrapped=unwrapServiceCells(raw),p=parseReconIdentity(raw),text=wrapped.text.replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim(),errors:string[]=[],warnings:string[]=[];
- if(wrapped.changed)warnings.push('Tên dịch vụ nhiều dòng đã ghép theo cột trong PDF; kiểm tra lại trên bản gốc.');
+ if(wrapped.changed)warnings.push('Tên dịch vụ và ô tiền xuống dòng đã ghép theo cột trong PDF; kiểm tra lại trên bản gốc.');
  let fx=p.exchangeRate,source='EXACT_TABLE',details:Detail[]=[],s=summaries(text,errors);
  if(fx&&D(fx).lte(0))fx=null;
  const legacy=historical(text,errors,warnings);

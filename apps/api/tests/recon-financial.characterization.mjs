@@ -71,6 +71,16 @@ const inlinePrefix=meubeatWrappedText.replace('        MEUBEAT\n1               
 const inlineSuffix=meubeatWrappedText.replace('1                                       ', '1       APP                            ').replace('\n        APP\n','\n');
 for(const text of [inlinePrefix,inlineSuffix]){const parsed=parseReconFinancial(text);check(parsed.ready,true);check(parsed.details.map(d=>d.serviceName),['MEUBEAT_APP','MEUBEAT_IVR','MEUBEAT']);check(parsed.mzn,wrapped.mzn);check(parsed.usd,wrapped.usd);}
 const missingApp=parseReconFinancial(meubeatWrappedText.replace('        MEUBEAT\n','').replace('\n        APP\n','\n'));
+// Poppler can wrap both APP and its final Payable money cell onto the next
+// physical line. Keep the amount's column, without borrowing summary totals.
+const firstRow=inlinePrefix.split('\n').find(v=>v.startsWith('1 '));
+const payableColumn=firstRow.lastIndexOf('90.00');
+const wrappedPayable=inlinePrefix.replace(firstRow,firstRow.slice(0,payableColumn)).replace('\n        APP\n','\n'+'        APP'.padEnd(payableColumn)+'90.00\n');
+const recovered=parseReconFinancial(wrappedPayable);
+check(recovered.ready,true);check(recovered.details.map(d=>d.serviceName),['MEUBEAT_APP','MEUBEAT_IVR','MEUBEAT']);check(recovered.mzn,wrapped.mzn);check(recovered.usd,wrapped.usd);check(recovered.details[0].partnerRevenue,'90.00');
+check(parseReconFinancial(wrappedPayable.replace('        APP'.padEnd(payableColumn)+'90.00','        APP')).ready,false);
+const overlap=inlinePrefix.replace('\n        APP\n','\n'+'        APP'.padEnd(firstRow.indexOf('1,160.00'))+'90.00\n');
+check(parseReconFinancial(overlap).ready,false);
 check(missingApp.ready,false);check(missingApp.details.find(d=>d.serviceName==='MEUBEAT_IVR')?.rowType,'CHILD');check(missingApp.details.find(d=>d.serviceName==='MEUBEAT_IVR')?.usd.partnerRevenue,'1.40');
 const edited=correctFinancial(b,[{lineNo:1,revenueMzn:'200'}],'Synthetic verified correction');check(edited.details[0].wht,'20.00');check(edited.details[0].partnerRevenue,'180.00');check(edited.mzn.remunerationProvider,'400.00');check(edited.mzn.wht,'40.00');check(edited.usd.partnerRevenue,'5.58');check(edited.details.at(-1).usd.partnerRevenue,'5.58');
 check(correctFinancial(a,[{lineNo:1,revenueMzn:'100.00'}],'unchanged').usd.partnerRevenue,'1.40');
