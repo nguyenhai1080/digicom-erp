@@ -27,7 +27,14 @@ export function parseDigicomStatement(raw:string):Financial|null{
  // The supplied form prints "5=3-4", although USD-to-VND conversion is
  // multiplication. Validate the reported amounts; never rewrite the source.
  if(whole(upstream.mul(fx))!==whole(pool))errors.push('Doanh thu hợp tác VND không khớp USD nguồn × tỷ giá.');
- if(whole(pool.mul(gstRate).div(100))!==whole(gst)||whole(pool.mul(otherRate).div(100))!==whole(other))errors.push('Số tiền chia sẻ không khớp tỷ lệ trong PDF.');
+ // Statements may round each share from the full USD × FX value before
+ // printing the whole-VND pool. Require one consistent calculation order
+ // for both parties; never accept an arbitrary one-dong tolerance.
+ const sharesMatch=(base:Prisma.Decimal)=>whole(base.mul(gstRate).div(100))===whole(gst)&&whole(base.mul(otherRate).div(100))===whole(other);
+ if(!sharesMatch(pool)){
+  if(sharesMatch(upstream.mul(fx)))result.warnings.push('PDF chia sẻ trên số USD × tỷ giá chưa làm tròn. Giữ nguyên số GST thực nhận trên biên bản.');
+  else errors.push('Số tiền chia sẻ không khớp tỷ lệ trong PDF.');
+ }
  const total=text.match(new RegExp('Tổng cộng\\s+('+num+')\\s+('+num+')\\s+('+num+')\\s+('+num+')','i'));
  if(!total||![upstream,pool,other,gst].every((v,i)=>v.eq(D(total[i+1]))))errors.push('Dòng tổng DIGICOM không khớp dòng dịch vụ.');
  const footer=text.match(new RegExp('Tổng số tiền Digicom phải trả cho GST[^:]{0,100}:\\s*(?:VND\\s*)?('+num+')','i'));

@@ -46,3 +46,17 @@ assert.equal(parseReconFinancial(vietnamese.replace('VND 375.000','VND 370.000')
 assert.equal(parseReconFinancial(vietnamese.replace('USD1 = VND 25.000','USD1 = VND 25,000')).ready,false);
 assert.equal(parseReconFinancial(source.replace('VND 375,000','VND 375.000')).ready,false);
 console.log('PASS: Vietnamese and English separators agree; mixed formatting and changed totals remain blocked.');
+
+// Fabricated cents demonstrate rounding the shares before rounding the pool.
+// 31.43 × 1,010 = 31,744.30; 85% rounds to 26,983, while the printed
+// whole-VND pool × 85% rounds to 26,982. Both valid orders retain GST 4,762.
+const beforePool=source.replaceAll('100.00','31.43').replaceAll('2,500,000','31,744').replaceAll('2,125,000','26,983').replaceAll('375,000','4,762').replaceAll('25,000','1,010');
+const before=parseReconFinancial(beforePool);
+assert.equal(before.ready,true);assert.equal(before.native.partnerRevenue,'4762');
+assert(before.warnings.some(v=>v.includes('chưa làm tròn')));
+assert.equal(parseReconFinancial(beforePool.replaceAll('26,983','26,982')).ready,true);
+assert.equal(parseReconFinancial(beforePool.replaceAll('26,983','26,984')).ready,false);
+assert.equal(parseReconFinancial(beforePool.replaceAll('4,762','4,761')).ready,false);
+assert.equal(parseReconFinancial(beforePool.replaceAll('31,744','31,745')).ready,false);
+assert.equal(parseReconFinancial(beforePool.replace('VND 4,762','VND 4,761')).ready,false);
+console.log('PASS: full-precision share rounding is supported; arbitrary one-dong differences and altered totals are blocked.');
