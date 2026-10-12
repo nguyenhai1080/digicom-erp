@@ -4,7 +4,7 @@ import {InvoicePayments} from './InvoicePayments';
 import React,{useEffect,useRef,useState} from 'react';
 import {pdfPreview,SigningControls,type Placement} from './FinancialReview';
 type Props={permissions:string[];csrf:string;request:(path:string,body?:unknown,csrf?:string)=>Promise<any>};
-const initialPlacement:Placement={page:1,x:.56,y:.78,width:.28};
+const initialPlacement:Placement={page:1,x:.56,y:.77,width:.28};
 function InvoiceCanvas({src,assetId,placement,onChange,disabled}:{src:string;assetId:string;placement:Placement;onChange:(p:Placement)=>void;disabled:boolean}){
  const area=useRef<HTMLDivElement>(null),drag=useRef<{x:number;y:number}|null>(null);
  return <div className="signing-canvas invoice-canvas" ref={area}><img className="scan-image" src={src} alt="Trang Invoice GST trước khi chèn ảnh"/><img className="signing-overlay" src={'/api/v1/invoices/signing-asset?v='+assetId} alt="Dấu, chữ ký, chức danh GST" draggable={false} style={{left:placement.x*100+'%',top:placement.y*100+'%',width:placement.width*100+'%'}} onPointerDown={e=>{if(disabled)return;const r=area.current!.getBoundingClientRect();drag.current={x:e.clientX-r.left-placement.x*r.width,y:e.clientY-r.top-placement.y*r.height};e.currentTarget.setPointerCapture(e.pointerId);}} onPointerMove={e=>{if(!drag.current)return;const r=area.current!.getBoundingClientRect();onChange({...placement,x:Math.max(0,Math.min(1-placement.width,(e.clientX-r.left-drag.current.x)/r.width)),y:Math.max(0,Math.min(1-e.currentTarget.offsetHeight/r.height,(e.clientY-r.top-drag.current.y)/r.height))});}} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}/></div>;
