@@ -26,14 +26,15 @@ function summary(values:string[]):Amounts{return Object.fromEntries(fields.map((
 function unwrapServiceCells(raw:string){
  const lines=raw.replace(/\r/g,'').split('\n');let changed=false;
  for(let i=1;i<lines.length-1;i++){
-  const row=lines[i],m=row.match(new RegExp('^(\\s*)(\\d{1,3})(\\s+)(?='+moneyPattern+')'));
+  const row=lines[i],m=row.match(new RegExp('^(\\s*)(\\d{1,3})(\\s+)([A-Za-z][A-Za-z0-9_() /&+.-]{0,59}?\\s+)?(?='+moneyPattern+')'));
   if(!m||!/\bIn\s+MZN\b/i.test(lines.slice(i+1).join('\n')))continue;
   const start=m[1].length+m[2].length+1,end=m[0].length;
   const cell=(line:string)=>{const name=line.slice(start,end).trim();return name&&name===line.trim()&&/^[A-Za-z][A-Za-z0-9_() /&+.-]{0,59}$/.test(name)?name:'';};
-  const before=cell(lines[i-1]),after=cell(lines[i+1]);
-  if(!before||!after)continue;
-  const name=before+' '+after;if(name.length>60)continue;
-  lines[i]=m[1]+m[2]+' '+name+' '+row.slice(end);lines[i-1]='';lines[i+1]='';changed=true;
+  const before=cell(lines[i-1]),after=cell(lines[i+1]),inline=m[4]?.trim()??'';
+  if(!before&&!after)continue;
+  const name=[before,inline,after].filter(Boolean).join(' ');if(name.length>60)continue;
+  lines[i]=m[1]+m[2]+' '+name+' '+row.slice(end);
+  if(before)lines[i-1]='';if(after)lines[i+1]='';changed=true;
  }
  return {text:lines.join('\n'),changed};
 }
@@ -113,7 +114,7 @@ export function parseReconFinancial(raw:string):Financial{
    if(children.length!==3||!['VOICEMAIL','ISIGN','MCA'].every(v=>children.some(d=>key(d.serviceName)===v)))errors.push('Bảng gộp MCAVM-ISIGN chưa đọc đủ ba dòng con VOICEMAIL/ISIGN/MCA.');
    else details=children;
   }
-  if(key(p.service)==='MEUBEAT'&&/\bMEUBEAT[ _-]+APP\b/i.test(text)&&/\bMEUBEAT[ _-]+IVR\b/i.test(text)){
+  if(key(p.service)==='MEUBEAT'&&(details.some(d=>key(d.serviceName)!==key(p.service))||(/\bMEUBEAT[ _-]+APP\b/i.test(text)&&/\bMEUBEAT[ _-]+IVR\b/i.test(text)))){
    const children=details.filter(d=>key(d.serviceName)!==key(p.service));
    if(children.length!==2||!['MEUBEATAPP','MEUBEATIVR'].every(v=>children.some(d=>key(d.serviceName)===v)))errors.push('MEUBEAT chưa đọc đủ hai dòng con MEUBEAT APP và MEUBEAT IVR.');
    else details=children;
@@ -129,7 +130,7 @@ export function parseReconFinancial(raw:string):Financial{
   for(const d of details)if(!close(r(D(d.remunerationProvider).minus(d.wht)),d.partnerRevenue))errors.push('Revenue−WHT khác Payable MZN ở '+d.serviceName+'.');
   for(const f of fields)if(!close(sum(details)[f],s.MZN[f],f==='ivaTax'?'0.05':'0.02'))errors.push('Tổng dòng '+f+' không khớp bảng MZN.');
   for(const f of fields)if(!close(convert(s.MZN,fx)[f],s.USD[f]))errors.push('Bảng USD '+f+' không khớp tỷ giá/bảng MZN.');
-  if(details.length===1){details[0].rowType='TOTAL';details[0].usd=s.USD;}
+  if(details.length===1&&key(details[0].serviceName)===key(p.service)){details[0].rowType='TOTAL';details[0].usd=s.USD;}
   else if(s.MZN){details=details.map((d,i)=>({...d,lineNo:i+1,rowType:'CHILD' as const}));const total=detail(s.MZN,p.service,details.length+1,fx);total.rowType='TOTAL';total.usd=s.USD;details.push(total);}
  }
  const footer=p.totalRevenueUsd,words=p.totalRevenueText?englishMoneyWords(p.totalRevenueText):null;

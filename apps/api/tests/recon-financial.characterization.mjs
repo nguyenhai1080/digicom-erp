@@ -66,6 +66,12 @@ check(parseReconFinancial(meubeatWrappedText.replace('        APP','        APP 
 check(parseReconFinancial(meubeatWrappedText.replace('        APP',' '.repeat(50)+'APP')).ready,false);
 check(parseReconFinancial(meubeatWrappedText.replace(/2 MEUBEAT IVR.*\n/,'')).ready,false);
 check(parseReconFinancial(meubeatWrappedText.replace('200.00 20.00 180.00','201.00 20.00 180.00')).ready,false);
+// Print-to-PDF may align either half of a multiline name with the money cells.
+const inlinePrefix=meubeatWrappedText.replace('        MEUBEAT\n1                                       ', '1       MEUBEAT                         ');
+const inlineSuffix=meubeatWrappedText.replace('1                                       ', '1       APP                            ').replace('\n        APP\n','\n');
+for(const text of [inlinePrefix,inlineSuffix]){const parsed=parseReconFinancial(text);check(parsed.ready,true);check(parsed.details.map(d=>d.serviceName),['MEUBEAT_APP','MEUBEAT_IVR','MEUBEAT']);check(parsed.mzn,wrapped.mzn);check(parsed.usd,wrapped.usd);}
+const missingApp=parseReconFinancial(meubeatWrappedText.replace('        MEUBEAT\n','').replace('\n        APP\n','\n'));
+check(missingApp.ready,false);check(missingApp.details.find(d=>d.serviceName==='MEUBEAT_IVR')?.rowType,'CHILD');check(missingApp.details.find(d=>d.serviceName==='MEUBEAT_IVR')?.usd.partnerRevenue,'1.40');
 const edited=correctFinancial(b,[{lineNo:1,revenueMzn:'200'}],'Synthetic verified correction');check(edited.details[0].wht,'20.00');check(edited.details[0].partnerRevenue,'180.00');check(edited.mzn.remunerationProvider,'400.00');check(edited.mzn.wht,'40.00');check(edited.usd.partnerRevenue,'5.58');check(edited.details.at(-1).usd.partnerRevenue,'5.58');
 check(correctFinancial(a,[{lineNo:1,revenueMzn:'100.00'}],'unchanged').usd.partnerRevenue,'1.40');
 assert.throws(()=>correctFinancial(b,[{lineNo:4,revenueMzn:'200'}],'bad'));checks++;
