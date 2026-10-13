@@ -125,6 +125,6 @@ export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
   const file=await prisma.$transaction(async tx=>{const i=await tx.invoice.findFirst({where:{companyId,id}});if(!i||i.status==='CANCELLED')throw new CommandError(404,'Không tìm thấy Invoice của công ty.');
    if(q.format==='pdf'){const d=await derivedBytes(tx,companyId,i.documentId,'INVOICE');return {bytes:d.bytes,mime:'application/pdf',name:financialFilename('Invoice',invoiceServices(i.snapshot),i.period,i.invoiceNumber,i.revisionNo)};}
    const d=await tx.document.findFirst({where:{companyId,id:(i.snapshot as any).workbookDocumentId,entityId:id,entityType:'Invoice',documentType:'INVOICE_WORKBOOK'},include:{attachment:true}});if(!d||d.attachment.companyId!==companyId)throw new CommandError(404,'Không tìm thấy workbook Invoice.');const ext=d.attachment.storedFilename.endsWith('.xlsm')?'xlsm':'xlsx';return {bytes:await checkedFile(d.attachment,`invoices/${companyId}/${d.attachment.id}.${ext}`,5*1024*1024),mime:d.attachment.mimeType!,name:financialFilename('Invoice',invoiceServices(i.snapshot),i.period,i.invoiceNumber,i.revisionNo,ext)};
-  });return reply.type(file.mime).header('Cache-Control','no-store').header('X-Content-Type-Options','nosniff').header('Content-Disposition','attachment; filename="'+file.name+'"').send(file.bytes);
+  });return reply.type(file.mime).header('Cache-Control','no-store').header('X-Content-Type-Options','nosniff').header('Content-Disposition',(q.format==='pdf'?'inline':'attachment')+'; filename="'+file.name+'"').send(file.bytes);
  });
 }
