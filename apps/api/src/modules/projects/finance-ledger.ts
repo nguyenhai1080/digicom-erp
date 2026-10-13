@@ -13,6 +13,10 @@ const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v);
 const fixed=(v:Prisma.Decimal)=>v.toDecimalPlaces(2,Prisma.Decimal.ROUND_HALF_UP).toFixed(2);
 const sent=['ISSUED','OVERDUE','PARTIALLY_PAID','PAID'];
 const idSchema=z.object({id:z.uuid()}).strict();
+export const invoiceIssueConfirmation=z.union([
+ z.object({digest:z.string().regex(/^[a-f0-9]{64}$/),confirmedSent:z.literal(true)}).strict(),
+ z.object({digest:z.string().regex(/^[a-f0-9]{64}$/),confirmedHistorical:z.literal(true),historicalReason:z.string().trim().min(10).max(1000)}).strict(),
+]);
 const period=z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/);
 const filters=z.object({period:period.optional(),partnerId:z.uuid().optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict();
 function fail(message:string):never{throw new CommandError(409,message);}
@@ -82,7 +86,7 @@ export async function financeLedgerRoutes(app:FastifyInstance,config:AuthConfig)
   return prisma.$transaction(async tx=>{const p=await issuePlan(tx,request.auth!.companyId,id);return {digest:p.digest,mode:p.selected.invoiceMode,items:p.candidates.map(i=>({id:i.id,invoiceNumber:i.invoiceNumber,payableAmount:fixed(i.payableAmount),dueDate:i.dueDate,currency:i.currency})),message:'Xác nhận Invoice đã gửi cho đối tác. Công nợ theo tiền tệ của từng Invoice.'};},{isolationLevel:'RepeatableRead',timeout:30000});
  });
  app.post('/api/v1/invoices/:id/issue',{onRequest:writeGuard('INVOICE_ISSUE',config)},async request=>{
-  const {id}=parse(idSchema,request.params),body=parse(z.object({digest:z.string().regex(/^[a-f0-9]{64}$/),confirmedSent:z.literal(true)}).strict(),request.body),user=request.auth!;
+  const {id}=parse(idSchema,request.params),body=parse(invoiceIssueConfirmation,request.body),user=request.auth!,historical='confirmedHistorical' in body;
   return prisma.$transaction(async tx=>{
    const inv=await tx.invoice.findFirst({where:{companyId:user.companyId,id}});if(!inv)throw new CommandError(404,'Không tìm thấy Invoice.');
    await financialPeriodLock(tx,user.companyId,inv.partnerId,inv.period);await tx.$queryRaw`SELECT id FROM companies WHERE id=${user.companyId}::uuid FOR UPDATE`;
@@ -95,7 +99,7 @@ export async function financeLedgerRoutes(app:FastifyInstance,config:AuthConfig)
     const sourceIds=i.scopes.flatMap(s=>s.items.map(v=>v.revenueId));
     await tx.revenue.updateMany({where:{companyId:user.companyId,id:{in:sourceIds}},data:{status:'INVOICED'}});
     if(await tx.accountReceivable.count({where:{companyId:user.companyId,invoiceId:i.id}})!==1)fail('Invoice phải có đúng một khoản phải thu.');
-    await audit(tx,user,'INVOICE_ISSUE','Invoice',i.id,{status:'DRAFT'},{status:'ISSUED',issuedAt:now,receivableId:ar.id,originalAmount:fixed(ar.originalAmount)},'Xác nhận đã gửi Invoice và tạo phải thu');
+    await audit(tx,user,'INVOICE_ISSUE','Invoice',i.id,{status:'DRAFT'},{status:'ISSUED',issuedAt:now,receivableId:ar.id,originalAmount:fixed(ar.originalAmount),publicationMode:historical?'HISTORICAL':'SENT',...(historical?{historicalReason:body.historicalReason}:{})},historical?'Ghi nhận phát hành lịch sử và tạo phải thu: '+body.historicalReason:'Xác nhận đã gửi Invoice và tạo phải thu');
     issued.push({id:i.id,invoiceNumber:i.invoiceNumber,receivableId:ar.id});
    }
    return {items:issued,message:'Đã phát hành '+issued.length+' Invoice và ghi nhận '+issued.length+' khoản phải thu theo tiền tệ gốc.'};

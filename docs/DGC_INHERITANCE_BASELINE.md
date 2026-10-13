@@ -54,6 +54,12 @@ These are concrete examples from version 61; the complete ruleset still requires
 
 ## Revised implementation order
 
+### Owner-authorized historical records (2026-10-13)
+
+The owner requested spreadsheet history to be imported, approved, invoiced, published within ERP and settled according to the received-payment column. Historical publication is recorded separately from confirmation that an Invoice was sent. Both use the inherited issue plan, source/file integrity, permission, digest and one-current-receivable guards from `40_Invoice_Core.js`.
+
+`51_Payment_Transaction.js:recordInvoicePayment` requires USD allocation plus actual VND bank receipt. The historical extension preserves those requirements for ordinary receipts and adds explicit source-referenced historical receipts in their original cash currency. Allocation amount, cash amount and cash currency are stored separately; unknown VND receipts/FX are null and unknown bank accounts stay empty. A reporting conversion may allocate an original USD receipt to an owner-authorized VND historical Invoice; it is marked as a reporting conversion, not actual bank FX. Invoice, current AR and source revenue update atomically through the shared payment command, with existing stale-source, balance, permission, idempotency and rollback guards. Missing historical receipt dates may use period-end plus 60 days only when the owner confirms that basis; the basis remains visible in payment history.
+
 1. Freeze the donor snapshot and build complete UI/action/field/status/role/calculation/effect maps from it. Resolve known target differences and source ambiguities. Preserve source provenance for each implemented command.
 2. Bring inherited commercial master data to parity: service, partner, account/category and service contract features. Keep the existing GST identity; project-specific contract drafts remain an extension.
 3. Restore the operational service chain in dependency order: output PDF/OCR → reviewed reconciliation → approved revenue → Invoice preview/issue/revision → current AR → payment and balance updates.
