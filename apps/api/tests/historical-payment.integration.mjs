@@ -54,6 +54,12 @@ try{
   check(rows.map(r=>[r.allocation_currency,r.paid_usd.toString(),r.paid_vnd.toString(),r.fx_rate.toString(),r.allocation_amount.toString(),r.cash_currency,r.cash_amount.toString()]),[['USD','25','650000','26000','25','VND','650000'],['VND','0','800','1','800','VND','800']]);
  });
  for(const [kind,bytes,filename] of [['SIGNING_COMPOSITE',png,'signing.png'],['INVOICE_TEMPLATE',template.toBuffer(),'template.xlsm']])check((await post('/api/v1/company-assets',{kind,filename,base64:bytes.toString('base64'),expectedCurrentId:null,reason:'Synthetic test asset'})).statusCode,201);
+ const bankInput={accountCode:'BANK_TEST',name:'Synthetic VND bank',kind:'BANK',currency:'VND',bankName:'Synthetic bank',accountNumber:'000000TEST',holderName:'Synthetic company',openingDate:'2010-01-01',openingBalance:'1000',note:'Synthetic test only',confirmed:true};
+ check((await post('/api/v1/cash-accounts',{...bankInput,confirmed:false})).statusCode,400);
+ check((await post('/api/v1/cash-accounts',{...bankInput,openingBalance:'1.5'})).statusCode,400);
+ check((await post('/api/v1/cash-accounts',bankInput,{'x-csrf-token':'invalid'})).statusCode,403);
+ const bankResponse=await post('/api/v1/cash-accounts',bankInput);check(bankResponse.statusCode,200);const bank=bankResponse.json().item;
+ check(bank.balance,'1000');check(await prisma.cashEntry.count({where:{companyId:company.id}}),1);
  const inv=await makeInvoice('USD','2024-04','100.00'),url='/api/v1/invoices/'+inv.id+'/payments';
  // A new service in an already issued partner/month must not recreate that
  // partner's old Invoice. DGC supports an explicit per-service selection.
@@ -89,6 +95,38 @@ try{
  check((await post(vurl,{...converted,allocationAmount:'2035246'})).statusCode,409);check((await post(vurl,converted)).statusCode,200);
  const vr=await prisma.invoicePayment.findFirstOrThrow({where:{invoiceId:vnd.id}});check(vr.cashCurrency,'USD');check(vr.cashAmount.toString(),'79.87');check(vr.paidVnd,null);check(vr.allocationAmount.toString(),'2035247');check(vr.historicalSource.rateKind,'REPORTING_CONVERSION');
  const ar=await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:vnd.id}});check(ar.status,'PAID');check(ar.outstandingAmount.toString(),'0');check((await get('/api/v1/receivables?asOf=2026-10-13')).json().total,0);
+ // Historical receipts leave the newly declared bank and cash ledger untouched.
+ check((await prisma.cashAccount.findUniqueOrThrow({where:{id:bank.id}})).balance.toString(),'1000');
+ check(await prisma.cashEntry.count({where:{companyId:company.id}}),1);
+ check(await prisma.invoicePayment.count({where:{companyId:company.id,cashAccountId:{not:null}}}),0);
+ // The separate-service draft provides a real normal-payment fixture.
+ const normalId=scopedCreated.json().items[0].id,normalIssue=await post('/api/v1/invoices/'+normalId+'/issue-preview',{});
+ check(normalIssue.statusCode,200);check((await post('/api/v1/invoices/'+normalId+'/issue',{digest:normalIssue.json().digest,confirmedHistorical:true,historicalReason:'Synthetic account/payment acceptance test'})).statusCode,200);
+ const normalInvoice=await prisma.invoice.findUniqueOrThrow({where:{id:normalId}}),normalUrl='/api/v1/invoices/'+normalId+'/payments';
+ const normalBody={requestId:randomUUID(),expectedUpdatedAt:normalInvoice.updatedAt.toISOString(),paymentDate:'2024-06-01',paidUsd:'20',paidVnd:'500000',cashAccountId:bank.id,paymentMethod:'Bank Transfer',swiftNo:'TEST',note:'Synthetic normal receipt',confirmed:true};
+ const usdAccount=await post('/api/v1/cash-accounts',{...bankInput,accountCode:'USD_TEST',currency:'USD',openingBalance:'0'});check(usdAccount.statusCode,200);
+ check((await post(normalUrl,{...normalBody,cashAccountId:usdAccount.json().item.id})).statusCode,409);
+ check((await post(normalUrl,{...normalBody,paymentMethod:'Cash'})).statusCode,409);
+ check((await post(normalUrl,{...normalBody,paymentDate:'2009-12-31'})).statusCode,409);
+ const foreignAccount=await prisma.cashAccount.create({data:{...bankInput,confirmed:undefined,companyId:other.id,openingDate:new Date(bankInput.openingDate),balance:1000}});
+ check((await post(normalUrl,{...normalBody,cashAccountId:foreignAccount.id})).statusCode,409);
+ const foreignHeaders={cookie:'erp_session='+foreignToken,'x-csrf-token':csrfToken(foreignToken,config.secret)};
+ const otherList=await app.inject({method:'GET',url:'/api/v1/cash-accounts',headers:{...headers,...foreignHeaders}});check(otherList.json().items.map(a=>a.id),[foreignAccount.id]);
+ await prisma.$executeRawUnsafe("ALTER TABLE cash_entries ADD CONSTRAINT test_cash_receipt_rollback CHECK(kind<>'INVOICE_RECEIPT')");
+ check((await post(normalUrl,normalBody)).statusCode,500);check(await prisma.invoicePayment.count({where:{invoiceId:normalId}}),0);check((await prisma.cashAccount.findUniqueOrThrow({where:{id:bank.id}})).balance.toString(),'1000');check((await prisma.invoice.findUniqueOrThrow({where:{id:normalId}})).paidAmount.toString(),'0');
+ await prisma.$executeRawUnsafe('ALTER TABLE cash_entries DROP CONSTRAINT test_cash_receipt_rollback');
+ const bankRace=await Promise.all([post(normalUrl,normalBody),post(normalUrl,normalBody)]);check(bankRace.map(r=>r.statusCode),[200,200]);check(bankRace[0].json().paymentId,bankRace[1].json().paymentId);
+ check((await prisma.cashAccount.findUniqueOrThrow({where:{id:bank.id}})).balance.toString(),'501000');
+ const receiptEntry=await prisma.cashEntry.findFirstOrThrow({where:{companyId:company.id,kind:'INVOICE_RECEIPT',sourceId:bankRace[0].json().paymentId}});check(receiptEntry.amount.toString(),'500000');check(receiptEntry.balanceAfter.toString(),'501000');
+ check(await prisma.cashEntry.count({where:{companyId:company.id,kind:'INVOICE_RECEIPT'}}),1);check((await prisma.accountReceivable.findFirstOrThrow({where:{invoiceId:normalId}})).outstandingAmount.toString(),'22');
+ check((await get('/api/v1/cash-balances')).json().vnd,'501000');
+ const fundResponse=await post('/api/v1/cash-accounts',{...bankInput,accountCode:'CASH_TEST',name:'Synthetic cash fund',kind:'CASH',bankName:'',accountNumber:'',holderName:'',openingBalance:'0'});check(fundResponse.statusCode,200);const fund=fundResponse.json().item;
+ const partialInvoice=await prisma.invoice.findUniqueOrThrow({where:{id:normalId}});
+ const cashBody={...normalBody,requestId:randomUUID(),expectedUpdatedAt:partialInvoice.updatedAt.toISOString(),cashAccountId:fund.id,paymentMethod:'Cash',paidUsd:'22',paidVnd:'550000'};check((await post(normalUrl,cashBody)).statusCode,200);
+ check((await prisma.cashAccount.findUniqueOrThrow({where:{id:fund.id}})).balance.toString(),'550000');check((await prisma.accountReceivable.findFirstOrThrow({where:{invoiceId:normalId}})).outstandingAmount.toString(),'0');check((await get('/api/v1/cash-balances')).json().vnd,'1051000');
+ const bankNow=await prisma.cashAccount.findUniqueOrThrow({where:{id:bank.id}}),editBody={name:bankNow.name,bankName:bankNow.bankName,accountNumber:bankNow.accountNumber,holderName:bankNow.holderName,note:'Synthetic closed account',status:'INACTIVE',expectedUpdatedAt:bankNow.updatedAt.toISOString()};
+ check((await post('/api/v1/cash-accounts/'+bank.id+'/update',{...editBody,openingBalance:'0'})).statusCode,400);check((await post('/api/v1/cash-accounts/'+bank.id+'/update',editBody)).statusCode,200);check((await post(normalUrl,normalBody)).statusCode,200);
+ check((await get('/api/v1/invoices/'+normalId+'/payments')).json().accounts.some(a=>a.id===bank.id),false);
  // Equal due dates cross page boundaries. Invoice number provides a stable
  // unique tie-breaker so no receivable is repeated or skipped between pages.
  const {id:fixtureId,receivable:fixtureAr,...fixture}=inv;
@@ -97,7 +135,7 @@ try{
  check(pages,Array.from({length:21},(_,n)=>'PAGE-'+String(n+1).padStart(2,'0')));check(new Set(pages).size,21);
  // Period ordering must precede creation/due dates, across the entire
  // paginated list rather than sorting individual pages in the browser.
- for(const [period,number,due] of [['2024-07','NEW-PERIOD','2024-01-01'],['2024-03','OLD-PERIOD','2025-01-01']])await prisma.invoice.create({data:{...fixture,invoiceNumber:number,businessKey:number,period,status:'ISSUED',paidAmount:0,payableAmount:1,revenueAmount:1,whtAmount:0,dueDate:new Date(due),receivable:{create:{originalAmount:1,paidAmount:0,outstandingAmount:1,status:'OPEN'}}}});
+ for(const [period,number,due] of [['2024-07','NEW-PERIOD','2024-05-01'],['2024-03','OLD-PERIOD','2025-01-01']])await prisma.invoice.create({data:{...fixture,invoiceNumber:number,businessKey:number,period,status:'ISSUED',paidAmount:0,payableAmount:1,revenueAmount:1,whtAmount:0,dueDate:new Date(due),receivable:{create:{originalAmount:1,paidAmount:0,outstandingAmount:1,status:'OPEN'}}}});
  for(const [route,query] of [['invoices','limit=10'],['receivables','asOf=2026-10-13'],['revenues',''],['manual-revenue/drafts','']]){
   const all=[];let count=Infinity;
   for(let page=1;all.length<count;page++){const response=await get('/api/v1/'+route+'?'+query+'&page='+page);check(response.statusCode,200);const result=response.json();count=result.total;all.push(...result.items);if(page>10)throw Error('Unexpected test pagination');}
@@ -105,5 +143,9 @@ try{
   if(route==='invoices'||route==='receivables'){check(periods[0],'2024-07');check(periods.at(-1),'2024-03');}
  }
  const usdAR=(await get('/api/v1/receivables?asOf=2026-10-13&partnerId='+inv.partnerId)).json();check(usdAR.total,23);check(usdAR.items.every(r=>Number(r.outstandingAmount)>0&&r.partnerKey==='USD'),true);check((await get('/api/v1/receivables?asOf=2026-10-13&partnerId='+vnd.partnerId)).json().total,0);
+ const configPermission=permissions.find(p=>p.code==='SYSTEM_CONFIG_EDIT');await prisma.rolePermission.delete({where:{roleId_permissionId:{roleId:role.id,permissionId:configPermission.id}}});check((await post('/api/v1/cash-accounts',{...bankInput,accountCode:'UNAUTHORIZED'})).statusCode,403);await prisma.rolePermission.create({data:{roleId:role.id,permissionId:configPermission.id}});
+ for(let n=1;n<=11;n++)check((await post('/api/v1/cash-accounts',{...bankInput,accountCode:'PAGE_CASH_'+String(n).padStart(2,'0'),kind:'CASH',openingBalance:'0'})).statusCode,200);
+ const accountPages=[];for(let page=1;page<=2;page++){const response=await get('/api/v1/cash-accounts?page='+page);check(response.statusCode,200);check(response.json().total,14);accountPages.push(...response.json().items.map(a=>a.id));}check(new Set(accountPages).size,14);
+ const bankEntries=(await get('/api/v1/cash-entries?accountId='+bank.id)).json();check(bankEntries.total,2);check(bankEntries.items.every(e=>e.cashAccountId===bank.id),true);check((await get('/api/v1/cash-entries?period=2024-06')).json().total,2);
  console.log('PASS: '+checks+' historical issue/payment, real currency, missing VND/bank, tenant/CSRF/permissions, rollback, duplicate race, Invoice/revenue/AR and stable pagination checks.');
 }finally{await app.close();await prisma.$disconnect();}

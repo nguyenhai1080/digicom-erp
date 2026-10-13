@@ -150,7 +150,8 @@ try{
  check((await request('GET','/api/v1/revenues?partnerId='+partner2.id)).json().items.every(v=>v.status==='INVOICED'),true);
  // DGC payment flow: issued/current only, USD AR and independently recorded VND.
  const payInv=await prisma.invoice.findUniqueOrThrow({where:{id:issueIds[0]}}),payUrl='/api/v1/invoices/'+payInv.id+'/payments';
- const paymentBody={requestId:randomUUID(),expectedUpdatedAt:payInv.updatedAt.toISOString(),paymentDate:'2026-03-19',paidUsd:'0.50',paidVnd:'12500',swiftNo:'SYNTHETIC-SWIFT',bankAccount:'Synthetic bank account',paymentMethod:'Bank Transfer',note:'Synthetic payment only',confirmed:true,swiftFile:{filename:'synthetic-swift.pdf',base64:single.bytes.toString('base64')}};
+ const cashAccount=await prisma.cashAccount.create({data:{companyId:company.id,accountCode:'TEST_BANK',name:'Synthetic bank',kind:'BANK',currency:'VND',bankName:'Synthetic',accountNumber:'000TEST',holderName:'Synthetic',openingDate:new Date('2010-01-01'),openingBalance:0,balance:0,note:''}});
+ const paymentBody={cashAccountId:cashAccount.id,requestId:randomUUID(),expectedUpdatedAt:payInv.updatedAt.toISOString(),paymentDate:'2026-03-19',paidUsd:'0.50',paidVnd:'12500',swiftNo:'SYNTHETIC-SWIFT',bankAccount:'Synthetic bank account',paymentMethod:'Bank Transfer',note:'Synthetic payment only',confirmed:true,swiftFile:{filename:'synthetic-swift.pdf',base64:single.bytes.toString('base64')}};
  check((await request('GET',payUrl,undefined,foreignHeaders)).statusCode,404);
  check((await request('POST',payUrl,paymentBody,foreignHeaders)).statusCode,404);
  check((await request('POST',payUrl,paymentBody,{'x-csrf-token':'bad'})).statusCode,403);
@@ -200,7 +201,7 @@ try{
  const vx=(await request('GET','/api/v1/invoices/'+vid+'/download?format=workbook'));check(vx.statusCode,200);const vzip=new AdmZip(vx.rawPayload);check(vzip.readAsText('xl/worksheets/sheet1.xml').includes('Revenue VND'),true);check(vx.headers['content-disposition'].endsWith('.xlsx"'),true);
  const vip=await post('/api/v1/invoices/'+vid+'/issue-preview',{});check(vip.statusCode,200);check(vip.json().items[0].currency,'VND');check((await post('/api/v1/invoices/'+vid+'/issue',{digest:vip.json().digest,confirmedSent:true})).statusCode,200);
  let vinv=await prisma.invoice.findUniqueOrThrow({where:{id:vid},include:{receivable:true}});check(vinv.currency,'VND');check(vinv.receivable.outstandingAmount.toFixed(0),'25000000');
- const vpmt={requestId:randomUUID(),expectedUpdatedAt:vinv.updatedAt.toISOString(),paymentDate:'2026-03-01',paidUsd:'0',paidVnd:'10000000',fxRate:'1',swiftNo:'VNATEL-REF',bankAccount:'Synthetic VND account',paymentMethod:'Bank Transfer',note:'Synthetic partial VND receipt',confirmed:true};
+ const vpmt={cashAccountId:cashAccount.id,requestId:randomUUID(),expectedUpdatedAt:vinv.updatedAt.toISOString(),paymentDate:'2026-03-01',paidUsd:'0',paidVnd:'10000000',fxRate:'1',swiftNo:'VNATEL-REF',bankAccount:'Synthetic VND account',paymentMethod:'Bank Transfer',note:'Synthetic partial VND receipt',confirmed:true};
  check((await post('/api/v1/invoices/'+vid+'/payments',{...vpmt,paidUsd:'1'})).statusCode,409);
  check((await post('/api/v1/invoices/'+vid+'/payments',vpmt)).statusCode,200);check((await post('/api/v1/invoices/'+vid+'/payments',vpmt)).statusCode,200);
  vinv=await prisma.invoice.findUniqueOrThrow({where:{id:vid},include:{receivable:true}});check(vinv.receivable.outstandingAmount.toFixed(0),'15000000');check(vinv.status,'PARTIALLY_PAID');

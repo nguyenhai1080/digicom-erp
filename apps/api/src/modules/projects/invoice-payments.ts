@@ -10,7 +10,7 @@ import {financialPeriodLock} from './recon-finalize.js';
 import {historicalPaymentSchema,historicalPaymentAmounts,historicalPaymentDate} from './historical-payment.js';
 
 const amount=z.string().regex(/^(0|[1-9]\d{0,13})(\.\d{1,2})?$/);
-const bodySchema=z.object({requestId:z.uuid(),expectedUpdatedAt:timestamp,paymentDate:date,paidUsd:amount,paidVnd:z.string().regex(/^[1-9]\d{0,15}$/),fxRate:z.string().regex(/^(0|[1-9]\d{0,11})(\.\d{1,4})?$/).optional(),swiftNo:z.string().trim().max(200),bankAccount:z.string().trim().min(1).max(200),paymentMethod:z.enum(['Bank Transfer','Cash','Other']),note:z.string().trim().max(2000),confirmed:z.literal(true),swiftFile:z.object({filename:z.string().trim().min(1).max(200),base64:z.string().max(7*1024*1024)}).strict().optional()}).strict();
+const bodySchema=z.object({requestId:z.uuid(),expectedUpdatedAt:timestamp,paymentDate:date,paidUsd:amount,paidVnd:z.string().regex(/^[1-9]\d{0,15}$/),fxRate:z.string().regex(/^(0|[1-9]\d{0,11})(\.\d{1,4})?$/).optional(),swiftNo:z.string().trim().max(200),cashAccountId:z.uuid(),bankAccount:z.string().trim().max(200).default(''),paymentMethod:z.enum(['Bank Transfer','Cash','Other']),note:z.string().trim().max(2000),confirmed:z.literal(true),swiftFile:z.object({filename:z.string().trim().min(1).max(200),base64:z.string().max(7*1024*1024)}).strict().optional()}).strict();
 const id=(p:unknown)=>parse(z.object({id:z.uuid()}).strict(),p).id;
 const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v);
 function fail(message:string):never{throw new CommandError(409,message);}
@@ -31,7 +31,8 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
   const invoice=await prisma.invoice.findFirst({where:{companyId:request.auth!.companyId,id:id(request.params)},include:{receivable:true}});
   if(!invoice)throw new CommandError(404,'Không tìm thấy Invoice.');
   const items=await prisma.invoicePayment.findMany({where:{companyId:invoice.companyId,invoiceId:invoice.id},orderBy:[{paymentDate:'desc'},{createdAt:'desc'}]});
-  return {invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items};
+  const accounts=await prisma.cashAccount.findMany({where:{companyId:invoice.companyId,status:'ACTIVE',currency:'VND'},select:{id:true,accountCode:true,name:true,kind:true,currency:true,bankName:true,accountNumber:true},orderBy:{accountCode:'asc'},take:1000});
+  return {accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items};
  });
  app.post('/api/v1/invoices/:id/payments',{bodyLimit:8*1024*1024,onRequest:writeGuard('PAYMENT_POST',config)},async request=>{
   const user=request.auth!,invoiceId=id(request.params),body=parse(z.union([bodySchema,historicalPaymentSchema]),request.body),historical='mode' in body,digest=sha(JSON.stringify({invoiceId,...body}));
@@ -67,8 +68,20 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
    if(!historical&&inv.currency==='VND'&&(!D(body.paidUsd).isZero()||body.fxRate&& !D(body.fxRate).eq(1)))fail('Invoice VND chỉ phân bổ VND, không nhập khoản USD giả.');
    const a=historical?historicalPaymentAmounts(inv.payableAmount.toString(),inv.paidAmount.toString(),body.allocationAmount,inv.currency,body.cashAmount,body.cashCurrency,body.conversionRate):inv.currency==='VND'?nativeVndPayment(inv.payableAmount.toFixed(0),inv.paidAmount.toFixed(0),body.paidVnd):paymentAmounts(inv.payableAmount.toFixed(2),inv.paidAmount.toFixed(2),body.paidUsd,body.paidVnd,body.fxRate);
    const allocationAmount=historical?D(body.allocationAmount):D(inv.currency==='VND'?body.paidVnd:body.paidUsd),cashCurrency=historical?body.cashCurrency:'VND',cashAmount=D(historical?body.cashAmount:body.paidVnd);
+   let cashAccount;
+   if(!historical){
+    await tx.$queryRaw`SELECT id FROM cash_accounts WHERE company_id=${user.companyId}::uuid AND id=${body.cashAccountId}::uuid FOR UPDATE`;
+    cashAccount=await tx.cashAccount.findFirst({where:{companyId:user.companyId,id:body.cashAccountId,status:'ACTIVE',currency:cashCurrency}});
+    if(!cashAccount)fail('Chọn tài khoản/quỹ đang hoạt động, đúng tiền tệ nhận và thuộc công ty.');
+    if(cashAccount.openingDate>new Date(body.paymentDate))fail('Ngày nhận tiền phải từ ngày bắt đầu theo dõi số dư tài khoản.');
+    if(body.paymentMethod==='Bank Transfer'&&cashAccount.kind!=='BANK'||body.paymentMethod==='Cash'&&cashAccount.kind!=='CASH')fail('Phương thức thanh toán không khớp loại tài khoản/quỹ.');
+   }
    const history=historical?{reference:body.sourceReference,dateBasis:body.dateBasis,accountKnown:!!body.bankAccount,rateKind:inv.currency===body.cashCurrency?'NONE':'REPORTING_CONVERSION'}:undefined;
-   const payment=await tx.invoicePayment.create({data:{companyId:user.companyId,invoiceId,allocationCurrency:inv.currency,allocationAmount,cashCurrency,cashAmount,historicalSource:history,paymentCode:await code(tx,user.companyId,'INVOICE_PAYMENT','PAY'),requestId:body.requestId,requestDigest:digest,paymentDate:new Date(body.paymentDate),paidUsd:historical?(inv.currency==='USD'?allocationAmount:D('0')):D(body.paidUsd),paidVnd:historical?(cashCurrency==='VND'?cashAmount:null):D(body.paidVnd),fxRate:a.rate,swiftNo:historical?'':body.swiftNo,bankAccount:body.bankAccount,paymentMethod:historical?'Other':body.paymentMethod,note:body.note,approvedById:user.userId}});
+   const payment=await tx.invoicePayment.create({data:{companyId:user.companyId,invoiceId,allocationCurrency:inv.currency,allocationAmount,cashCurrency,cashAmount,historicalSource:history,paymentCode:await code(tx,user.companyId,'INVOICE_PAYMENT','PAY'),requestId:body.requestId,requestDigest:digest,paymentDate:new Date(body.paymentDate),paidUsd:historical?(inv.currency==='USD'?allocationAmount:D('0')):D(body.paidUsd),paidVnd:historical?(cashCurrency==='VND'?cashAmount:null):D(body.paidVnd),fxRate:a.rate,swiftNo:historical?'':body.swiftNo,cashAccountId:cashAccount?.id,bankAccount:cashAccount?[cashAccount.accountCode,cashAccount.bankName,cashAccount.accountNumber,cashAccount.name].filter(Boolean).join(' · '):body.bankAccount,paymentMethod:historical?'Other':body.paymentMethod,note:body.note,approvedById:user.userId}});
+   if(cashAccount){
+    const updated=await tx.cashAccount.update({where:{id:cashAccount.id},data:{balance:{increment:cashAmount}}});
+    await tx.cashEntry.create({data:{companyId:user.companyId,cashAccountId:cashAccount.id,entryCode:await code(tx,user.companyId,'CASH_ENTRY','CASH'),entryDate:new Date(body.paymentDate),kind:'INVOICE_RECEIPT',direction:'IN',currency:cashCurrency,amount:cashAmount,balanceAfter:updated.balance,sourceId:payment.id,description:'Thu tiền Invoice '+inv.invoiceNumber+' · '+payment.paymentCode}});
+   }
    if(bytes){const filename='SWIFT_'+inv.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+body.paymentDate+'_'+payment.paymentCode+'.'+ext;const doc=ext==='pdf'?await persistPdf(tx,user,'InvoicePayment',payment.id,'PAYMENT_SWIFT',filename,bytes,1,files):await persistPaymentImage(tx,user,payment.id,filename,bytes,ext,files);await tx.invoicePayment.update({where:{id:payment.id},data:{documentId:doc.id}});}
    await tx.invoice.update({where:{id:inv.id},data:{paidAmount:a.paidAfter,status:a.status}});
    await tx.accountReceivable.update({where:{id:ar.id},data:{paidAmount:a.paidAfter,outstandingAmount:a.outstanding,status:a.status}});

@@ -522,6 +522,8 @@ enum ValidationSeverity {
 }
 
 model Company {
+  cashAccounts CashAccount[]
+  cashEntries CashEntry[]
   invoices Invoice[]
   outputReconUploads OutputReconUpload[]
   id                String       @id @default(uuid()) @db.Uuid
@@ -1928,6 +1930,8 @@ model InvoiceScopeItem {
 
 // Each immutable approved receipt is both a USD invoice allocation and a VND cash movement.
 model InvoicePayment {
+  cashAccountId String? @map("cash_account_id") @db.Uuid
+  cashAccount CashAccount? @relation(fields:[companyId,cashAccountId],references:[companyId,id],onDelete:Restrict)
   allocationCurrency String @default("USD") @map("allocation_currency") @db.VarChar(3)
   id String @id @default(uuid()) @db.Uuid
   companyId String @map("company_id") @db.Uuid
@@ -1957,4 +1961,52 @@ model InvoicePayment {
   @@unique([companyId,paymentCode])
   @@index([companyId,invoiceId,paymentDate])
   @@map("invoice_payments")
+}
+
+// Company-owned bank accounts and cash funds. Historical receipts have no account link.
+model CashAccount {
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ accountCode String @map("account_code")
+ name String
+ kind String @db.VarChar(10)
+ currency String @db.VarChar(3)
+ bankName String @map("bank_name")
+ accountNumber String @map("account_number")
+ holderName String @map("holder_name")
+ openingDate DateTime @map("opening_date") @db.Date
+ openingBalance Decimal @map("opening_balance") @db.Decimal(20,2)
+ balance Decimal @db.Decimal(20,2)
+ status String @default("ACTIVE") @db.VarChar(10)
+ note String
+ createdAt DateTime @default(now()) @map("created_at")
+ updatedAt DateTime @updatedAt @map("updated_at")
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict)
+ entries CashEntry[]
+ invoicePayments InvoicePayment[]
+ @@unique([companyId,id])
+ @@unique([companyId,accountCode])
+ @@index([companyId,status,currency])
+ @@map("cash_accounts")
+}
+model CashEntry {
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ cashAccountId String @map("cash_account_id") @db.Uuid
+ entryCode String @map("entry_code")
+ entryDate DateTime @map("entry_date") @db.Date
+ kind String @db.VarChar(30)
+ direction String @db.VarChar(3)
+ currency String @db.VarChar(3)
+ amount Decimal @db.Decimal(20,2)
+ balanceAfter Decimal @map("balance_after") @db.Decimal(20,2)
+ sourceId String @map("source_id") @db.Uuid
+ description String
+ createdAt DateTime @default(now()) @map("created_at")
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict)
+ account CashAccount @relation(fields:[companyId,cashAccountId],references:[companyId,id],onDelete:Restrict)
+ @@unique([companyId,entryCode])
+ @@unique([companyId,kind,sourceId])
+ @@index([companyId,cashAccountId,entryDate,id])
+ @@map("cash_entries")
 }
