@@ -55,6 +55,20 @@ try{
  });
  for(const [kind,bytes,filename] of [['SIGNING_COMPOSITE',png,'signing.png'],['INVOICE_TEMPLATE',template.toBuffer(),'template.xlsm']])check((await post('/api/v1/company-assets',{kind,filename,base64:bytes.toString('base64'),expectedCurrentId:null,reason:'Synthetic test asset'})).statusCode,201);
  const inv=await makeInvoice('USD','2024-04','100.00'),url='/api/v1/invoices/'+inv.id+'/payments';
+ // A new service in an already issued partner/month must not recreate that
+ // partner's old Invoice. DGC supports an explicit per-service selection.
+ const selectedService=await prisma.service.create({data:{companyId:company.id,serviceCode:'NEW',serviceKey:'NEW',serviceName:'New service',category:'OTHER',keyword:'NEW'}});
+ const oldContract=await prisma.contract.findFirstOrThrow({where:{companyId:company.id,partnerId:inv.partnerId}});
+ await prisma.contractService.create({data:{companyId:company.id,contractId:oldContract.id,serviceId:selectedService.id,dgcStatus:'ACTIVE',businessModel:'REVENUE_SHARE'}});
+ const nextDraft=await post('/api/v1/manual-revenue/drafts',{partnerId:inv.partnerId,rows:[{period:inv.period,serviceId:selectedService.id,contractId:oldContract.id,currency:'USD',amount:'42.00',deduction:'0',note:'New service after old Invoice paid'}]});check(nextDraft.statusCode,201);
+ const nextRecon=await prisma.reconciliation.findUniqueOrThrow({where:{id:nextDraft.json().items[0].id}});check((await post('/api/v1/manual-revenue/'+nextRecon.id+'/approve',{expectedUpdatedAt:nextRecon.updatedAt.toISOString(),confirmed:true})).statusCode,200);
+ const scopedSelection={partnerId:inv.partnerId,period:inv.period,invoiceMode:'PER_SERVICE',serviceId:selectedService.id,currency:'USD',invoiceDate:inv.period+'-30',paymentTermDays:30};
+ const {serviceId:omitService,...allServices}=scopedSelection;check((await post('/api/v1/invoices/preview',allServices)).statusCode,409);
+ const scopedPreview=await post('/api/v1/invoices/preview',scopedSelection);check(scopedPreview.statusCode,200);const scopedPlan=scopedPreview.json();check(scopedPlan.invoices.length,1);check(scopedPlan.invoices[0].invoice.lines.map(l=>l.serviceName),['New service']);
+ const scopedCreated=await post('/api/v1/invoices/create',{...scopedSelection,digest:scopedPlan.digest,confirmed:true,placements:scopedPlan.invoices.map(i=>({businessKey:i.businessKey,placement:{page:1,x:.56,y:.64,width:.28}}))});check(scopedCreated.statusCode,201);
+ check((await prisma.invoice.findUniqueOrThrow({where:{id:inv.id}})).status,'ISSUED');check((await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:inv.id}})).outstandingAmount.toString(),'100');
+ const referenceResponse=await get('/api/v1/invoices/references');check(referenceResponse.statusCode,200);check(referenceResponse.json().services.some(s=>s.id===selectedService.id),true);
+ check(referenceResponse.json().services.every(s=>['id','serviceKey','serviceName'].every(k=>Object.hasOwn(s,k))),true);
  const body={mode:'HISTORICAL',requestId:randomUUID(),expectedUpdatedAt:inv.updatedAt.toISOString(),paymentDate:'2024-06-29',allocationAmount:'100.00',cashCurrency:'USD',cashAmount:'100.00',sourceReference:'Synthetic workbook, F2 received, G2 date',dateBasis:'SOURCE',note:'No bank or VND amount supplied',confirmed:true};
  check((await post(url,{...body,confirmed:false})).statusCode,400);check((await post(url,{...body,sourceReference:''})).statusCode,400);check((await post(url,{...body,allocationAmount:'100.01',cashAmount:'100.01'})).statusCode,409);
  check((await post(url,body,{'x-csrf-token':'bad'})).statusCode,403);
