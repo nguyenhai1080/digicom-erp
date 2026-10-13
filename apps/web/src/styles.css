@@ -47,3 +47,4 @@ h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:20px;line-height:1
 @media(max-width:800px){.finance-filters{grid-template-columns:1fr}}
 
 .table-scroll td > small { display:block; margin-top:4px; }
+.dashboard-compare-toggle{display:flex;align-items:center;gap:8px;margin:12px 0}.dashboard-compare-toggle input{width:auto;margin:0}.dashboard-summary{flex-wrap:wrap;gap:12px 26px}.dashboard-legend{display:flex;gap:20px;margin:12px 0}.dashboard-legend span{display:flex;align-items:center;gap:7px}.dashboard-legend i{display:inline-block;width:14px;height:14px;border-radius:3px}
