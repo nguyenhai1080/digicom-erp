@@ -88,7 +88,7 @@ try{
  check((await post(vurl,{...converted,paymentDate:'2024-07-29'})).statusCode,409);
  check((await post(vurl,{...converted,allocationAmount:'2035246'})).statusCode,409);check((await post(vurl,converted)).statusCode,200);
  const vr=await prisma.invoicePayment.findFirstOrThrow({where:{invoiceId:vnd.id}});check(vr.cashCurrency,'USD');check(vr.cashAmount.toString(),'79.87');check(vr.paidVnd,null);check(vr.allocationAmount.toString(),'2035247');check(vr.historicalSource.rateKind,'REPORTING_CONVERSION');
- const ar=await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:vnd.id}});check(ar.status,'PAID');check(ar.outstandingAmount.toString(),'0');check((await get('/api/v1/receivables?asOf=2026-10-13')).json().items.every(a=>a.status==='PAID'&&a.outstandingAmount==='0.00'),true);
+ const ar=await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:vnd.id}});check(ar.status,'PAID');check(ar.outstandingAmount.toString(),'0');check((await get('/api/v1/receivables?asOf=2026-10-13')).json().total,0);
  // Equal due dates cross page boundaries. Invoice number provides a stable
  // unique tie-breaker so no receivable is repeated or skipped between pages.
  const {id:fixtureId,receivable:fixtureAr,...fixture}=inv;
@@ -104,5 +104,6 @@ try{
   const periods=all.map(r=>r.period??r.payload.period);check(periods,[...periods].sort().reverse());check(new Set(all.map(r=>r.id)).size,count);
   if(route==='invoices'||route==='receivables'){check(periods[0],'2024-07');check(periods.at(-1),'2024-03');}
  }
+ const usdAR=(await get('/api/v1/receivables?asOf=2026-10-13&partnerId='+inv.partnerId)).json();check(usdAR.total,23);check(usdAR.items.every(r=>Number(r.outstandingAmount)>0&&r.partnerKey==='USD'),true);check((await get('/api/v1/receivables?asOf=2026-10-13&partnerId='+vnd.partnerId)).json().total,0);
  console.log('PASS: '+checks+' historical issue/payment, real currency, missing VND/bank, tenant/CSRF/permissions, rollback, duplicate race, Invoice/revenue/AR and stable pagination checks.');
 }finally{await app.close();await prisma.$disconnect();}
