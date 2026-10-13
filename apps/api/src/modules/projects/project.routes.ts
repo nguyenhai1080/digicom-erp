@@ -1,4 +1,6 @@
 import {cashAccountRoutes} from './cash-accounts.js';
+import {expenseRoutes} from './expenses.js';
+import {cashHistoryRoutes} from './cash-history.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, Prisma } from '@erp/db';
@@ -41,6 +43,8 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   await app.register(financeLedgerRoutes, config);
   await app.register(invoicePaymentRoutes, config);
   await app.register(cashAccountRoutes, config);
+  await app.register(expenseRoutes, config);
+  await app.register(cashHistoryRoutes, config);
   await app.register(manualRevenueRoutes, config);
   app.get('/api/v1/projects', { preHandler: requirePermission('PROJECT_VIEW') }, async request => ({
     items: await prisma.project.findMany({ where: projectAccessWhere(request.auth!), take: 100, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

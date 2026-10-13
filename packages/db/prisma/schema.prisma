@@ -524,6 +524,7 @@ enum ValidationSeverity {
 model Company {
   cashAccounts CashAccount[]
   cashEntries CashEntry[]
+  cashHistory CashHistory[]
   invoices Invoice[]
   outputReconUploads OutputReconUpload[]
   id                String       @id @default(uuid()) @db.Uuid
@@ -1965,6 +1966,7 @@ model InvoicePayment {
 
 // Company-owned bank accounts and cash funds. Historical receipts have no account link.
 model CashAccount {
+ expenses Expense[]
  id String @id @default(uuid()) @db.Uuid
  companyId String @map("company_id") @db.Uuid
  accountCode String @map("account_code")
@@ -1988,6 +1990,65 @@ model CashAccount {
  @@unique([companyId,accountCode])
  @@index([companyId,status,currency])
  @@map("cash_accounts")
+}
+model Expense {
+ direction String @default("OUT") @db.VarChar(3)
+ purpose String @default("Khác")
+ projectLabel String @default("") @map("project_label")
+ nature String @default("ACTUAL") @db.VarChar(20)
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ cashAccountId String @map("cash_account_id") @db.Uuid
+ expenseCode String @map("expense_code")
+ requestId String @map("request_id") @db.Uuid
+ requestDigest String @map("request_digest")
+ expenseDate DateTime @map("expense_date") @db.Date
+ category String @db.VarChar(30)
+ description String
+ payee String
+ reference String
+ currency String @db.VarChar(3)
+ amount Decimal @db.Decimal(20,2)
+ status String @default("DRAFT") @db.VarChar(10)
+ note String
+ documentId String? @map("document_id") @db.Uuid
+ createdById String @map("created_by_id") @db.Uuid
+ postedById String? @map("posted_by_id") @db.Uuid
+ postedAt DateTime? @map("posted_at")
+ voidReason String? @map("void_reason")
+ createdAt DateTime @default(now()) @map("created_at")
+ updatedAt DateTime @updatedAt @map("updated_at")
+ account CashAccount @relation(fields:[companyId,cashAccountId],references:[companyId,id],onDelete:Restrict)
+ @@unique([companyId,expenseCode])
+ @@unique([companyId,requestId])
+ @@index([companyId,expenseDate,status])
+ @@map("expenses")
+}
+model CashHistory {
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict,map:"cash_history_company_fkey")
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ sourceKey String @map("source_key")
+ sourceDigest String @map("source_digest")
+ sourceFile String @map("source_file")
+ sourceReferences Json @map("source_references")
+ sourceData Json @map("source_data")
+ transactionDate DateTime @map("transaction_date") @db.Date
+ direction String @db.VarChar(3)
+ kind String @db.VarChar(20)
+ amount Decimal @db.Decimal(20,2)
+ currency String @default("VND") @db.VarChar(3)
+ sender String
+ recipient String
+ description String
+ purpose String
+ projectLabel String @map("project_label")
+ nature String @db.VarChar(20)
+ importedById String @map("imported_by_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at")
+ @@unique([companyId,sourceKey])
+ @@index([companyId,transactionDate,kind])
+ @@map("cash_history")
 }
 model CashEntry {
  id String @id @default(uuid()) @db.Uuid

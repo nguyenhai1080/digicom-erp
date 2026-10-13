@@ -38,13 +38,13 @@ export async function stampPdf(source:Buffer,bytes:Buffer,mime:string|null,p:Pla
  if(doc.getPageCount()>12||p.page>doc.getPageCount())throw new CommandError(400,'Trang chèn dấu không tồn tại.');
  drawPlacement(doc.getPage(p.page-1),await image(doc,bytes,mime),p);return Buffer.from(await doc.save({useObjectStreams:false}));
 }
-export async function persistPdf(tx:Prisma.TransactionClient,user:Identity,entityType:string,entityId:string,type:'RECON_SIGNED'|'INVOICE'|'PAYMENT_SWIFT',filename:string,bytes:Buffer,version:number,rollback:string[]){
+export async function persistPdf(tx:Prisma.TransactionClient,user:Identity,entityType:string,entityId:string,type:'RECON_SIGNED'|'INVOICE'|'PAYMENT_SWIFT'|'EXPENSE_EVIDENCE',filename:string,bytes:Buffer,version:number,rollback:string[]){
  if(bytes.length>16*1024*1024)throw new CommandError(422,'PDF kết quả vượt giới hạn lưu trữ.');
- const id=randomUUID(),folder=type==='RECON_SIGNED'?'signed-recon':type==='PAYMENT_SWIFT'?'payments':'invoices',relative=`${folder}/${user.companyId}/${id}.pdf`,path=resolve(storageRoot(),relative),temp=path+'.pending';
+ const id=randomUUID(),folder=type==='RECON_SIGNED'?'signed-recon':type==='PAYMENT_SWIFT'?'payments':type==='EXPENSE_EVIDENCE'?'expenses':'invoices',relative=`${folder}/${user.companyId}/${id}.pdf`,path=resolve(storageRoot(),relative),temp=path+'.pending';
  await mkdir(resolve(storageRoot(),folder,user.companyId),{recursive:true,mode:0o700});rollback.push(temp);
  const handle=await open(temp,'wx',0o600);try{await handle.writeFile(bytes);await handle.sync();}finally{await handle.close();}await rename(temp,path);rollback.push(path);
  const attachment=await tx.attachment.create({data:{id,companyId:user.companyId,originalFilename:filename,storedFilename:id+'.pdf',storageProvider:'local',storagePath:relative,mimeType:'application/pdf',fileSize:BigInt(bytes.length),checksumSha256:sha(bytes),uploadedById:user.userId}});
- return tx.document.create({data:{companyId:user.companyId,documentCode:await code(tx,user.companyId,type,type==='INVOICE'?'INV-PDF':type==='PAYMENT_SWIFT'?'SWIFT':'RSIGN'),documentType:type,entityType,entityId,attachmentId:attachment.id,versionNo:version,createdById:user.userId}});
+ return tx.document.create({data:{companyId:user.companyId,documentCode:await code(tx,user.companyId,type,type==='INVOICE'?'INV-PDF':type==='PAYMENT_SWIFT'?'SWIFT':type==='EXPENSE_EVIDENCE'?'EXP-DOC':'RSIGN'),documentType:type,entityType,entityId,attachmentId:attachment.id,versionNo:version,createdById:user.userId}});
 }
 export async function rollbackFiles(paths:string[]){for(const path of paths)try{await unlink(path);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}}
 export async function derivedBytes(tx:Prisma.TransactionClient,companyId:string,documentId:string,type:'RECON_SIGNED'|'INVOICE'){
@@ -59,10 +59,10 @@ export async function persistWorkbook(tx:Prisma.TransactionClient,user:Identity,
  return tx.document.create({data:{companyId:user.companyId,documentCode:await code(tx,user.companyId,'INVOICE_WORKBOOK','INV-XLS'),documentType:'INVOICE_WORKBOOK',entityType:'Invoice',entityId:invoiceId,attachmentId:a.id,createdById:user.userId}});
 }
 
-export async function persistPaymentImage(tx:Prisma.TransactionClient,user:Identity,paymentId:string,filename:string,bytes:Buffer,ext:'png'|'jpg',rollback:string[]){
- const id=randomUUID(),relative=`payments/${user.companyId}/${id}.${ext}`,path=resolve(storageRoot(),relative),temp=path+'.pending';
- await mkdir(resolve(storageRoot(),'payments',user.companyId),{recursive:true,mode:0o700});rollback.push(temp);
+export async function persistPaymentImage(tx:Prisma.TransactionClient,user:Identity,paymentId:string,filename:string,bytes:Buffer,ext:'png'|'jpg',rollback:string[],expense=false){
+ const folder=expense?'expenses':'payments',id=randomUUID(),relative=`${folder}/${user.companyId}/${id}.${ext}`,path=resolve(storageRoot(),relative),temp=path+'.pending';
+ await mkdir(resolve(storageRoot(),folder,user.companyId),{recursive:true,mode:0o700});rollback.push(temp);
  const h=await open(temp,'wx',0o600);try{await h.writeFile(bytes);await h.sync();}finally{await h.close();}await rename(temp,path);rollback.push(path);
  const a=await tx.attachment.create({data:{id,companyId:user.companyId,originalFilename:filename,storedFilename:id+'.'+ext,storageProvider:'local',storagePath:relative,mimeType:ext==='png'?'image/png':'image/jpeg',fileSize:BigInt(bytes.length),checksumSha256:sha(bytes),uploadedById:user.userId}});
- return tx.document.create({data:{companyId:user.companyId,documentCode:await code(tx,user.companyId,'PAYMENT_SWIFT','SWIFT'),documentType:'PAYMENT_SWIFT',entityType:'InvoicePayment',entityId:paymentId,attachmentId:a.id,createdById:user.userId}});
+ return tx.document.create({data:{companyId:user.companyId,documentCode:await code(tx,user.companyId,expense?'EXPENSE_EVIDENCE':'PAYMENT_SWIFT',expense?'EXP-DOC':'SWIFT'),documentType:expense?'EXPENSE_EVIDENCE':'PAYMENT_SWIFT',entityType:expense?'Expense':'InvoicePayment',entityId:paymentId,attachmentId:a.id,createdById:user.userId}});
 }

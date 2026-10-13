@@ -34,7 +34,7 @@ export async function cashAccountRoutes(app:FastifyInstance,config:AuthConfig){
    await audit(tx,user,'CASH_ACCOUNT_EDIT','CashAccount',item.id,old,item,'Cập nhật thông tin/trạng thái tài khoản');return {item,message:'Đã cập nhật tài khoản.'};
   });
  });
- app.get('/api/v1/cash-balances',{preHandler:requirePermission('PAYMENT_VIEW')},async req=>{const companyId=req.auth!.companyId;const [total,count]=await prisma.$transaction([prisma.cashAccount.aggregate({where:{companyId,currency:'VND'},_sum:{balance:true}}),prisma.cashAccount.count({where:{companyId,currency:'VND'}})]);return {vnd:count?total._sum.balance?.toFixed(0)??'0':null};});
+ app.get('/api/v1/cash-balances',{preHandler:requirePermission('PAYMENT_VIEW')},async req=>{const companyId=req.auth!.companyId;const [total,count]=await prisma.$transaction([prisma.cashAccount.aggregate({where:{companyId,currency:'VND'},_sum:{balance:true}}),prisma.cashAccount.count({where:{companyId,currency:'VND'}})]);const groups=await prisma.cashAccount.groupBy({by:['kind'],where:{companyId,currency:'VND'},_sum:{balance:true},orderBy:{kind:'asc'}});return {vnd:count?total._sum.balance?.toFixed(0)??'0':null,bank:groups.find(g=>g.kind==='BANK')?._sum?.balance?.toFixed(0)??null,cash:groups.find(g=>g.kind==='CASH')?._sum?.balance?.toFixed(0)??null};});
  app.get('/api/v1/cash-entries',{preHandler:requirePermission('PAYMENT_VIEW')},async req=>{
   const q=parse(z.object({page:z.coerce.number().int().min(1).default(1),accountId:z.uuid().optional(),period:z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/).optional()}).strict(),req.query),companyId=req.auth!.companyId;
   const start=q.period?new Date(q.period+'-01'):undefined,end=start?new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+1,1)):undefined;
