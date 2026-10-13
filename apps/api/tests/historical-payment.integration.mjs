@@ -75,5 +75,11 @@ try{
  check((await post(vurl,{...converted,allocationAmount:'2035246'})).statusCode,409);check((await post(vurl,converted)).statusCode,200);
  const vr=await prisma.invoicePayment.findFirstOrThrow({where:{invoiceId:vnd.id}});check(vr.cashCurrency,'USD');check(vr.cashAmount.toString(),'79.87');check(vr.paidVnd,null);check(vr.allocationAmount.toString(),'2035247');check(vr.historicalSource.rateKind,'REPORTING_CONVERSION');
  const ar=await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:vnd.id}});check(ar.status,'PAID');check(ar.outstandingAmount.toString(),'0');check((await get('/api/v1/receivables?asOf=2026-10-13')).json().items.every(a=>a.status==='PAID'&&a.outstandingAmount==='0.00'),true);
- console.log('PASS: '+checks+' historical issue/payment, real currency, missing VND/bank, tenant/CSRF/permissions, rollback, duplicate race, Invoice/revenue/AR checks.');
+ // Equal due dates cross page boundaries. Invoice number provides a stable
+ // unique tie-breaker so no receivable is repeated or skipped between pages.
+ const {id:fixtureId,receivable:fixtureAr,...fixture}=inv;
+ for(let n=21;n>0;n--){const number='PAGE-'+String(n).padStart(2,'0');await prisma.invoice.create({data:{...fixture,invoiceNumber:number,businessKey:number,period:'2024-06',status:'ISSUED',paidAmount:0,payableAmount:1,revenueAmount:1,whtAmount:0,dueDate:new Date('2024-07-30'),receivable:{create:{originalAmount:1,paidAmount:0,outstandingAmount:1,status:'OPEN'}}}});}
+ const pages=[];for(let page=1;page<=3;page++){const res=await get('/api/v1/receivables?asOf=2026-10-13&period=2024-06&page='+page);check(res.statusCode,200);check(res.json().total,21);pages.push(...res.json().items.map(r=>r.invoiceNumber));}
+ check(pages,Array.from({length:21},(_,n)=>'PAGE-'+String(n+1).padStart(2,'0')));check(new Set(pages).size,21);
+ console.log('PASS: '+checks+' historical issue/payment, real currency, missing VND/bank, tenant/CSRF/permissions, rollback, duplicate race, Invoice/revenue/AR and stable pagination checks.');
 }finally{await app.close();await prisma.$disconnect();}

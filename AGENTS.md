@@ -20,3 +20,10 @@ The owner clarified on 2026-10-08 that ERP Core must inherit the full existing E
 ## Owner partner display rule (2026-10-12)
 
 - Display partner keys in data tables instead of full legal names. Keep legal names available in profiles, hover text and financial documents.
+
+## Owner historical payment and cash flow rule (2026-10-13)
+
+- Historical receipts imported from the owner's workbook update Invoice, revenue and AR status only. Do not post them to bank or cash account balances.
+- Future cash accounts have two types: official bank accounts and cash funds for company/office spending. All receipts, payments, expenses and internal transfers belong in Quản lý thu chi.
+- Future receipts increase bank balances; payments decrease them. Transfers from bank to cash funds decrease the bank and increase the cash fund as one linked transfer, without counting it as revenue or expense.
+- Apply those balance movements only after completing historical imports and establishing the current cash ledger; do not invent historical bank accounts or actual VND receipts.
