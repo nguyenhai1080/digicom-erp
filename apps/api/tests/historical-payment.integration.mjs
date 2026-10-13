@@ -95,5 +95,14 @@ try{
  for(let n=21;n>0;n--){const number='PAGE-'+String(n).padStart(2,'0');await prisma.invoice.create({data:{...fixture,invoiceNumber:number,businessKey:number,period:'2024-06',status:'ISSUED',paidAmount:0,payableAmount:1,revenueAmount:1,whtAmount:0,dueDate:new Date('2024-07-30'),receivable:{create:{originalAmount:1,paidAmount:0,outstandingAmount:1,status:'OPEN'}}}});}
  const pages=[];for(let page=1;page<=3;page++){const res=await get('/api/v1/receivables?asOf=2026-10-13&period=2024-06&page='+page);check(res.statusCode,200);check(res.json().total,21);pages.push(...res.json().items.map(r=>r.invoiceNumber));}
  check(pages,Array.from({length:21},(_,n)=>'PAGE-'+String(n+1).padStart(2,'0')));check(new Set(pages).size,21);
+ // Period ordering must precede creation/due dates, across the entire
+ // paginated list rather than sorting individual pages in the browser.
+ for(const [period,number,due] of [['2024-07','NEW-PERIOD','2024-01-01'],['2024-03','OLD-PERIOD','2025-01-01']])await prisma.invoice.create({data:{...fixture,invoiceNumber:number,businessKey:number,period,status:'ISSUED',paidAmount:0,payableAmount:1,revenueAmount:1,whtAmount:0,dueDate:new Date(due),receivable:{create:{originalAmount:1,paidAmount:0,outstandingAmount:1,status:'OPEN'}}}});
+ for(const [route,query] of [['invoices','limit=10'],['receivables','asOf=2026-10-13'],['revenues',''],['manual-revenue/drafts','']]){
+  const all=[];let count=Infinity;
+  for(let page=1;all.length<count;page++){const response=await get('/api/v1/'+route+'?'+query+'&page='+page);check(response.statusCode,200);const result=response.json();count=result.total;all.push(...result.items);if(page>10)throw Error('Unexpected test pagination');}
+  const periods=all.map(r=>r.period??r.payload.period);check(periods,[...periods].sort().reverse());check(new Set(all.map(r=>r.id)).size,count);
+  if(route==='invoices'||route==='receivables'){check(periods[0],'2024-07');check(periods.at(-1),'2024-03');}
+ }
  console.log('PASS: '+checks+' historical issue/payment, real currency, missing VND/bank, tenant/CSRF/permissions, rollback, duplicate race, Invoice/revenue/AR and stable pagination checks.');
 }finally{await app.close();await prisma.$disconnect();}
