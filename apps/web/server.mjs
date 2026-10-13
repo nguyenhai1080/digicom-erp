@@ -47,7 +47,9 @@ const server = createServer(async (request, response) => {
       const preview = request.method === 'GET' && /^\/api\/v1\/output-recon\/uploads\/[0-9a-f-]{36}\/preview$/i.test(pathname);
       const financialPdf = request.method === 'POST' && (pathname.startsWith('/api/v1/invoices/') || /\/(finalize|signed-preview)$/.test(pathname));
       const manualRevenueUpload = request.method === 'POST' && ['/api/v1/manual-revenue/import-preview', '/api/v1/manual-revenue/drafts'].includes(pathname);
-      const bodyLimit = manualRevenueUpload ? 8 * 1024 * 1024 : upload ? 7 * 1024 * 1024 : 32768;
+      const cashHistoryImport = request.method === 'POST' && pathname === '/api/v1/cash-history/import';
+      const expenseUpload = request.method === 'POST' && (pathname === '/api/v1/expenses' || /^\/api\/v1\/expenses\/[0-9a-f-]{36}\/update$/i.test(pathname));
+      const bodyLimit = cashHistoryImport ? 12 * 1024 * 1024 : expenseUpload || manualRevenueUpload ? 8 * 1024 * 1024 : upload ? 7 * 1024 * 1024 : 32768;
       const chunks = []; let size = 0;
       for await (const chunk of request) {
         size += chunk.length;
@@ -66,7 +68,7 @@ const server = createServer(async (request, response) => {
       const upstream = await fetch(target, {
         method: request.method, headers,
         body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
-        redirect: 'manual', signal: AbortSignal.timeout(readPdf ? 120000 : financialPdf ? 65000 : upload ? 60000 : preview ? 45000 : 15000)
+        redirect: 'manual', signal: AbortSignal.timeout(readPdf ? 120000 : financialPdf ? 65000 : upload ? 60000 : preview || cashHistoryImport || expenseUpload ? 45000 : 15000)
       });
       const outputHeaders = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
       if (upstream.headers.get('content-type')?.split(';')[0] === 'application/pdf') {
@@ -74,6 +76,10 @@ const server = createServer(async (request, response) => {
         outputHeaders['Content-Disposition'] = upstream.headers.get('content-disposition') || 'attachment; filename="document.pdf"';
       }
       if (preview && upstream.headers.get('content-type')?.split(';')[0] === 'image/png') outputHeaders['Content-Type'] = 'image/png';
+      if (/^\/api\/v1\/expenses\/[0-9a-f-]{36}\/document$/i.test(pathname) && ['image/png','image/jpeg'].includes(upstream.headers.get('content-type')?.split(';')[0])) {
+        outputHeaders['Content-Type'] = upstream.headers.get('content-type');
+        outputHeaders['Content-Disposition'] = upstream.headers.get('content-disposition') || 'inline';
+      }
       if ((/^\/api\/v1\/company-assets\/[0-9a-f-]{36}\/download$/i.test(pathname) || /^\/api\/v1\/invoices\/[0-9a-f-]{36}\/download$/i.test(pathname) || ['/api/v1/output-recon/signing-asset','/api/v1/invoices/signing-asset','/api/v1/invoices/preview-page'].includes(pathname)) && ['image/png','image/jpeg','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel.sheet.macroEnabled.12'].includes(upstream.headers.get('content-type')?.split(';')[0])) {
         outputHeaders['Content-Type'] = upstream.headers.get('content-type');
         outputHeaders['Content-Disposition'] = upstream.headers.get('content-disposition') || 'attachment';
