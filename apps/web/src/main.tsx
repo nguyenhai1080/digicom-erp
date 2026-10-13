@@ -15,7 +15,7 @@ import { Users } from './Users';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.63';
+const version = '0.6.64';
 document.title = `ERP Core Web · v${version}`;
 async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
@@ -81,8 +81,8 @@ function App() {
       <label>Mã công ty<input name="companyCode" defaultValue="GST" required maxLength={50} autoComplete="organization" /></label>
       {setup && <label>Họ và tên<input name="fullName" required maxLength={120} autoComplete="name" /></label>}
       <label>Email<input name="email" type="email" required maxLength={254} autoComplete="username" /></label>
-      <label>Mật khẩu<input name="password" type="password" required minLength={setup ? 15 : 1} maxLength={128} autoComplete={setup ? 'new-password' : 'current-password'} /></label>
-      {setup && <><p className="hint">Dùng mật khẩu từ 15 ký tự.</p><label>Nhập lại mật khẩu<input name="confirmation" type="password" required minLength={15} maxLength={128} autoComplete="new-password" /></label><label>Mã thiết lập<input name="setupToken" type="password" required minLength={32} maxLength={512} autoComplete="off" /></label></>}
+      <label>Mật khẩu<input name="password" type="password" required minLength={setup ? 8 : 1} maxLength={128} autoComplete={setup ? 'new-password' : 'current-password'} /></label>
+      {setup && <><p className="hint">Dùng mật khẩu từ 8 ký tự.</p><label>Nhập lại mật khẩu<input name="confirmation" type="password" required minLength={8} maxLength={128} autoComplete="new-password" /></label><label>Mã thiết lập<input name="setupToken" type="password" required minLength={32} maxLength={512} autoComplete="off" /></label></>}
       <button className="primary" type="submit">{busy ? 'Đang xử lý…' : setup ? 'Tạo tài khoản quản trị' : 'Đăng nhập'}</button>
     </fieldset></form>
     {message && <p className="notice" role="alert">{message}</p>}

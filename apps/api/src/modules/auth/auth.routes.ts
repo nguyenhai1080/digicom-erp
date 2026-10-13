@@ -3,7 +3,7 @@ import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../plugins/prisma.js';
-import { hashPassword, verifyPassword } from './password.js';
+import { hashPassword, verifyPassword, newPasswordSchema } from './password.js';
 import { authenticate, csrfToken, requireOrigin, sameSecret, SESSION_COOKIE, SESSION_SECONDS, tokenHash, type AuthConfig } from './access.js';
 
 const loginSchema = z.object({
@@ -12,7 +12,7 @@ const loginSchema = z.object({
   password: z.string().min(1).max(128)
 }).strict();
 const setupSchema = loginSchema.extend({
-  password: z.string().min(15).max(128), fullName: z.string().trim().min(1).max(120),
+  password: newPasswordSchema, fullName: z.string().trim().min(1).max(120),
   setupToken: z.string().min(32).max(512)
 }).strict();
 class BootstrapClosedError extends Error {}
@@ -75,7 +75,7 @@ export async function authRoutes(app: FastifyInstance, config: AuthConfig) {
     if (!config.bootstrapEnabled || config.bootstrapToken.length < 32) return reply.code(404).send({ message: 'Thiết lập quản trị chưa được bật.' });
     if (!requireOrigin(config, request, reply)) return;
     const parsed = setupSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ message: 'Kiểm tra thông tin; mật khẩu cần từ 15 đến 128 ký tự.' });
+    if (!parsed.success) return reply.code(400).send({ message: 'Kiểm tra thông tin; mật khẩu cần từ 8 đến 128 ký tự.' });
     const { companyCode, email, password, fullName, setupToken } = parsed.data;
     if (companyCode !== config.defaultCompanyCode || !sameSecret(setupToken, config.bootstrapToken)) {
       return reply.code(403).send({ message: 'Thiết lập quản trị không được phép.' });

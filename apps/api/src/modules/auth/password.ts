@@ -1,4 +1,7 @@
+import { z } from 'zod';
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+
+export const newPasswordSchema = z.string().min(8).max(128);
 
 const params = { N: 131072, r: 8, p: 1, maxmem: 192 * 1024 * 1024 };
 let active = 0;
