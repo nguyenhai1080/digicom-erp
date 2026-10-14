@@ -17,8 +17,8 @@ import { Users } from './Users';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.76';
-document.title = `ERP Core Web · v${version}`;
+const version = '0.6.77';
+document.title = 'ERP Core - GST';
 async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin',
@@ -37,7 +37,6 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [health, setHealth] = useState('Đang kiểm tra dịch vụ…');
   const [message, setMessage] = useState('');
-  const [setup, setSetup] = useState(window.location.hash === '#setup');
   const [page, setPage] = useState('dashboard');
   useEffect(() => {
     let cancelled = false;
@@ -51,20 +50,13 @@ function App() {
     }).catch(() => { if (!cancelled) setHealth('Chưa kết nối được dịch vụ'); });
     return () => { cancelled = true; window.removeEventListener('erp-session-expired', expired); };
   }, []);
-  function changeMode(value: boolean) { setSetup(value); window.location.hash = value ? 'setup' : ''; setMessage(''); }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
     const password = String(data.get('password') ?? '');
-    if (setup && password !== data.get('confirmation')) { setMessage('Hai mật khẩu chưa khớp.'); return; }
     setBusy(true); setMessage('');
     try {
-      const body = { companyCode: data.get('companyCode'), email: data.get('email'), password };
-      if (setup) {
-        await api('/auth/bootstrap', { ...body, fullName: data.get('fullName'), setupToken: data.get('setupToken') });
-        form.reset(); changeMode(false); setMessage('Đã tạo tài khoản quản trị. Bạn có thể đăng nhập.');
-      } else {
-        await api('/auth/login', body); setSession(await api('/auth/me')); form.reset();
-      }
+      const body = { companyCode: 'GST', email: data.get('email'), password };
+      await api('/auth/login', body); setSession(await api('/auth/me')); form.reset();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không kết nối được dịch vụ.'); }
     finally { const input = form.elements.namedItem('password'); if (input instanceof HTMLInputElement) input.value = ''; setBusy(false); }
   }
@@ -77,18 +69,13 @@ function App() {
   if (loading) return <main className="auth-screen"><p role="status">Đang kiểm tra phiên đăng nhập…</p></main>;
   if (!session) return <main className="auth-screen"><section className="auth-card">
     <div className="brand">ERP Core</div><p className="muted">Không gian quản lý công việc và tài chính</p>
-    <h1>{setup ? 'Thiết lập quản trị' : 'Đăng nhập'}</h1>
-    {setup && <p>Chỉ dùng cho tài khoản quản trị đầu tiên, khi bạn đã được cấp mã thiết lập.</p>}
+    <h1>Đăng nhập</h1>
     <form method="post" onSubmit={submit}><fieldset disabled={busy}>
-      <label>Mã công ty<input name="companyCode" defaultValue="GST" required maxLength={50} autoComplete="organization" /></label>
-      {setup && <label>Họ và tên<input name="fullName" required maxLength={120} autoComplete="name" /></label>}
       <label>Email<input name="email" type="email" required maxLength={254} autoComplete="username" /></label>
-      <label>Mật khẩu<input name="password" type="password" required minLength={setup ? 8 : 1} maxLength={128} autoComplete={setup ? 'new-password' : 'current-password'} /></label>
-      {setup && <><p className="hint">Dùng mật khẩu từ 8 ký tự.</p><label>Nhập lại mật khẩu<input name="confirmation" type="password" required minLength={8} maxLength={128} autoComplete="new-password" /></label><label>Mã thiết lập<input name="setupToken" type="password" required minLength={32} maxLength={512} autoComplete="off" /></label></>}
-      <button className="primary" type="submit">{busy ? 'Đang xử lý…' : setup ? 'Tạo tài khoản quản trị' : 'Đăng nhập'}</button>
+      <label>Mật khẩu<input name="password" type="password" required minLength={1} maxLength={128} autoComplete="current-password" /></label>
+      <button className="primary" type="submit">{busy ? 'Đang xử lý…' : 'Đăng nhập'}</button>
     </fieldset></form>
     {message && <p className="notice" role="alert">{message}</p>}
-    <button className="text-button" onClick={() => changeMode(!setup)} disabled={busy}>{setup ? 'Quay lại đăng nhập' : 'Thiết lập quản trị lần đầu'}</button>
     <footer><span role="status">{health}</span><span>v{version} · Staging</span></footer>
   </section></main>;
   return <div className="shell"><aside><h2>ERP Core</h2><p className="sidebar-subtitle">Hệ thống quản lý công việc và tài chính<br/>{session.user.companyCode}</p><div className="nav-title">QUẢN LÝ</div><nav className="sidebar-nav" aria-label="Quản lý ERP">
