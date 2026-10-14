@@ -21,7 +21,7 @@ async function account(tx:Prisma.TransactionClient,companyId:string,b:{cashAccou
  if(!a)throw new CommandError(409,'Chọn tài khoản/quỹ đang hoạt động, đúng tiền tệ và thuộc công ty.');
  if(a.openingDate>new Date(b.expenseDate))throw new CommandError(409,'Ngày chi phải từ ngày bắt đầu theo dõi số dư tài khoản.');return a;
 }
-async function evidence(v:z.infer<typeof file>|undefined){
+export async function evidence(v:z.infer<typeof file>|undefined){
  if(!v)return;
  if(!/^[A-Za-z0-9+/]+={0,2}$/.test(v.base64))throw new CommandError(400,'Chứng từ không hợp lệ.');
  const bytes=Buffer.from(v.base64,'base64');if(bytes.length>5*1024*1024)throw new CommandError(400,'Chứng từ tối đa 5 MB.');let ext:'pdf'|'png'|'jpg'='pdf';

@@ -1,4 +1,5 @@
 import {cashAccountRoutes} from './cash-accounts.js';
+import {cashTransferRoutes} from './cash-transfers.js';
 import {expenseRoutes} from './expenses.js';
 import {cashHistoryRoutes} from './cash-history.js';
 import type { FastifyInstance } from 'fastify';
@@ -43,6 +44,7 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   await app.register(financeLedgerRoutes, config);
   await app.register(invoicePaymentRoutes, config);
   await app.register(cashAccountRoutes, config);
+  await app.register(cashTransferRoutes, config);
   await app.register(expenseRoutes, config);
   await app.register(cashHistoryRoutes, config);
   await app.register(manualRevenueRoutes, config);

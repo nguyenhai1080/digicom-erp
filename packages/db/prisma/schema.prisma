@@ -522,6 +522,7 @@ enum ValidationSeverity {
 }
 
 model Company {
+  cashTransfers CashTransfer[]
   cashAccounts CashAccount[]
   cashEntries CashEntry[]
   cashHistory CashHistory[]
@@ -1966,6 +1967,8 @@ model InvoicePayment {
 
 // Company-owned bank accounts and cash funds. Historical receipts have no account link.
 model CashAccount {
+ transfersOut CashTransfer[] @relation("CashTransferSource")
+ transfersIn CashTransfer[] @relation("CashTransferDestination")
  expenses Expense[]
  id String @id @default(uuid()) @db.Uuid
  companyId String @map("company_id") @db.Uuid
@@ -2070,4 +2073,33 @@ model CashEntry {
  @@unique([companyId,kind,sourceId])
  @@index([companyId,cashAccountId,entryDate,id])
  @@map("cash_entries")
+}
+
+model CashTransfer {
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ transferCode String @map("transfer_code")
+ requestId String @map("request_id") @db.Uuid
+ requestDigest String @map("request_digest")
+ sourceAccountId String @map("source_account_id") @db.Uuid
+ destinationAccountId String @map("destination_account_id") @db.Uuid
+ transferDate DateTime @map("transfer_date") @db.Date
+ currency String @db.VarChar(3)
+ amount Decimal @db.Decimal(20,2)
+ description String
+ reference String
+ note String
+ status String @default("POSTED") @db.VarChar(10)
+ documentId String? @map("document_id") @db.Uuid
+ createdById String @map("created_by_id") @db.Uuid
+ voidReason String? @map("void_reason")
+ createdAt DateTime @default(now()) @map("created_at")
+ updatedAt DateTime @updatedAt @map("updated_at")
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict)
+ source CashAccount @relation("CashTransferSource",fields:[companyId,sourceAccountId],references:[companyId,id],onDelete:Restrict)
+ destination CashAccount @relation("CashTransferDestination",fields:[companyId,destinationAccountId],references:[companyId,id],onDelete:Restrict)
+ @@unique([companyId,requestId])
+ @@unique([companyId,transferCode])
+ @@index([companyId,transferDate,id])
+ @@map("cash_transfers")
 }
