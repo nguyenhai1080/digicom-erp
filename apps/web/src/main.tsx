@@ -17,7 +17,7 @@ import { Users } from './Users';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.77';
+const version = '0.6.78';
 document.title = 'ERP Core - GST';
 async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
