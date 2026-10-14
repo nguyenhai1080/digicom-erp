@@ -48,7 +48,7 @@ export function PartnerEditor({permissions,csrf,request,item,onClose,onSaved}:Pr
 }
 export function PartnerCreate({onSaved,...props}:Props&{onSaved:()=>Promise<void>}){
   const [open,setOpen]=useState(false);
-  return <section className="panel"><div className="section-heading"><div><h3>Đối tác</h3><p className="muted">Thông tin pháp lý, liên hệ và xuất Invoice/SOA theo biểu mẫu DGC.</p></div><button className="action-primary" onClick={()=>setOpen(true)}>Thêm mới đối tác</button></div>{open&&<PartnerEditor {...props} onSaved={onSaved} onClose={()=>setOpen(false)}/>}</section>;
+  return <section className="panel"><div className="section-heading"><div><h3>Đối tác</h3><p className="muted">Thông tin pháp lý, liên hệ và xuất Invoice/SOA.</p></div><button className="action-primary" onClick={()=>setOpen(true)}>Thêm mới đối tác</button></div>{open&&<PartnerEditor {...props} onSaved={onSaved} onClose={()=>setOpen(false)}/>}</section>;
 }
 export function Partners(props:Props){
   const [data,setData]=useState<any>(null);const [page,setPage]=useState(1);const [search,setSearch]=useState('');const [query,setQuery]=useState('');

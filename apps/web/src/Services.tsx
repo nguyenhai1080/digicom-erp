@@ -21,14 +21,14 @@ function ServiceEditor({item,onClose,onSaved,...props}:Props&{item?:any;onClose:
     catch(e){setMessage(e instanceof Error?e.message:'Không thể lưu dịch vụ.');}finally{setBusy(false);}
   }
   return createPortal(<dialog ref={dialog} className="partner-dialog" aria-labelledby="service-title" onCancel={e=>{if(busy)e.preventDefault();else onClose();}}>
-    <div className="partner-dialog-heading"><div><h2 id="service-title">{deleting?'Xác nhận xóa dịch vụ':item?'Hồ sơ dịch vụ':'Thêm mới dịch vụ'}</h2><p className="muted">Danh mục dịch vụ kế thừa ERP DGC.</p></div><button disabled={busy} onClick={onClose}>Đóng</button></div>
+    <div className="partner-dialog-heading"><div><h2 id="service-title">{deleting?'Xác nhận xóa dịch vụ':item?'Hồ sơ dịch vụ':'Thêm mới dịch vụ'}</h2><p className="muted">Thông tin và phân loại dịch vụ.</p></div><button disabled={busy} onClick={onClose}>Đóng</button></div>
     <form onSubmit={submit}><div className="partner-dialog-body">
       {deleting?<fieldset disabled={busy||saved}><p>Xóa vĩnh viễn <b>{item.serviceKey} · {item.serviceName}</b>? Chỉ dịch vụ chưa có liên kết nghiệp vụ mới được xóa.</p><label>Lý do xóa *<input name="deleteReason" required maxLength={500}/></label></fieldset>:
       <fieldset disabled={busy||saved||!editable}><div className="partner-grid">
         {item&&<label>Service_ID<input value={item.serviceKey} readOnly/></label>}
         <label>Mã dịch vụ<input name="serviceCode" defaultValue={item?.serviceCode??''} placeholder="Tự động nếu bỏ trống" maxLength={100}/></label>
         <label>Phân loại dịch vụ<select name="dgcCategory" defaultValue={item?(item.dgcCategory??''):'Basic'} required>
-          {item&&!item.dgcCategory&&<option value="">Chưa đối chiếu DGC · {item.category}</option>}{categories.map(c=><option key={c}>{c}</option>)}
+          {item&&!item.dgcCategory&&<option value="">Chưa phân loại · {item.category}</option>}{categories.map(c=><option key={c}>{c}</option>)}
         </select></label>
         <label className="partner-wide">Tên dịch vụ *<input name="serviceName" required maxLength={500} defaultValue={item?.serviceName??''}/></label>
         <label>Keyword<input name="keyword" maxLength={500} defaultValue={item?.keyword??''}/></label><label>Trạng thái<select name="status" defaultValue={item?.status??'ACTIVE'}>{Object.entries(statuses).filter(([k])=>k!=='ARCHIVED'||item?.status==='ARCHIVED').map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>

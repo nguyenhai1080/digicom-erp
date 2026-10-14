@@ -87,7 +87,7 @@ function historical(text:string,errors:string[],warnings:string[]):{a:Amounts;fx
  const gross=received&&before.find(v=>D(v).gt(received)&&D(received).div(v).minus('.40').abs().lte('.03'));
  const dollars=[...text.matchAll(new RegExp('('+moneyPattern+')\\s*USD\\b','gi'))].map(m=>r(n(m[1])));
  if(!sharing||!received||!gross||!dollars.length||D(dollars.at(-1)!).lte(0)){errors.push('MOVTV lịch sử thiếu số gốc để xác minh; không suy ngược bằng tỷ lệ giả định.');return null;}
- warnings.push('MOVTV lịch sử: tỷ giá được suy từ Payable MZN/USD cuối PDF theo DGC; kiểm tra bản gốc.');
+ warnings.push('MOVTV lịch sử: tỷ giá được suy từ Payable MZN/USD cuối PDF; kiểm tra bản gốc.');
  return {a:{totalServiceRevenue:gross,ivaTax:r(D(received).minus(sharing)),serviceRevenueForSharing:sharing,remunerationProvider:revenue,wht,partnerRevenue:payable},fx:D(payable).div(dollars.at(-1)!).toFixed(12)};
 }
 export function parseReconFinancial(raw:string):Financial{
