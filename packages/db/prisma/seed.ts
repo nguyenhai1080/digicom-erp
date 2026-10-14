@@ -17,6 +17,11 @@ const permissions = [
 ];
 async function main() {
   const companyCode = process.env.DEFAULT_COMPANY_CODE ?? 'GST';
+  const companyName=process.env.DEFAULT_COMPANY_NAME?.trim()||(companyCode==='GST'?'CÔNG TY CỔ PHẦN CÔNG NGHỆ GST VIỆT NAM':'');
+  const defaultCurrency=process.env.DEFAULT_COMPANY_CURRENCY??'USD';
+  const timezone=process.env.DEFAULT_COMPANY_TIMEZONE??'Asia/Ho_Chi_Minh';
+  if(!/^[A-Za-z0-9_-]{1,50}$/.test(companyCode)||!companyName||companyName.length>250||!['USD','VND','MZN'].includes(defaultCurrency))throw new Error('Provide a valid company code, legal company name and currency before seeding');
+  new Intl.DateTimeFormat('en',{timeZone:timezone}).format();
   if (companyCode === 'DEFAULT') {
     throw new Error('Company code has changed to GST; update DEFAULT_COMPANY_CODE before seeding.');
   }
@@ -25,9 +30,9 @@ async function main() {
     update: {},
     create: {
       companyCode,
-      companyName: 'CÔNG TY CỔ PHẦN CÔNG NGHỆ GST VIỆT NAM',
-      defaultCurrency: 'USD',
-      timezone: 'Asia/Ho_Chi_Minh'
+      companyName,
+      defaultCurrency,
+      timezone
     }
   });
   for (const code of permissions) {

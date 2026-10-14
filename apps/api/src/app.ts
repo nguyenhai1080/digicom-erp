@@ -24,6 +24,11 @@ export async function buildApp(options: { auth?: AuthConfig; logger?: boolean } 
   });
   await app.register(helmet);
   await app.register(cookie);
+  if(!/^[A-Za-z0-9_-]{1,50}$/.test(auth.defaultCompanyCode))throw new Error('DEFAULT_COMPANY_CODE must be a valid company key');
+  const appName=process.env.APP_NAME?.trim()||(auth.defaultCompanyCode==='GST'?'ERP Core':auth.defaultCompanyCode+' Finance');
+  const appTitle=process.env.APP_TITLE?.trim()||(auth.defaultCompanyCode==='GST'?'ERP Core - GST':appName);
+  if(appName.length>80||appTitle.length>120)throw new Error('Application branding is too long');
+  app.get('/api/v1/public-config',async (_req,reply)=>reply.header('Cache-Control','no-store').send({companyCode:auth.defaultCompanyCode,appName,appTitle}));
   await app.register(healthRoutes);
   await app.register(authRoutes, auth);
   await app.register(userRoutes, auth);

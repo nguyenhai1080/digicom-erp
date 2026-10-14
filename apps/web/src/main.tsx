@@ -14,11 +14,11 @@ import { Invoices } from './Invoices';
 import { FinanceLedger } from './FinanceLedger';
 import { Dashboard } from './Dashboard';
 import { Users } from './Users';
+import {CompanyBrandProvider,useBranding} from './CompanyBranding';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
 const version = '0.6.79';
-document.title = 'ERP Core - GST';
 async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin',
@@ -32,6 +32,7 @@ async function api(path: string, body?: unknown, csrf?: string) {
   return result;
 }
 function App() {
+  const branding=useBranding();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -55,7 +56,7 @@ function App() {
     const password = String(data.get('password') ?? '');
     setBusy(true); setMessage('');
     try {
-      const body = { companyCode: 'GST', email: data.get('email'), password };
+      const body = { companyCode: branding.companyCode, email: data.get('email'), password };
       await api('/auth/login', body); setSession(await api('/auth/me')); form.reset();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không kết nối được dịch vụ.'); }
     finally { const input = form.elements.namedItem('password'); if (input instanceof HTMLInputElement) input.value = ''; setBusy(false); }
@@ -68,7 +69,7 @@ function App() {
   }
   if (loading) return <main className="auth-screen"><p role="status">Đang kiểm tra phiên đăng nhập…</p></main>;
   if (!session) return <main className="auth-screen"><section className="auth-card">
-    <div className="brand">ERP Core</div><p className="muted">Không gian quản lý công việc và tài chính</p>
+    <div className="brand">{branding.appName}</div><p className="muted">Không gian quản lý công việc và tài chính</p>
     <h1>Đăng nhập</h1>
     <form method="post" onSubmit={submit}><fieldset disabled={busy}>
       <label>Email<input name="email" type="email" required maxLength={254} autoComplete="username" /></label>
@@ -78,7 +79,7 @@ function App() {
     {message && <p className="notice" role="alert">{message}</p>}
     <footer><span role="status">{health}</span><span>v{version} · Staging</span></footer>
   </section></main>;
-  return <div className="shell"><aside><h2>ERP Core</h2><p className="sidebar-subtitle">Hệ thống quản lý công việc và tài chính<br/>{session.user.companyCode}</p><div className="nav-title">QUẢN LÝ</div><nav className="sidebar-nav" aria-label="Quản lý ERP">
+  return <div className="shell"><aside><h2>{branding.appName}</h2><p className="sidebar-subtitle">Hệ thống quản lý công việc và tài chính<br/>{session.user.companyCode}</p><div className="nav-title">QUẢN LÝ</div><nav className="sidebar-nav" aria-label="Quản lý ERP">
     <button className={'nav ' + (page === 'dashboard' ? 'active' : '')} aria-current={page==='dashboard'?'page':undefined} onClick={() => { setPage('dashboard'); setMessage(''); }}>Dashboard</button>
     {session.user.permissions.includes('PROJECT_VIEW') && <button className={'nav ' + (page === 'projects' ? 'active' : '')} aria-current={page==='projects'?'page':undefined} onClick={() => setPage('projects')}>Quản lý Dự án</button>}
     {session.user.permissions.includes('SERVICE_VIEW') && <button className={'nav ' + (page === 'services' ? 'active' : '')} aria-current={page==='services'?'page':undefined} onClick={() => setPage('services')}>Quản lý Dịch vụ</button>}
@@ -91,10 +92,10 @@ function App() {
     {session.user.permissions.includes('PAYMENT_VIEW') && <button className={'nav '+(page==='cash'?'active':'')} onClick={()=>setPage('cash')}>Quản lý Thu chi</button>}
     {session.user.permissions.includes('SYSTEM_CONFIG_EDIT') && <button className={'nav ' + (page === 'assets' ? 'active' : '')} aria-current={page==='assets'?'page':undefined} onClick={() => setPage('assets')}>Cấu hình chung</button>}
     {session.user.permissions.includes('USER_VIEW') && <button className={'nav '+(page==='users'?'active':'')} onClick={()=>setPage('users')}>Quản lý Người dùng</button>}
-    </nav><div className="sidebar-footer">ERP Core · v{version}</div>
-  </aside><main><header><div><h1>{page==='cash'?'Quản lý Thu chi':page === 'users' ? 'Quản lý Người dùng' : page === 'revenues' ? 'Quản lý Doanh thu' : page === 'receivables' ? 'Quản lý Công nợ' : page === 'invoices' ? 'Quản lý Invoice' : page === 'assets' ? 'Cấu hình chung' : page === 'output-recon' ? 'Đối soát đầu ra' : page === 'contracts' ? 'Quản lý Hợp đồng' : page === 'projects' ? 'Quản lý Dự án' : page === 'partners' ? 'Quản lý Đối tác' : page === 'services' ? 'Quản lý Dịch vụ' : 'Dashboard'}</h1><p className="lead">{page==='cash'?'Theo dõi tiền vào, tiền ra và số dư tài khoản/quỹ.':page==='users'?'Tài khoản, vai trò và quyền truy cập.':page==='revenues'?'Theo dõi doanh thu và nguồn đối soát đã chốt.':page==='receivables'?'Theo dõi phải thu, số dư và số ngày quá hạn từ Invoice phát hành.':page==='invoices'?'Tạo Invoice theo template GST từ doanh thu đối soát đã chốt.':page==='assets'?'Tỷ giá chung, logo, dấu, chữ ký và template Invoice theo công ty.':page==='output-recon'?'Nhận và kiểm tra PDF đối soát theo đối tác, dịch vụ và kỳ.':page==='contracts'?'Quản lý hợp đồng dịch vụ đầu vào và đầu ra.':page==='services'?'Xem danh sách dịch vụ, thêm mới và cập nhật bằng popup nhập liệu.':page==='partners'?'Quản lý hồ sơ đối tác đầu vào và đầu ra.':page==='projects'?'Theo dõi tiến độ, ngân sách và chi phí dự án.':'Tổng quan hệ thống ERP và công ty.'}</p></div><div className="top-user"><div><p>{session.user.fullName}</p><p className="muted">{session.user.companyCode} · {session.user.email}</p></div><button onClick={logout} disabled={busy}>Đăng xuất</button></div></header>
+    </nav><div className="sidebar-footer">{branding.appName} · v{version}</div>
+  </aside><main><header><div><h1>{page==='cash'?'Quản lý Thu chi':page === 'users' ? 'Quản lý Người dùng' : page === 'revenues' ? 'Quản lý Doanh thu' : page === 'receivables' ? 'Quản lý Công nợ' : page === 'invoices' ? 'Quản lý Invoice' : page === 'assets' ? 'Cấu hình chung' : page === 'output-recon' ? 'Đối soát đầu ra' : page === 'contracts' ? 'Quản lý Hợp đồng' : page === 'projects' ? 'Quản lý Dự án' : page === 'partners' ? 'Quản lý Đối tác' : page === 'services' ? 'Quản lý Dịch vụ' : 'Dashboard'}</h1><p className="lead">{page==='cash'?'Theo dõi tiền vào, tiền ra và số dư tài khoản/quỹ.':page==='users'?'Tài khoản, vai trò và quyền truy cập.':page==='revenues'?'Theo dõi doanh thu và nguồn đối soát đã chốt.':page==='receivables'?'Theo dõi phải thu, số dư và số ngày quá hạn từ Invoice phát hành.':page==='invoices'?'Tạo Invoice theo template công ty từ doanh thu đối soát đã chốt.':page==='assets'?'Tỷ giá chung, logo, dấu, chữ ký và template Invoice theo công ty.':page==='output-recon'?'Nhận và kiểm tra PDF đối soát theo đối tác, dịch vụ và kỳ.':page==='contracts'?'Quản lý hợp đồng dịch vụ đầu vào và đầu ra.':page==='services'?'Xem danh sách dịch vụ, thêm mới và cập nhật bằng popup nhập liệu.':page==='partners'?'Quản lý hồ sơ đối tác đầu vào và đầu ra.':page==='projects'?'Theo dõi tiến độ, ngân sách và chi phí dự án.':'Tổng quan hệ thống ERP và công ty.'}</p></div><div className="top-user"><div><p>{session.user.fullName}</p><p className="muted">{session.user.companyCode} · {session.user.email}</p></div><button onClick={logout} disabled={busy}>Đăng xuất</button></div></header>
     {message && <p className="notice" role="alert">{message}</p>}
     {page==='cash'?<CashManagement request={api} csrf={session.csrfToken} permissions={session.user.permissions}/>:page === 'users' ? <Users request={api} csrf={session.csrfToken} permissions={session.user.permissions} userId={session.user.userId}/> : page === 'dashboard' ? <Dashboard key={session.user.companyId} request={api} permissions={session.user.permissions}/> : (page === 'revenues'||page === 'receivables') ? <FinanceLedger key={page} kind={page} request={api} csrf={session.csrfToken} permissions={session.user.permissions} canDownload={session.user.permissions.includes('INVOICE_VIEW')}/> : page === 'invoices' ? <Invoices permissions={session.user.permissions} csrf={session.csrfToken} request={api}/> : page === 'assets' ? <><CashAccounts request={api} csrf={session.csrfToken} permissions={session.user.permissions}/><ReportingRates csrf={session.csrfToken} request={api} permissions={session.user.permissions} onSaved={()=>{}}/><CompanyAssets csrf={session.csrfToken} request={api}/></> : page === 'output-recon' ? <OutputRecon permissions={session.user.permissions} csrf={session.csrfToken} request={api}/> : page === 'contracts' ? <ServiceContracts permissions={session.user.permissions} csrf={session.csrfToken} request={api}/> : page === 'services' ? <Services permissions={session.user.permissions} csrf={session.csrfToken} request={api}/> : page === 'partners' ? <Partners permissions={session.user.permissions} csrf={session.csrfToken} request={api}/> : <Execution permissions={session.user.permissions} csrf={session.csrfToken} request={api}/>}
   </main></div>;
 }
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><CompanyBrandProvider><App/></CompanyBrandProvider></React.StrictMode>);

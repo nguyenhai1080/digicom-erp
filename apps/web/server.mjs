@@ -4,7 +4,8 @@ import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const publicDirectory = fileURLToPath(new URL('./public/', import.meta.url));
-const apiBase = new URL(process.env.API_BASE_URL || 'https://erp-core-web-staging.n1.tinhgon.xyz');
+if(process.env.NODE_ENV==='production'&&!process.env.API_BASE_URL)throw new Error('Production requires the dedicated API_BASE_URL');
+const apiBase = new URL(process.env.API_BASE_URL || 'http://127.0.0.1:3001');
 if (!['https:', 'http:'].includes(apiBase.protocol) || apiBase.username || apiBase.password) {
   throw new Error('API_BASE_URL must be an HTTP(S) URL without credentials');
 }
