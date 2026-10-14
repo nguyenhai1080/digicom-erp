@@ -27,9 +27,9 @@ template.addFile('xl/sharedStrings.xml',Buffer.from('<sst><si><t>GST Synthetic</
 const cells=['B1','C2','C3','C4','C6','C7','C8','C9','C10','C11','C12','C13','B14','C17','D17','D18','D19','C20','C22','C23','C24','C25','C26','C27','D27'];
 template.addFile('xl/worksheets/sheet1.xml',Buffer.from('<worksheet><sheetData><row r="1">'+cells.map(ref=>'<c r="'+ref+'" t="s"><v>0</v></c>').join('')+'</row></sheetData></worksheet>'));
 template.addFile('xl/media/image1.png',png);template.addFile('xl/vbaProject.bin',Buffer.from('synthetic-preserved-not-executed'));
-async function makeInvoice(currency,period,amount){
- const partner=await prisma.partner.create({data:{companyId:company.id,partnerCode:currency,partnerKey:currency,legalName:'Synthetic '+currency,partnerType:'CUSTOMER'}}),service=await prisma.service.create({data:{companyId:company.id,serviceCode:currency,serviceKey:currency,serviceName:currency,category:'OTHER',keyword:currency}});
- const contract=await prisma.contract.create({data:{companyId:company.id,partnerId:partner.id,contractCode:currency,contractName:'Synthetic agreement',currency,status:'ACTIVE',dgcDirection:'Output',businessType:'REVENUE_SHARE',contractType:'OTHER',valueType:'REVENUE_SHARE',services:{create:[{companyId:company.id,serviceId:service.id,dgcStatus:'ACTIVE',businessModel:'REVENUE_SHARE'}]}}});
+async function makeInvoice(currency,period,amount,suffix=''){
+ const partner=await prisma.partner.create({data:{companyId:company.id,partnerCode:currency+suffix,partnerKey:currency+suffix,legalName:'Synthetic '+currency,partnerType:'CUSTOMER'}}),service=await prisma.service.create({data:{companyId:company.id,serviceCode:currency+suffix,serviceKey:currency+suffix,serviceName:currency,category:'OTHER',keyword:currency}});
+ const contract=await prisma.contract.create({data:{companyId:company.id,partnerId:partner.id,contractCode:currency+suffix,contractName:'Synthetic agreement',currency,status:'ACTIVE',dgcDirection:'Output',businessType:'REVENUE_SHARE',contractType:'OTHER',valueType:'REVENUE_SHARE',services:{create:[{companyId:company.id,serviceId:service.id,dgcStatus:'ACTIVE',businessModel:'REVENUE_SHARE'}]}}});
  const draft=await post('/api/v1/manual-revenue/drafts',{partnerId:partner.id,rows:[{period,serviceId:service.id,contractId:contract.id,currency,amount,deduction:'0',note:'Synthetic historical source'}]});check(draft.statusCode,201);
  const rid=draft.json().items[0].id,recon=await prisma.reconciliation.findUniqueOrThrow({where:{id:rid}});check((await post('/api/v1/manual-revenue/'+rid+'/approve',{expectedUpdatedAt:recon.updatedAt.toISOString(),confirmed:true})).statusCode,200);
  const selection={partnerId:partner.id,period,invoiceMode:'PER_SERVICE',currency,invoiceDate:period+'-28',paymentTermDays:30},preview=await post('/api/v1/invoices/preview',selection);check(preview.statusCode,200);
@@ -147,5 +147,31 @@ try{
  for(let n=1;n<=11;n++)check((await post('/api/v1/cash-accounts',{...bankInput,accountCode:'PAGE_CASH_'+String(n).padStart(2,'0'),kind:'CASH',openingBalance:'0'})).statusCode,200);
  const accountPages=[];for(let page=1;page<=2;page++){const response=await get('/api/v1/cash-accounts?page='+page);check(response.statusCode,200);check(response.json().total,14);accountPages.push(...response.json().items.map(a=>a.id));}check(new Set(accountPages).size,14);
  const bankEntries=(await get('/api/v1/cash-entries?accountId='+bank.id)).json();check(bankEntries.total,2);check(bankEntries.items.every(e=>e.cashAccountId===bank.id),true);check((await get('/api/v1/cash-entries?period=2024-06')).json().total,2);
+ // Explicitly authorized conversion of historical receipt to the current cash ledger.
+ const fixInvoice=await makeInvoice('VND','2024-02','123000','FIX'),fixRoute='/api/v1/invoices/'+fixInvoice.id+'/payments';
+ check((await post(fixRoute,{...body,requestId:randomUUID(),expectedUpdatedAt:fixInvoice.updatedAt.toISOString(),allocationAmount:'123000',cashCurrency:'VND',cashAmount:'123000',paymentDate:'2024-04-30',dateBasis:'SOURCE'})).statusCode,200);
+ const fixPayment=await prisma.invoicePayment.findFirstOrThrow({where:{invoiceId:fixInvoice.id}}),fixBank=(await post('/api/v1/cash-accounts',{...bankInput,accountCode:'FIX_BANK',openingBalance:'1000'})).json().item;
+ const fixUrl='/api/v1/invoice-payments/'+fixPayment.id+'/post-cash',fixBody={cashAccountId:fixBank.id,reason:'Owner confirms actual money received into this bank',confirmed:true};
+ check((await post(fixUrl,{...fixBody,confirmed:false})).statusCode,400);
+ check((await post(fixUrl,fixBody,{'x-csrf-token':'bad'})).statusCode,403);
+ check((await post(fixUrl,{...fixBody,cashAccountId:foreignAccount.id})).statusCode,409);
+ check((await post(fixUrl,{...fixBody,cashAccountId:usdAccount.json().item.id})).statusCode,409);
+ const closedId=bank.id;check((await post(fixUrl,{...fixBody,cashAccountId:closedId})).statusCode,409);
+ const beforeFixInvoice=await prisma.invoice.findUniqueOrThrow({where:{id:fixInvoice.id}}),beforeFixAR=await prisma.accountReceivable.findFirstOrThrow({where:{invoiceId:fixInvoice.id}});
+ await prisma.$executeRawUnsafe("ALTER TABLE cash_entries ADD CONSTRAINT test_fix_rollback CHECK(kind<>'INVOICE_RECEIPT') NOT VALID");
+ check((await post(fixUrl,fixBody)).statusCode,500);check((await prisma.cashAccount.findUniqueOrThrow({where:{id:fixBank.id}})).balance.toString(),'1000');check((await prisma.invoicePayment.findUniqueOrThrow({where:{id:fixPayment.id}})).cashAccountId,null);
+ await prisma.$executeRawUnsafe('ALTER TABLE cash_entries DROP CONSTRAINT test_fix_rollback');
+ const fixRace=await Promise.all([post(fixUrl,fixBody),post(fixUrl,fixBody)]);check(fixRace.map(r=>r.statusCode),[200,200]);check(fixRace[0].json().entryId,fixRace[1].json().entryId);
+ check((await prisma.cashAccount.findUniqueOrThrow({where:{id:fixBank.id}})).balance.toString(),'124000');check(await prisma.cashEntry.count({where:{kind:'INVOICE_RECEIPT',sourceId:fixPayment.id}}),1);
+ check((await post(fixUrl,{...fixBody,cashAccountId:fund.id})).statusCode,409);
+ check((await prisma.invoice.findUniqueOrThrow({where:{id:fixInvoice.id}})).paidAmount.toString(),beforeFixInvoice.paidAmount.toString());check((await prisma.accountReceivable.findFirstOrThrow({where:{invoiceId:fixInvoice.id}})).outstandingAmount.toString(),beforeFixAR.outstandingAmount.toString());
+ check((await prisma.invoicePayment.findUniqueOrThrow({where:{id:fixPayment.id}})).historicalSource.reference,fixPayment.historicalSource.reference);
+ const fixBankBefore=await prisma.cashAccount.findUniqueOrThrow({where:{id:fixBank.id}}),openingBody={name:fixBankBefore.name,bankName:fixBankBefore.bankName,accountNumber:fixBankBefore.accountNumber,holderName:fixBankBefore.holderName,note:'',status:'ACTIVE',expectedUpdatedAt:fixBankBefore.updatedAt.toISOString(),openingBalance:'2000',openingReason:'Owner confirms revised opening bank balance',confirmed:true};
+ check((await post('/api/v1/cash-accounts/'+fixBank.id+'/update',{...openingBody,confirmed:false})).statusCode,400);
+ check((await post('/api/v1/cash-accounts/'+fixBank.id+'/update',openingBody)).statusCode,200);
+ const adjusted=await prisma.cashAccount.findUniqueOrThrow({where:{id:fixBank.id}});check(adjusted.openingBalance.toString(),'2000');check(adjusted.balance.toString(),'125000');check(await prisma.cashEntry.count({where:{cashAccountId:fixBank.id,kind:'OPENING_ADJUSTMENT'}}),1);
+ check((await post('/api/v1/cash-accounts/'+fixBank.id+'/update',openingBody)).statusCode,409);
+ const badOpening={...openingBody,expectedUpdatedAt:adjusted.updatedAt.toISOString(),openingBalance:'1.5'};check((await post('/api/v1/cash-accounts/'+fixBank.id+'/update',badOpening)).statusCode,400);
+ check((await prisma.invoice.findUniqueOrThrow({where:{id:fixInvoice.id}})).paidAmount.toString(),'123000');
  console.log('PASS: '+checks+' historical issue/payment, real currency, missing VND/bank, tenant/CSRF/permissions, rollback, duplicate race, Invoice/revenue/AR and stable pagination checks.');
 }finally{await app.close();await prisma.$disconnect();}

@@ -26,11 +26,19 @@ export async function cashAccountRoutes(app:FastifyInstance,config:AuthConfig){
   });
  });
  app.post('/api/v1/cash-accounts/:id/update',{onRequest:writeGuard('SYSTEM_CONFIG_EDIT',config)},async req=>{
-  const accountId=id(req.params),b=parse(metadata.extend({status:z.enum(['ACTIVE','INACTIVE']),expectedUpdatedAt:timestamp}).strict(),req.body),user=req.auth!;
+  const accountId=id(req.params),b=parse(metadata.extend({status:z.enum(['ACTIVE','INACTIVE']),expectedUpdatedAt:timestamp,openingBalance:z.string().regex(/^(0|[1-9]\d{0,15})(\.\d{1,2})?$/).optional(),openingReason:z.string().trim().min(10).max(2000).optional(),confirmed:z.literal(true).optional()}).strict().refine(v=>v.openingBalance===undefined||v.confirmed===true&&!!v.openingReason),req.body),user=req.auth!;
   return prisma.$transaction(async tx=>{
    await tx.$queryRaw`SELECT id FROM cash_accounts WHERE company_id=${user.companyId}::uuid AND id=${accountId}::uuid FOR UPDATE`;
    const old=await tx.cashAccount.findFirst({where:{companyId:user.companyId,id:accountId}});if(!old)throw new CommandError(404,'Không tìm thấy tài khoản.');unchanged(old,b.expectedUpdatedAt);bankFields({...b,kind:old.kind});
-   const {expectedUpdatedAt,...fields}=b,item=await tx.cashAccount.update({where:{id:old.id},data:fields});
+   const {expectedUpdatedAt,openingBalance,openingReason,confirmed,...fields}=b;
+   const next=openingBalance===undefined?old.openingBalance:new Prisma.Decimal(openingBalance),delta=next.minus(old.openingBalance);
+   if(old.currency==='VND'&&!next.isInteger())throw new CommandError(400,'Số dư VND phải là số nguyên.');
+   if(old.balance.plus(delta).lt(0))throw new CommandError(409,'Điều chỉnh làm số dư tài khoản âm.');
+   const item=await tx.cashAccount.update({where:{id:old.id},data:{...fields,...(!delta.isZero()?{openingBalance:next,balance:{increment:delta}}:{})}});
+   if(!delta.isZero()){
+    await tx.cashEntry.create({data:{companyId:user.companyId,cashAccountId:old.id,entryCode:await code(tx,user.companyId,'CASH_ENTRY','CASH'),entryDate:old.openingDate,kind:'OPENING_ADJUSTMENT',direction:delta.gt(0)?'IN':'OUT',currency:old.currency,amount:delta.abs(),balanceAfter:item.balance,sourceId:crypto.randomUUID(),description:'Điều chỉnh số dư đầu kỳ · '+openingReason}});
+    await audit(tx,user,'CASH_OPENING_ADJUST','CashAccount',item.id,{openingBalance:old.openingBalance,balance:old.balance},{openingBalance:item.openingBalance,balance:item.balance,delta},openingReason!);
+   }
    await audit(tx,user,'CASH_ACCOUNT_EDIT','CashAccount',item.id,old,item,'Cập nhật thông tin/trạng thái tài khoản');return {item,message:'Đã cập nhật tài khoản.'};
   });
  });

@@ -90,6 +90,34 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
    return {paymentId:payment.id,message:'Đã ghi nhận thanh toán, cập nhật Invoice và công nợ. Còn phải thu '+a.outstanding.toFixed(2)+' '+inv.currency+'.'};
   },{timeout:30000});}catch(e){await rollbackFiles(files);throw e;}
  });
+ app.post('/api/v1/invoice-payments/:id/post-cash',{onRequest:writeGuard('PAYMENT_POST',config)},async request=>{
+  const user=request.auth!,paymentId=id(request.params),b=parse(z.object({cashAccountId:z.uuid(),reason:z.string().trim().min(10).max(2000),confirmed:z.literal(true)}).strict(),request.body);
+  if(!['PAYMENT_CREATE','PAYMENT_APPROVE'].every(p=>user.permissions.includes(p)))throw new CommandError(403,'Cần quyền tạo và duyệt thanh toán.');
+  return prisma.$transaction(async tx=>{
+   const initial=await tx.invoicePayment.findFirst({where:{companyId:user.companyId,id:paymentId},include:{invoice:true}});
+   if(!initial)throw new CommandError(404,'Không tìm thấy thanh toán.');
+   await financialPeriodLock(tx,user.companyId,initial.invoice.partnerId,initial.invoice.period);
+   await tx.$queryRaw`SELECT id FROM invoices WHERE id=${initial.invoiceId}::uuid AND company_id=${user.companyId}::uuid FOR UPDATE`;
+   await tx.$queryRaw`SELECT id FROM invoice_payments WHERE id=${paymentId}::uuid AND company_id=${user.companyId}::uuid FOR UPDATE`;
+   const payment=await tx.invoicePayment.findFirstOrThrow({where:{companyId:user.companyId,id:paymentId},include:{invoice:{include:{receivable:true}}}});
+   const existing=await tx.cashEntry.findUnique({where:{companyId_kind_sourceId:{companyId:user.companyId,kind:'INVOICE_RECEIPT',sourceId:paymentId}}});
+   if(existing){if(payment.cashAccountId!==b.cashAccountId||existing.cashAccountId!==b.cashAccountId)fail('Khoản thu đã được ghi vào tài khoản khác.');return {message:'Khoản thu đã được ghi vào tài khoản; không cộng trùng.',entryId:existing.id};}
+   if(payment.cashAccountId||!payment.historicalSource)fail('Chỉ bổ sung tài khoản cho khoản lịch sử chưa ghi vào sổ tài khoản.');
+   const inv=payment.invoice,ar=inv.receivable;
+   if(!inv.isCurrent||!inv.issuedAt||!['PAID','PARTIALLY_PAID','ISSUED','OVERDUE'].includes(inv.status)||!ar||ar.companyId!==user.companyId||!ar.paidAmount.eq(inv.paidAmount)||!ar.outstandingAmount.eq(ar.originalAmount.minus(ar.paidAmount)))fail('Invoice hoặc công nợ không hợp lệ.');
+   const total=await tx.invoicePayment.aggregate({where:{companyId:user.companyId,invoiceId:inv.id},_sum:{allocationAmount:true}});
+   if(!(total._sum.allocationAmount??D('0')).eq(inv.paidAmount))fail('Lịch sử thanh toán không khớp số đã thu.');
+   if(payment.cashCurrency!=='VND'||!payment.cashAmount.gt(0)||!payment.cashAmount.isInteger())fail('Cần số tiền VND thực nhận hợp lệ trước khi ghi vào tài khoản.');
+   await tx.$queryRaw`SELECT id FROM cash_accounts WHERE company_id=${user.companyId}::uuid AND id=${b.cashAccountId}::uuid FOR UPDATE`;
+   const account=await tx.cashAccount.findFirst({where:{companyId:user.companyId,id:b.cashAccountId,status:'ACTIVE',currency:payment.cashCurrency}});
+   if(!account||account.openingDate>payment.paymentDate||payment.paymentDate>new Date())fail('Tài khoản không hợp lệ hoặc ngày nhận tiền nằm ngoài thời gian theo dõi.');
+   const updated=await tx.cashAccount.update({where:{id:account.id},data:{balance:{increment:payment.cashAmount}}});
+   const entry=await tx.cashEntry.create({data:{companyId:user.companyId,cashAccountId:account.id,entryCode:await code(tx,user.companyId,'CASH_ENTRY','CASH'),entryDate:payment.paymentDate,kind:'INVOICE_RECEIPT',direction:'IN',currency:payment.cashCurrency,amount:payment.cashAmount,balanceAfter:updated.balance,sourceId:payment.id,description:'Thu tiền Invoice '+inv.invoiceNumber+' · '+payment.paymentCode}});
+   const result=await tx.invoicePayment.update({where:{id:payment.id},data:{cashAccountId:account.id,bankAccount:[account.accountCode,account.bankName,account.accountNumber,account.name].filter(Boolean).join(' · '),paymentMethod:account.kind==='BANK'?'Bank Transfer':'Cash',historicalSource:{...(payment.historicalSource as object),cashPosting:{entryId:entry.id,postedAt:new Date().toISOString(),postedById:user.userId,reason:b.reason}}}});
+   await audit(tx,user,'INVOICE_PAYMENT_CASH_POST','InvoicePayment',payment.id,{cashAccountId:payment.cashAccountId,balance:account.balance,historicalSource:payment.historicalSource},{cashAccountId:result.cashAccountId,balance:updated.balance,entryId:entry.id,amount:payment.cashAmount,invoicePaid:inv.paidAmount,arOutstanding:ar.outstandingAmount},b.reason);
+   return {message:'Đã cộng '+payment.cashAmount.toFixed(0)+' VND vào '+account.accountCode+'. Giữ nguyên số đã thu và công nợ.',entryId:entry.id};
+  },{timeout:30000});
+ });
  app.get('/api/v1/invoice-payments/:id/document',{preHandler:requirePermission('PAYMENT_VIEW')},async(request,reply)=>{
   const user=request.auth!,payment=await prisma.invoicePayment.findFirst({where:{companyId:user.companyId,id:id(request.params)}});
   if(!payment?.documentId)throw new CommandError(404,'Không có chứng từ.');
