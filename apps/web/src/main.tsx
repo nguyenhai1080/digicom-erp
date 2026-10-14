@@ -17,7 +17,7 @@ import { Users } from './Users';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.69';
+const version = '0.6.70';
 document.title = `ERP Core Web · v${version}`;
 async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
