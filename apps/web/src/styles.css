@@ -30,6 +30,7 @@ h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:20px;line-height:1
 .financial-review td input { min-width: 110px; max-width: 150px; }
 .financial-total { background: #edf4fa; font-weight: 600; }
 .number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.currency { text-align: center; white-space: nowrap; }
 .signing-canvas { position: relative; margin: 16px 0; width: 100%; border: 1px solid #d9e2ed; background: white; }
 .signing-canvas .scan-image { display: block; width: 100%; height: auto; }
 .signing-canvas .signing-overlay { position: absolute; height: auto; cursor: move; touch-action: none; border: 1px dashed #1f507c; }
