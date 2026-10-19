@@ -47,6 +47,10 @@ async function issuePlan(tx:Prisma.TransactionClient,companyId:string,id:string)
   if(sourceIds.length>2000||sourceIds.some(v=>typeof v!=='string'||!z.uuid().safeParse(v).success))fail('Tham chiếu doanh thu không hợp lệ.');
   const rows=await tx.revenue.findMany({where:{companyId,id:{in:sourceIds}},include:{reconciliation:true,service:true,contract:true}});
   if(rows.length!==sourceIds.length)fail('Không tìm thấy đủ doanh thu thuộc công ty.');
+  if(snap.layout==='DGC_V61_V1'){
+   if(!Array.isArray(snap.sourceVersions)||snap.sourceVersions.length!==sourceIds.length||new Set(snap.sourceVersions.map((s:any)=>s.id)).size!==sourceIds.length)fail('Invoice DGC thiếu phiên bản nguồn đã chốt.');
+   for(const rv of rows){const v=snap.sourceVersions.find((s:any)=>s.id===rv.id);if(!v||v.updatedAt!==rv.updatedAt.toISOString()||v.reconciliationUpdatedAt!==rv.reconciliation.updatedAt.toISOString()||v.calculationChecksum!==sha(JSON.stringify(rv.calculationJson)))fail('Nguồn Invoice DGC đã thay đổi sau khi tạo PDF; cần tạo lại bản nháp.');}
+  }
   for(const rv of rows){
    const j=rv.calculationJson as any,recon=rv.reconciliation;
    if(!rv.isCurrent||!['INVOICE_READY','INVOICED'].includes(rv.status)||!j?.dgc||!j.approvedById||!recon.isCurrent||recon.status!=='APPROVED'||recon.companyId!==companyId||rv.service.companyId!==companyId||rv.contract.companyId!==companyId||rv.partnerId!==i.partnerId||rv.currency!==i.currency||rv.periodStart.toISOString().slice(0,7)!==i.period)fail('Doanh thu/đối soát nguồn chưa duyệt, đã thay thế hoặc sai liên kết.');

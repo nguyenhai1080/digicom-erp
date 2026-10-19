@@ -2,6 +2,8 @@
 
 Ngày 19/10/2026, Asia/Saigon. Đây là kế hoạch chuẩn bị, chưa phải biên bản nghiệm thu hay lệnh triển khai.
 
+Đã bắt đầu staging địa phương và triển khai Invoice DGC riêng; xem [kết quả và phạm vi đã kiểm tra](DGC_MIGRATION_AND_INVOICE_20261019.md). Phần dưới giữ kế hoạch đích; trạng thái importer/chưa có DB thử trong bản đầu không còn mô tả toàn bộ hiện trạng.
+
 ## Môi trường độc lập
 
 | Thành phần | Địa phương | Staging | Production |

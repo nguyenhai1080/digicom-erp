@@ -21,7 +21,7 @@ function Editor({item,refs,onClose,onSaved,...props}:Props&{item:any;refs:any;on
  <label className="partner-wide">Đối tác *<select name="partnerId" required defaultValue={item?.partnerId??''}><option value="">Chọn đối tác…</option>{refs.partners.map((p:any)=><option key={p.id} value={p.id}>{p.partnerKey} · {p.legalName} · {p.status}</option>)}</select></label>
  <div className="partner-wide"><b>Dịch vụ</b><div className="contract-service-options">{refs.services.map((s:any)=><label key={s.id}><input type="checkbox" name="serviceIds" value={s.id} defaultChecked={selected.includes(s.id)}/>{s.serviceKey} · {s.serviceName} · {s.status}</label>)}</div><p className="hint">Bỏ chọn sẽ giữ liên kết cũ ở trạng thái Inactive.</p></div>
  {(['signingDate','effectiveDate','expiryDate'] as const).map((k,i)=><label key={k}>{['Ngày ký','Ngày bắt đầu','Ngày kết thúc'][i]}<input name={k} type="date" defaultValue={item?.[k]?.slice(0,10)??''}/></label>)}
- <label>Tiền tệ<select name="currency" defaultValue={item?.currency??'MZN'}>{['MZN','USD','VND'].map(v=><option key={v}>{v}</option>)}</select></label>
+ <label>Tiền tệ<select name="currency" defaultValue={item?.currency??'USD'}>{['USD','VND'].map(v=><option key={v}>{v}</option>)}</select></label>
  {['revenueShareRate','taxRate'].map((k,i)=><label key={k}>{['Revenue share rate','Tax rate'][i]}<input name={k} type="number" min="0" max="1" step="0.000001" defaultValue={item?.[k]??'0'}/><span className="hint">Nhập tỷ lệ: 0.15 = 15%</span></label>)}
  <label>Fixed fee<input name="fixedFee" type="number" min="0" step="0.0001" defaultValue={item?.fixedFee??'0'}/></label>
  <label>Payment term days<input name="paymentTermDays" type="number" min="0" max="3650" step="1" defaultValue={item?.paymentTermDays??30}/></label>

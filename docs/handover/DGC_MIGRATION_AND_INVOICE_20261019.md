@@ -1,0 +1,81 @@
+# Đợt chuyển dữ liệu thử và Invoice DGC — 19/10/2026
+
+Tài liệu này cập nhật trạng thái sau PROGRESS_20261019.md. Chưa triển khai production, chưa nghiệm thu toàn bộ DGC và chưa đưa số liệu tài chính thật vào các bảng vận hành.
+
+## Nguồn đã kiểm tra lại
+
+- `clasp deployments` tại checkout Apps Script cũ, chỉ đọc: deployment được bàn giao vẫn trỏ **version 61**, mô tả `Prevent-recurring-small-OCR-and-cancelled-invoice-errors`. Không push/deploy/chạy hàm Apps Script.
+- Google Drive/Sheets xác nhận đúng workbook **DGC_ERP_2026_PROD_RC1_CLONE**, ID `1xDrNhKbLTSSidbX6R1Ajo-7AkX2QY2AcSPBDefeaF6A`.
+- Lấy CellData của **25 bảng**, gồm các bảng nghiệp vụ trong snapshot cũ và `55_APPROVAL_PACKAGE`; loại trừ người dùng, bí mật cấu hình, bảng backup/repair và báo cáo sinh lại. Giữ userEntered/effective/formatted values, công thức, định dạng số/ngày, hyperlink/note và số hàng thật.
+- Timezone workbook là **America/Los_Angeles**, locale en_GB. Không suy timezone báo cáo từ timezone người thao tác hoặc baseline Africa/Maputo. Serial ngày được chuyển thành ngày lịch nguồn theo epoch Sheets, không chạy qua timezone của máy. Giá trị raw/display luôn được giữ lại.
+- Snapshot là nhiều lần đọc liên tiếp, **chưa khóa nguồn và không bảo đảm snapshot tài chính nguyên tử**. Cần xuất lại trong cửa sổ khóa ghi trước cutover; đây là dữ liệu thử.
+
+Tất cả dữ liệu thô, báo cáo chi tiết, quyết định có hash nguồn và backup nằm trong `artifacts/dgc-migration/20261019/`, bị Git ignore. Không có raw donor hoặc dữ liệu thật được đưa vào Git.
+
+## Kết quả chuyển thử thực tế
+
+PostgreSQL riêng trong container **dgc-erp-acceptance-postgres**, cổng loopback **55433**. Không dùng container `erp-core-postgres` ở cổng 5432. Database chứa snapshot thật là **dgc_migration_staging_snapshot_20261019**; các database `*_synthetic`, `erp_execution_acceptance_*` chỉ chứa fixture tổng hợp.
+
+| Hạng mục | Kết quả |
+| --- | ---: |
+| Hàng nguồn giữ nguyên trong staging | 3.154 |
+| Dịch vụ đã nhập vào danh mục | 10 |
+| Đối tác đã nhập vào danh mục | 4 |
+| Khóa ánh xạ đã lưu | 14 |
+| Hợp đồng đã nhập thật | 0 |
+| Revenue / Invoice / cash account / cash entry vận hành từ nguồn thật | 0 |
+| User đăng nhập từ nguồn thật | 0 |
+
+Chạy lại staging không tăng 3.154 hàng. Chạy lại services trả về 0 created/10 unchanged; partners trả về 0 created/4 unchanged. Raw rows vẫn giữ ID trùng theo sheet ID/hàng nguồn. Không tạo công nợ từ cả AR_AP và INVOICES, không nhân đôi dòng tiền payment/transaction.
+
+Chủ sở hữu đã xác nhận ánh xạ **Movitel.Status → Active**. Source là `21_DM_PARTNER!R2`, hàng có `Partner_ID=Movitel`, ô trống. Mapping chỉ áp dụng với đúng snapshot/row hash, lưu reason/approvedBy/approvedAt, digest vào kế hoạch và audit `DGC_IMPORT_DECISION`; không sửa Google Sheet. Có đúng một decision audit sau replay.
+
+Còn **8 hàng chờ quyết định trước import contracts**: Tax_Rate ở sáu hợp đồng CTR0003–CTR0008 vượt miền 0–1 của hệ mới; liên kết CTS0008/MYCLIP và CTS0009/MEU PAR chưa khớp danh mục. Không chia tỷ lệ cho 100 hoặc tạo dịch vụ mới tự động. Xem báo cáo private `prepared/pending-master-decisions.json` để đối chiếu giá trị raw/display và vị trí nguồn.
+
+Preflight có **40 cảnh báo**: 7 nhóm ID trùng, 14 tham chiếu không khớp và 19 tham chiếu có nhiều ứng viên. Đây là số diagnostics theo trường, không phải 40 hồ sơ độc lập. Chưa có resolver toàn chuỗi tài chính. Bộ đếm tìm 474 Drive ID từ 2.087 tham chiếu theo phạm vi/thuật toán mới, có thêm approval packages; không so trực tiếp với 465/1.939 ở kiểm kê cũ và không coi là file đã tải.
+
+Đã tạo pg_dump custom, SHA-256 và manifest trong `backup/`; restore sang **dgc_migration_staging_restore_20261019** giữ đúng 3.154 hàng nguồn, 14 mapping, 10 dịch vụ, 4 đối tác, không có Invoice/cash entry vận hành. Container thử chưa có chính sách vận hành/backup định kỳ; snapshot và dump riêng là nguồn phục hồi của đợt này.
+
+## Công cụ migration đã triển khai
+
+`scripts/dgc-migration.mjs` có ba lệnh:
+
+```powershell
+node scripts/dgc-migration.mjs prepare --cells artifacts/dgc-migration/20261019/cells --out artifacts/dgc-migration/20261019/prepared --decisions artifacts/dgc-migration/20261019/owner-decisions.json
+node scripts/dgc-migration.mjs stage --snapshot <snapshot.json> --snapshot-hash <reviewed-hash>
+node scripts/dgc-migration.mjs apply-masters --snapshot <snapshot.json> --snapshot-hash <reviewed-hash> --scope services --plan-hash <reviewed-plan-hash> --decisions <owner-decisions.json>
+```
+
+`DATABASE_URL` phải được cấp riêng trong tiến trình, chỉ chấp nhận localhost và tên DB `dgc_migration_staging_*`. Có đúng một tenant DGC. Chỉ ghi báo cáo riêng tư dưới `artifacts/`.
+
+Migration additive bổ sung `dgc_import_snapshots`, `dgc_import_rows`, `dgc_import_links` và Prisma models tương ứng. Mỗi hàng giữ sheet ID/tên, số hàng, legacy ID, row hash, payload raw/display và snapshot hash. Liên kết tới target có target hash; replay từ chối nguồn bị sửa/di chuyển, đích bị sửa, khóa không có provenance, mapping mới khác hoặc checksum bị can thiệp. Company row lock và transaction bảo vệ import; audit cùng transaction. Mã hiện hỗ trợ import danh mục services/partners/contracts/contractServices; toàn scope bị chặn nếu còn vấn đề trong scope đó.
+
+File decisions hỗ trợ **Status**, **Tax_Rate của contracts** và **Service_ID của contractServices** có xác nhận owner, lý do và khớp chính xác snapshot/hàng/hash/giá trị cũ. Phải cung cấp giá trị đích được xác nhận; không tự chia thuế cho 100, làm tròn hay đoán alias. Các kiểm tra tỷ lệ và phụ thuộc danh mục vẫn chạy sau mapping. Mọi import financial và di chuyển file vẫn cần implementation riêng.
+
+## Invoice DGC đã có runtime riêng
+
+Nguồn hành vi: donor v61 `40_Invoice_Core.js:363–465, 627–796`, `41_Invoice_PDF.js:10`, `80_Audit_Integrity.js:549`. Không sử dụng template pháp nhân GST cho DGC.
+
+- Cấu hình Invoice tại Tài sản công ty: pháp nhân, địa chỉ/liên hệ, ngân hàng/SWIFT, tên và chức danh người ký. API `/api/v1/company/invoice-profile` yêu cầu SYSTEM_CONFIG_EDIT, đúng Origin/CSRF, expectedUpdatedAt, có phiên bản và audit. Không có ngân hàng/chữ ký/pháp nhân thật được tự điền hoặc upload trong đợt này.
+- DGC yêu cầu **COMPANY_LOGO, COMPANY_STAMP, SIGNATURE** riêng, đọc đúng tenant và kiểm checksum; không dùng SIGNING_COMPOSITE của GST. Preview cho kéo dấu và chữ ký độc lập. Metadata snapshot giữ profile, từng asset ID/version/hash và vị trí; thay config/asset làm digest cũ hết hiệu lực.
+- Numbering **01/MM/YYYY/DGC-INV**, ít nhất hai chữ số, sequence theo tháng. Quét số lớn nhất trong lịch sử Invoice cùng tenant, kể cả cancelled/superseded, kết hợp sequence để không cấp lại số đã nhập. Company lock, period lock và digest bảo vệ create/retry.
+- Hạn thanh toán mặc định 45 ngày; giá trị 0 trong yêu cầu DGC cũng được hiểu là 45 theo `payload.paymentTermDays || 45` của donor. Ngày đến hạn hiển thị trong preview và snapshot.
+- USD giữ hai chữ số, VND giữ số nguyên. Contract UI/API mặc định USD và chỉ chọn USD/VND theo phạm vi owner. MZN chỉ là thông tin nguồn PDF.
+- Bundle in từng dịch vụ con theo donor; tổng nhóm lấy từ TOTAL. Điều chỉnh chênh lệch làm tròn vào dòng cuối theo helper donor, chặn dòng âm. Khác quy tắc parent-only riêng GST; nhánh GST vẫn dùng adapter cũ.
+- Draft/PDF/workbook và scope tạo cùng transaction, rollback file khi DB thất bại. Draft không tạo AR. Issue tiếp tục dùng guard nguồn/permission/digest/one-AR của core; DGC bổ sung kiểm phiên bản nguồn từ lúc tạo PDF. Thay đổi nguồn yêu cầu tạo lại draft, không dùng lại PDF cũ. Không gửi email.
+- UI phân trang 10 dòng cho chi tiết Invoice và tài sản công ty; kế thừa list Invoice/AR và các guard thanh toán hiện có.
+
+Thích ứng công khai: renderer pdf-lib giữ các trường nghiệp vụ donor nhưng bố cục được dựng lại; hỗ trợ phân trang thay vì `overflow:hidden` của HTML donor. Tên/chức danh là text cấu hình, dấu và chữ ký là hai ảnh nguyên gốc như donor Invoice. Workbook XLSX DGC là bản xuất bổ sung, giữ decimal dưới dạng chuỗi chính xác, không chạy macro; không giả là workbook gốc của DGC. Chưa nghiệm thu mẫu pháp nhân/chữ ký thật hoặc thao tác UI trên trình duyệt.
+
+Luồng đối soát đầu ra hiện vẫn dùng composite và quy tắc chọn kiểu ký theo partner DIGICOM của nền GST; chưa chuyển toàn bộ phần này sang asset/signing policy DGC. InputRecon/AP/PDF, SOA và mapping quyền Staff/Manager/BOD chưa hoàn tất. Invoice cancel/tạo lại sau phát hành chưa thanh toán, draft tham chiếu song song giữa hai chế độ billing, SOA as-of, lịch sử cash và file gốc vẫn thuộc phần việc tiếp theo; xóa draft không thay chức năng cancel đã phát hành.
+
+## Kiểm tra và phần tiếp theo
+
+- Build toàn workspace Node 22/pnpm 10.18.3 đạt; migration trên các DB dùng thử đạt.
+- Migration characterization và PostgreSQL integration: danh mục/quan hệ hợp đồng, replay, sửa nguồn/đích, hàng di chuyển, checksum, owner decision và rollback khi downstream lỗi; không phát sinh financial posting.
+- DGC Invoice characterization: child expansion/rounding, numbering, ảnh ký tách biệt, trang dài, company/overlap guards. Windows integration đạt 66 assertions cho profile/version/quyền, draft/PDF/workbook, số lịch sử, nguồn thay đổi, rollback, issue/AR USD/VND.
+- Đã render và xem trực quan PDF tổng hợp một trang, nhiều trang và preview thực tế qua API bằng Poppler. Các ảnh trong proof là hình chữ nhật fixture, không phải chữ ký thật.
+- Linux Node 22/PostgreSQL/Poppler/Tesseract: **264** checks trong luồng chung đối soát–Invoice–AR/payment, **101** checks hợp đồng dịch vụ, **72** assertions DGC API gồm cả preview PNG và mặc định hạn thanh toán đều đạt. API được biên dịch từ source hiện tại trong container kiểm thử, DB fixture riêng; không dùng bản deploy hoặc DB GST.
+- Ba kỳ vọng lỗi thời trong suite cũ được đối chiếu với code HEAD/donor trước sửa test: PDF mở inline; register AR chỉ liệt kê khoản còn dư; người có quyền được duyệt draft trực tiếp như UI hiện tại và donor generic status helper. Bổ sung kiểm tra quyền và direct-approval đúng hành vi. Không đổi nghiệp vụ runtime để chạy theo các kỳ vọng cũ.
+
+Ưu tiên tiếp tục: (1) quyết định tám hàng contracts/alias, import contracts với provenance; (2) tách signing policy đối soát DGC, kiểm quyền từng action; (3) port InputRecon/AP và SOA từ donor với fixture, ghi rõ as-of; (4) resolver và importer financial/file toàn chuỗi, đối soát lại theo tiền tệ/kỳ/đối tác; (5) nghiệm thu staging, cấp remote/host DGC đúng tài khoản rồi mới cutover. Chưa có dịch vụ, DNS hoặc production DGC được tạo trong đợt này.

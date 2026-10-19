@@ -6,7 +6,8 @@
 
 - This checkout is DGC Finance, branch `dgc/main`; read START_HERE.md and docs/handover/PROGRESS_20261019.md before continuing. Do not push it to the GST upstream or deploy to GST services.
 - Keep database, storage, credentials and deployment services separate from GST. The current Vibehost connector was verified as GST Vietnam, not the required old DGC account.
-- The GST-only Invoice renderer/numbering remains blocked for DGC until source-grounded DGC implementation and fixtures exist. Do not remove that guard just to enable DGC.
+- DGC uses the separate DGC_V61_V1 Invoice adapter, confirmed invoice profile and separate logo/stamp/signature assets; GST keeps its own renderer. Do not substitute the GST template or composite signature into the DGC flow. See docs/handover/DGC_MIGRATION_AND_INVOICE_20261019.md for current validation and remaining scope.
+- Local migration tools accept only localhost databases named dgc_migration_staging_*. Raw staged rows are private evidence, not posted financial records. The real snapshot currently has 10 services and 4 partners imported into local staging; Movitel Active was explicitly approved by the owner. Contract decisions and all financial imports remain pending.
 - DGC tables default to 10 rows, including cash reports. GST's exception of 12 rows does not apply here.
 
 The owner clarified on 2026-10-08 that ERP Core must inherit the full existing ERP DGC functionality and business behavior. The new business domain is Projects. Do not replace DGC with a simplified unrelated ERP or use project workflows as substitutes for existing service finance workflows.

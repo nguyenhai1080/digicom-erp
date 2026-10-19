@@ -18,6 +18,8 @@
     "test:recon-financial": "node tests/recon-financial.characterization.mjs",
     "test:company-branding": "node tests/company-branding.mjs",
     "test:dgc-config": "node tests/dgc-config-preflight.mjs",
+    "test:dgc-invoice": "node tests/dgc-invoice.characterization.mjs",
+    "test:dgc-invoice:integration": "node tests/dgc-invoice.integration.mjs",
     "test:recon-invoice": "node tests/recon-invoice.integration.mjs"
   },
   "dependencies": {

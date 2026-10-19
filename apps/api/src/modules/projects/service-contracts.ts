@@ -2,14 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, Prisma } from '@erp/db';
 import { requirePermission, type AuthConfig } from '../auth/access.js';
-import { audit, CommandError, currency, date, money, parse, text, timestamp, unchanged, writeGuard } from './commands.js';
+import { audit, CommandError, date, money, parse, text, timestamp, unchanged, writeGuard } from './commands.js';
 const optionalText=(max=500)=>z.string().trim().max(max).nullable().optional();
 const rate=z.string().regex(/^(0(\.\d{1,6})?|1(\.0{1,6})?)$/);
 const statuses=['DRAFT','ACTIVE','EXPIRED','TERMINATED','SUSPENDED'] as const;
 const profile=z.object({contractName:text,contractNumber:optionalText(100),partnerId:z.uuid(),
   dgcDirection:z.enum(['Input','Output','Other']).default('Output'),serviceIds:z.array(z.uuid()).max(100).default([]),
   signingDate:date.nullable().optional(),effectiveDate:date.nullable().optional(),expiryDate:date.nullable().optional(),
-  currency:currency.default('MZN'),revenueShareRate:rate.default('0'),fixedFee:money.default('0'),taxRate:rate.default('0'),
+  currency:z.enum(['USD','VND']).default('USD'),revenueShareRate:rate.default('0'),fixedFee:money.default('0'),taxRate:rate.default('0'),
   paymentTermDays:z.number().int().min(0).max(3650).default(0),billingCycle:z.string().trim().min(1).max(100).default('Monthly'),
   status:z.enum(statuses).default('DRAFT'),ownerEmail:z.email().max(254).nullable().optional(),
   attachmentUrl:z.url().max(2000).refine(v=>/^https?:\/\//i.test(v)).nullable().optional(),notes:optionalText(4000)});

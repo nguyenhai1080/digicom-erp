@@ -15,6 +15,7 @@ import { reconFinalizeRoutes } from './recon-finalize.js';
 import { invoiceRoutes } from './invoices.js';
 import { invoicePaymentRoutes } from './invoice-payments.js';
 import {manualRevenueRoutes} from './manual-revenue.js';
+import {dgcInvoiceProfileRoutes} from './dgc-invoice-profile.js';
 import { financeLedgerRoutes } from './finance-ledger.js';
 const projectId = (input: unknown) => parse(z.object({ id: z.uuid() }), input).id;
 const childIds = (input: unknown) => parse(z.object({ id: z.uuid(), child: z.uuid() }), input);
@@ -41,6 +42,7 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   await app.register(outputReconRoutes, config);
   await app.register(reconFinalizeRoutes, config);
   await app.register(invoiceRoutes, config);
+  await app.register(dgcInvoiceProfileRoutes, config);
   await app.register(financeLedgerRoutes, config);
   await app.register(invoicePaymentRoutes, config);
   await app.register(cashAccountRoutes, config);

@@ -522,6 +522,7 @@ enum ValidationSeverity {
 }
 
 model Company {
+  dgcImportSnapshots DgcImportSnapshot[]
   cashTransfers CashTransfer[]
   cashAccounts CashAccount[]
   cashEntries CashEntry[]
@@ -588,6 +589,53 @@ model Company {
   projectCostEntries        ProjectCostEntry[]
 
   @@map("companies")
+}
+
+model DgcImportSnapshot {
+ companyId String @map("company_id") @db.Uuid
+ snapshotHash String @map("snapshot_hash")
+ sourceSpreadsheetId String @map("source_spreadsheet_id")
+ sourceMetadata Json @map("source_metadata")
+ rowCount Int @map("row_count")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ rows DgcImportRow[]
+ @@id([companyId,snapshotHash])
+ @@map("dgc_import_snapshots")
+}
+
+model DgcImportRow {
+ companyId String @map("company_id") @db.Uuid
+ snapshotHash String @map("snapshot_hash")
+ sheetId Int @map("sheet_id")
+ sheetName String @map("sheet_name")
+ sourceRow Int @map("source_row")
+ legacyId String @map("legacy_id")
+ rowHash String @map("row_hash")
+ payload Json
+ snapshot DgcImportSnapshot @relation(fields:[companyId,snapshotHash],references:[companyId,snapshotHash],onDelete:Restrict,onUpdate:NoAction)
+ links DgcImportLink[]
+ @@id([companyId,snapshotHash,sheetId,sourceRow])
+ @@index([companyId,sheetId,legacyId],map:"dgc_import_source_lookup")
+ @@map("dgc_import_rows")
+}
+
+model DgcImportLink {
+ companyId String @map("company_id") @db.Uuid
+ sourceSpreadsheetId String @map("source_spreadsheet_id")
+ sheetId Int @map("sheet_id")
+ sourceRow Int @map("source_row")
+ legacyId String @map("legacy_id")
+ rowHash String @map("row_hash")
+ snapshotHash String @map("snapshot_hash")
+ targetModel String @map("target_model")
+ targetId String @map("target_id") @db.Uuid
+ targetHash String @map("target_hash")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+ source DgcImportRow @relation(fields:[companyId,snapshotHash,sheetId,sourceRow],references:[companyId,snapshotHash,sheetId,sourceRow],onDelete:Restrict,onUpdate:NoAction)
+ @@id([companyId,sourceSpreadsheetId,sheetId,sourceRow,legacyId])
+ @@unique([companyId,targetModel,targetId])
+ @@map("dgc_import_links")
 }
 
 model User {

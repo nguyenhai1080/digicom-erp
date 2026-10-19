@@ -27,7 +27,7 @@ try{
  check((await request('GET','/api/v1/service-contracts',undefined,{cookie:''})).statusCode,401);
  check((await request('POST','/api/v1/service-contracts',profile,{'x-csrf-token':'bad'})).statusCode,403);
  check((await request('POST','/api/v1/service-contracts',profile,{origin:'https://foreign.example.test'})).statusCode,403);
- for(const invalid of [{contractName:' '},{companyId:other.id},{createdBy:'spoof'},{ownerUserId:user.id},{revenueShareRate:'15'},{revenueShareRate:'0.1234567'},{taxRate:'-1'},{fixedFee:'-1'},{paymentTermDays:-1},{effectiveDate:'2026-02-30'},{effectiveDate:'2026-05-02',expiryDate:'2026-05-01'},{status:'SIGNED'},{dgcDirection:'PROJECT'},{attachmentUrl:'javascript:alert(1)'},{ownerEmail:'bad'}])check((await post('/api/v1/service-contracts',{...profile,...invalid})).statusCode,400);
+ for(const invalid of [{contractName:' '},{companyId:other.id},{createdBy:'spoof'},{ownerUserId:user.id},{revenueShareRate:'15'},{revenueShareRate:'0.1234567'},{taxRate:'-1'},{fixedFee:'-1'},{paymentTermDays:-1},{effectiveDate:'2026-02-30'},{effectiveDate:'2026-05-02',expiryDate:'2026-05-01'},{status:'SIGNED'},{dgcDirection:'PROJECT'},{currency:'MZN'},{attachmentUrl:'javascript:alert(1)'},{ownerEmail:'bad'}])check((await post('/api/v1/service-contracts',{...profile,...invalid})).statusCode,400);
  check((await post('/api/v1/service-contracts',{...profile,partnerId:foreignPartner.id})).statusCode,404);
  check((await post('/api/v1/service-contracts',{...profile,serviceIds:[foreignService.id]})).statusCode,404);
  const response=await post('/api/v1/service-contracts',profile);check(response.statusCode,201);let item=response.json().item;
@@ -48,7 +48,7 @@ try{
  }
  check(await prisma.revenue.count({where:{companyId:company.id}}),0);check(await prisma.reconciliation.count({where:{companyId:company.id}}),0);
  const log=await prisma.auditLog.findFirst({where:{entityId:item.id,action:'CONTRACT_EDIT'}});check(log.companyId,company.id);check(log.userId,user.id);check(log.newValue.services.length,2);
- const unused=(await post('/api/v1/service-contracts',{contractName:'Unused default fixture',partnerId:partner.id})).json().item;check(unused.contractCode,'CTR0002');check(unused.currency,'MZN');check(unused.paymentTermDays,0);check(unused.services.length,0);
+ const unused=(await post('/api/v1/service-contracts',{contractName:'Unused default fixture',partnerId:partner.id})).json().item;check(unused.contractCode,'CTR0002');check(unused.currency,'USD');check(unused.paymentTermDays,0);check(unused.services.length,0);
  const foreign=await prisma.contract.create({data:{companyId:other.id,partnerId:foreignPartner.id,contractCode:'F1',contractName:'Foreign',dgcDirection:'Output',businessType:'REVENUE_SHARE',contractType:'OTHER',valueType:'REVENUE_SHARE'}});
  check((await request('GET','/api/v1/service-contracts/'+foreign.id)).statusCode,404);
  check((await post('/api/v1/service-contracts/'+foreign.id+'/update',{...update,expectedUpdatedAt:foreign.updatedAt.toISOString()})).statusCode,404);
