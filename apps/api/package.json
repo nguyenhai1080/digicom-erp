@@ -16,6 +16,8 @@
     "test:services": "node tests/services.integration.mjs",
     "test:service-contracts": "node tests/service-contracts.integration.mjs",
     "test:recon-financial": "node tests/recon-financial.characterization.mjs",
+    "test:company-branding": "node tests/company-branding.mjs",
+    "test:dgc-config": "node tests/dgc-config-preflight.mjs",
     "test:recon-invoice": "node tests/recon-invoice.integration.mjs"
   },
   "dependencies": {

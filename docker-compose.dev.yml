@@ -1,15 +1,15 @@
+name: dgc-finance-dev
 services:
   postgres:
     image: postgres:16
-    container_name: erp-core-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: erp
-      POSTGRES_PASSWORD: erp_dev_password
-      POSTGRES_DB: erp_core
+      POSTGRES_USER: dgc_dev
+      POSTGRES_PASSWORD: dgc_local_only
+      POSTGRES_DB: dgc_finance_dev
     ports:
-      - "5432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
-      - erp_pg_data:/var/lib/postgresql/data
+      - dgc_pg_data:/var/lib/postgresql/data
 volumes:
-  erp_pg_data:
+  dgc_pg_data:

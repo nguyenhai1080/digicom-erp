@@ -1,6 +1,6 @@
 import React,{createContext,useContext,useEffect,useState} from 'react';
 export type Branding={companyCode:string;appName:string;appTitle:string};
-const Context=createContext<Branding>({companyCode:'GST',appName:'ERP Core',appTitle:'ERP Core - GST'});
+const Context=createContext<Branding>({companyCode:'DGC',appName:'DGC Finance',appTitle:'DGC Finance'});
 export const useBranding=()=>useContext(Context);
 export function CompanyBrandProvider({children}:{children:React.ReactNode}){
  const [config,setConfig]=useState<Branding|null>(null),[error,setError]=useState('');

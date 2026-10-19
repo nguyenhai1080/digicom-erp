@@ -16,15 +16,14 @@ const permissions = [
   'PAYMENT_ALLOCATE','REPORT_VIEW','AUDIT_VIEW'
 ];
 async function main() {
-  const companyCode = process.env.DEFAULT_COMPANY_CODE ?? 'GST';
-  const companyName=process.env.DEFAULT_COMPANY_NAME?.trim()||(companyCode==='GST'?'CÔNG TY CỔ PHẦN CÔNG NGHỆ GST VIỆT NAM':'');
-  const defaultCurrency=process.env.DEFAULT_COMPANY_CURRENCY??'USD';
-  const timezone=process.env.DEFAULT_COMPANY_TIMEZONE??'Asia/Ho_Chi_Minh';
+  const companyCode = process.env.DEFAULT_COMPANY_CODE ?? 'DGC';
+  if(companyCode!=='DGC')throw new Error('This repository seeds DGC only; check the dedicated DGC database and configuration');
+  const companyName=process.env.DEFAULT_COMPANY_NAME?.trim()||'';
+  const defaultCurrency=process.env.DEFAULT_COMPANY_CURRENCY??'MZN';
+  const timezone=process.env.DEFAULT_COMPANY_TIMEZONE??'Africa/Maputo';
   if(!/^[A-Za-z0-9_-]{1,50}$/.test(companyCode)||!companyName||companyName.length>250||!['USD','VND','MZN'].includes(defaultCurrency))throw new Error('Provide a valid company code, legal company name and currency before seeding');
   new Intl.DateTimeFormat('en',{timeZone:timezone}).format();
-  if (companyCode === 'DEFAULT') {
-    throw new Error('Company code has changed to GST; update DEFAULT_COMPANY_CODE before seeding.');
-  }
+  if(await prisma.company.findFirst({where:{companyCode:{not:'DGC'}}}))throw new Error('DGC seed requires a database without other company tenants');
   const company = await prisma.company.upsert({
     where: { companyCode },
     update: {},

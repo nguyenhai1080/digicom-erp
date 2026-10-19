@@ -30,7 +30,7 @@ export function loadAuthConfig(): AuthConfig {
     secret: secret || 'local-development-csrf-secret-only', appOrigin: origin.origin,
     secureCookies: production, bootstrapEnabled: process.env.AUTH_BOOTSTRAP_ENABLED === 'true',
     bootstrapToken: process.env.AUTH_BOOTSTRAP_TOKEN ?? '',
-    defaultCompanyCode: process.env.DEFAULT_COMPANY_CODE ?? 'GST'
+    defaultCompanyCode: process.env.DEFAULT_COMPANY_CODE ?? 'DGC'
   };
 }
 export interface Identity {
