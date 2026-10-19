@@ -20,7 +20,8 @@
     "test:dgc-config": "node tests/dgc-config-preflight.mjs",
     "test:dgc-invoice": "node tests/dgc-invoice.characterization.mjs",
     "test:dgc-invoice:integration": "node tests/dgc-invoice.integration.mjs",
-    "test:recon-invoice": "node tests/recon-invoice.integration.mjs"
+    "test:recon-invoice": "node tests/recon-invoice.integration.mjs",
+    "test:dgc-recon": "node tests/dgc-recon.integration.mjs"
   },
   "dependencies": {
     "@erp/db": "workspace:*",

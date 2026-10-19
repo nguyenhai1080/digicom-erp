@@ -2,6 +2,8 @@
 
 Owner correction, 2026-10-08: inherit the updated review-and-finalize workflow, not the obsolete explanatory text that mentions separately uploading a signed file and BOD approval.
 
+Owner update, 2026-10-19: DGC may combine stamp, signature and signer-title/name into **one image insertion**. This supersedes the three separate draggable images requirement below for DGC output reconciliation. The original three assets remain available; composition is versioned and audited. Current status: docs/handover/DGC_MIGRATION_AND_INVOICE_20261019.md.
+
 ## Verified deployed v61 evidence
 
 - `Index.html` `renderPdfReviewModal` (3138): OCR header, financial summary and service-detail results; manual Revenue MZN correction; original scan preview; draggable company stamp, signature and signer-title/name image; Confirm chốt file.
@@ -24,5 +26,7 @@ Owner correction, 2026-10-08: inherit the updated review-and-finalize workflow, 
 The v0.6.19 implementation is described in DGC_OUTPUT_RECON_INVOICE_V0619.md. It includes PDF-derived intake, financial review/correction, actual company composite-image placement, atomic direct finalization, preserved original/signed history, approved placement-only edits, and native Draft Invoice generation.
 
 This is characterized runtime coverage, not accepted full DGC parity. Unknown/ambiguous financial PDF layouts remain blocked; Invoice issue/AR/payment and full donor reporting are separate remaining work. The owner authorized one combined GST image containing stamp, signature and signer title/name instead of the donor's three separate images.
+
+The dedicated DGC path now uses a DGC-owned composite on every page, independent of the partner key; GST retains its DIGICOM external-digital policy. Direct finalization requires RECON_APPROVE; DGC approved placement-only changes additionally require RECON_RESTAMP (BOD capability). Seed declares this capability and grants ADMIN; full donor role provisioning has not been applied to real users. DGC operational recon/header/item amounts use the source's verified USD values, or supported native VND; MZN remains in the approved source snapshot. The parser for GST's VND share is blocked in DGC. These changes apply to new finalizations, not historical records or migration amounts.
 
 GST signing assets must be supplied/identified explicitly. Do not copy DGC/DIGICOM stamps or signatures into GST, invent signatures, alter permissions, or import live financial records as fixtures.

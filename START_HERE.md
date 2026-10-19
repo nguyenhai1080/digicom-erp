@@ -4,7 +4,7 @@ Cập nhật ngày 19/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19/10
 
-Đợt tiếp tục đã lấy snapshot 25 bảng/3.154 hàng vào staging riêng, nhập thử 10 dịch vụ, 4 đối tác (Movitel Active), 9 hợp đồng và 14 liên kết dịch vụ theo xác nhận owner, triển khai adapter Invoice DGC và kiểm thử DB/PDF Linux. Đọc [kết quả migration và Invoice mới nhất](docs/handover/DGC_MIGRATION_AND_INVOICE_20261019.md) trước các nhận định lịch sử bên dưới. Chưa nhập financial record thật; thuế/alias hợp đồng đã được xử lý và kiểm tra replay/restore, InputRecon/AP/SOA và migration toàn chuỗi chưa hoàn tất.
+Đợt tiếp tục đã lấy snapshot 25 bảng/3.154 hàng vào staging riêng, nhập thử 10 dịch vụ, 4 đối tác (Movitel Active), 9 hợp đồng và 14 liên kết dịch vụ theo xác nhận owner, triển khai adapter Invoice DGC, ảnh ghép ký đối soát theo xác nhận owner và kiểm thử DB/PDF Linux. Đọc [kết quả migration và Invoice mới nhất](docs/handover/DGC_MIGRATION_AND_INVOICE_20261019.md) trước các nhận định lịch sử bên dưới. Chưa nhập financial record thật; thuế/alias hợp đồng đã được xử lý và kiểm tra replay/restore, InputRecon/AP/SOA và migration toàn chuỗi chưa hoàn tất.
 
 Code đã được đưa vào repository Git riêng tại thư mục này, branch `dgc/main`, kế thừa `f97eb627`; chưa cấu hình remote hoặc triển khai. Đọc [tiến độ và khoảng trống hiện tại](docs/handover/PROGRESS_20261019.md) cùng [kế hoạch môi trường/chuyển dữ liệu](docs/handover/DGC_ENVIRONMENT_MIGRATION_PLAN.md). Phần dưới là yêu cầu bàn giao ban đầu; nhận định thư mục trống/chưa có Git không còn là trạng thái hiện tại. Ưu tiên tiếp theo là Invoice DGC, mapping quyền/tài sản ký, rồi InputRecon/AP/SOA trước staging.
 

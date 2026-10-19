@@ -33,10 +33,12 @@ export function drawPlacement(page:PDFPage,image:PDFImage,p:Placement){
  page.drawImage(image,{x:b.x+points[0],y:b.y+points[1],width:w,height:h,rotate:degrees(b.rotation)});
 }
 export async function image(doc:PDFDocument,bytes:Buffer,mime:string|null){return mime==='image/png'?doc.embedPng(bytes):mime==='image/jpeg'?doc.embedJpg(bytes):Promise.reject(new CommandError(409,'Ảnh dấu phải là PNG/JPEG.'));}
-export async function stampPdf(source:Buffer,bytes:Buffer,mime:string|null,p:Placement){
+export async function stampPdf(source:Buffer,bytes:Buffer,mime:string|null,p:Placement,allPages=false){
  let doc:PDFDocument;try{doc=await PDFDocument.load(source,{updateMetadata:false});}catch{throw new CommandError(422,'Không thể chèn dấu vào PDF bị lỗi hoặc khóa.');}
  if(doc.getPageCount()>12||p.page>doc.getPageCount())throw new CommandError(400,'Trang chèn dấu không tồn tại.');
- drawPlacement(doc.getPage(p.page-1),await image(doc,bytes,mime),p);return Buffer.from(await doc.save({useObjectStreams:false}));
+ const picture=await image(doc,bytes,mime);
+ for(const page of allPages?doc.getPages():[doc.getPage(p.page-1)])drawPlacement(page,picture,p);
+ return Buffer.from(await doc.save({useObjectStreams:false}));
 }
 export async function persistPdf(tx:Prisma.TransactionClient,user:Identity,entityType:string,entityId:string,type:'RECON_SIGNED'|'INVOICE'|'PAYMENT_SWIFT'|'EXPENSE_EVIDENCE',filename:string,bytes:Buffer,version:number,rollback:string[]){
  if(bytes.length>16*1024*1024)throw new CommandError(422,'PDF kết quả vượt giới hạn lưu trữ.');

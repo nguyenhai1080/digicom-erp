@@ -2,7 +2,7 @@
 
 Ứng dụng DGC độc lập, kế thừa ERP Core tại `f97eb627ad102e73eb57373d098b0ea162965665`. Đọc [START_HERE](START_HERE.md), [bàn giao](docs/handover/HANDOVER.md) và [trạng thái tiếp nhận](docs/handover/PROGRESS_20261019.md) trước khi làm tiếp. Chưa nghiệm thu tương đương toàn bộ nghiệp vụ hoặc triển khai production.
 
-Đã có [migration staging và Invoice DGC riêng](docs/handover/DGC_MIGRATION_AND_INVOICE_20261019.md): 3.154 hàng nguồn được giữ ở vùng staging, nhập thử 10 dịch vụ/4 đối tác; chưa nhập số liệu tài chính thật vào các bảng vận hành. Tài liệu này cập nhật trạng thái tiếp nhận ban đầu.
+Đã có [migration staging, Invoice và ký đối soát DGC](docs/handover/DGC_MIGRATION_AND_INVOICE_20261019.md): 3.154 hàng nguồn được giữ ở vùng staging, nhập thử 10 dịch vụ/4 đối tác/9 hợp đồng/14 liên kết. Đối soát DGC hỗ trợ ảnh ghép dấu/chữ ký/chức danh theo xác nhận owner; chưa nhập số liệu tài chính thật vào các bảng vận hành. Tài liệu này cập nhật trạng thái tiếp nhận ban đầu.
 
 ## Phát triển địa phương
 
