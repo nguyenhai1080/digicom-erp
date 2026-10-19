@@ -1,5 +1,7 @@
 # Bàn giao xây dựng và chuyển dữ liệu DGC Finance
 
+> Cập nhật phạm vi của chủ sở hữu ngày 19/10/2026: DGC không cần hỗ trợ MZN trong vận hành. Dùng USD/VND; MZN trong mô tả donor bên dưới chỉ là thông tin nguồn phục vụ đọc PDF/đối soát, không phải yêu cầu phát triển tài khoản, thanh toán hoặc Invoice MZN. Không tự quy đổi số liệu lịch sử. Timezone cần xác nhận riêng, không suy ra từ thay đổi tiền tệ này.
+
 Chốt thông tin ngày 19/10/2026, múi giờ Asia/Saigon. DGC Finance sẽ dùng nền ERP Core, triển khai độc lập trên tài khoản Vibehost cũ tại erp.digicomjsc.com. Nguồn dữ liệu chính thức là DGC_ERP_2026_PROD_RC1_CLONE. DGC chưa được triển khai và chuyển dữ liệu sang ERP Core trong phạm vi công việc đã hoàn thành.
 
 ## 1. Quyết định và phạm vi

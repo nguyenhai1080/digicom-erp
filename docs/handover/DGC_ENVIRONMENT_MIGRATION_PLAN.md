@@ -17,7 +17,7 @@ Kết nối Vibehost hiện trả về **GST Vietnam** và chỉ liệt kê `gst
 
 Sau khi có remote DGC private và tài khoản đúng: tạo staging DGC độc lập; API build root bằng Dockerfile, UI build `apps/web`; đặt API_BASE_URL của UI về API DGC, APP_URL của API về UI DGC. Gắn DB vào API, storage vào API. Ghi service ID, hostname DB, volume, DNS, commit và thời điểm backup vào hồ sơ môi trường riêng; không ghi mật khẩu/token vào Git.
 
-`deploy/dgc.env.example` chỉ là mẫu: tên pháp nhân để trống, phải cung cấp giá trị xác nhận. MZN/Africa/Maputo là baseline donor, cần đối chiếu cấu hình công ty thực tế trước seed. `ERP_SEED_ON_START=false`, bootstrap mặc định tắt. Seed hiện từ chối company code ngoài DGC và database đã có tenant khác; không có tài khoản đăng nhập hoặc dữ liệu tài chính mẫu được seed. Chỉ cấp ADMIN kỹ thuật theo quy trình khởi tạo riêng; chưa thay thế mapping Staff/Manager/BOD.
+`deploy/dgc.env.example` chỉ là mẫu: tên pháp nhân để trống, phải cung cấp giá trị xác nhận. Chủ sở hữu xác nhận DGC không cần hỗ trợ MZN; phạm vi vận hành là USD/VND, seed mặc định USD. MZN chỉ giữ trong dữ liệu/PDF nguồn để đối soát, không tự quy đổi hoặc tạo giao dịch MZN. Africa/Maputo là timezone baseline donor, vẫn cần xác nhận riêng trước seed. `ERP_SEED_ON_START=false`, bootstrap mặc định tắt. Seed hiện từ chối company code ngoài DGC và database đã có tenant khác; không có tài khoản đăng nhập hoặc dữ liệu tài chính mẫu được seed. Chỉ cấp ADMIN kỹ thuật theo quy trình khởi tạo riêng; chưa thay thế mapping Staff/Manager/BOD.
 
 Migration lịch sử `20261007173000_gst_company_identity` vẫn giữ nguyên để bảo toàn lịch sử upstream: nó đổi DEFAULT thành GST nếu DEFAULT tồn tại. DGC phải migrate DB mới trống rồi seed DGC; không restore DB GST làm nền DGC hoặc chạy migration trên DB chưa xác minh. Migration không tự chạy seed.
 
@@ -40,7 +40,7 @@ Importer, bảng mapping và công cụ đối soát toàn chuỗi **chưa đư�
 
 ## Điều kiện nghiệm thu và cutover
 
-- Staging hoàn thành Invoice DGC, input recon/AP/PDF, SOA, MZN, quyền, lịch sử thay thế/hủy, audit và báo cáo; có fixture từ donor và kiểm tra đầy đủ tác động DB/file.
+- Staging hoàn thành Invoice DGC, input recon/AP/PDF, SOA, USD/VND, quyền, lịch sử thay thế/hủy, audit và báo cáo; có fixture từ donor và kiểm tra đầy đủ tác động DB/file.
 - Đối soát approved revenue (không cộng TOTAL + CHILD), current issued Invoice, current AR/AP, payment, số dư đầu/cuối và SOA theo từng tiền tệ/kỳ/đối tác; ghi rõ mọi chênh lệch. Xác nhận riêng ngữ nghĩa thanh toán SOA theo as-of.
 - Kiểm tra phân trang mặc định 10, mã đối tác và định dạng số trên toàn bộ bảng dữ liệu. Hai bảng báo cáo quỹ đã đổi từ 12 về 10; chưa nghiệm thu toàn bộ UI.
 - Có backup/restore diễn tập, kế hoạch rollback gồm DB + file + version code. Chưa xác định RPO/RTO, thời điểm khóa nguồn và người nghiệm thu.

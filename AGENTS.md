@@ -2,6 +2,8 @@
 
 ## DGC independent repository (2026-10-19)
 
+- Owner correction: DGC does not require operational MZN support. Use USD/VND, with USD as the initial company currency. MZN figures in donor PDFs/snapshots remain source evidence for reconciliation; do not add MZN account/payment workflows or silently convert historical values. Currency scope does not determine the reporting timezone, which still requires confirmation.
+
 - This checkout is DGC Finance, branch `dgc/main`; read START_HERE.md and docs/handover/PROGRESS_20261019.md before continuing. Do not push it to the GST upstream or deploy to GST services.
 - Keep database, storage, credentials and deployment services separate from GST. The current Vibehost connector was verified as GST Vietnam, not the required old DGC account.
 - The GST-only Invoice renderer/numbering remains blocked for DGC until source-grounded DGC implementation and fixtures exist. Do not remove that guard just to enable DGC.
