@@ -522,6 +522,8 @@ enum ValidationSeverity {
 }
 
 model Company {
+  inputReconciliations InputReconciliation[]
+  accountPayables AccountPayable[]
   dgcImportSnapshots DgcImportSnapshot[]
   cashTransfers CashTransfer[]
   cashAccounts CashAccount[]
@@ -811,6 +813,8 @@ model Attachment {
 }
 
 model Document {
+  inputReconciliations InputReconciliation[]
+  @@unique([companyId,id])
   invoicePayments InvoicePayment[]
   invoices Invoice[]
   id             String         @id @default(uuid()) @db.Uuid
@@ -863,6 +867,9 @@ model AuditLog {
 }
 
 model Partner {
+  inputReconciliations InputReconciliation[] @relation("InputReconPartner")
+  outputInputReconciliations InputReconciliation[] @relation("InputReconOutputPartner")
+  @@unique([companyId,id])
   invoices Invoice[]
   outputReconUploads OutputReconUpload[]
   id                  String        @id @default(uuid()) @db.Uuid
@@ -966,6 +973,8 @@ model PartnerBankAccount {
 }
 
 model Service {
+  inputReconciliations InputReconciliation[]
+  @@unique([companyId,id])
   invoices Invoice[]
   outputReconUploads OutputReconUpload[]
   id                   String          @id @default(uuid()) @db.Uuid
@@ -1052,6 +1061,9 @@ model ServiceRelationship {
 }
 
 model Contract {
+  inputReconciliations InputReconciliation[] @relation("InputReconContract")
+  outputInputReconciliations InputReconciliation[] @relation("InputReconOutputContract")
+  @@unique([companyId,id])
   id                    String               @id @default(uuid()) @db.Uuid
   companyId             String               @map("company_id") @db.Uuid
   contractCode          String               @map("contract_code")
@@ -1813,6 +1825,8 @@ model CommercialTermSnapshot {
 }
 
 model Revenue {
+  inputReconciliations InputReconciliation[]
+  @@unique([companyId,id])
   id                   String        @id @default(uuid()) @db.Uuid
   companyId            String        @map("company_id") @db.Uuid
   revenueCode          String        @map("revenue_code")
@@ -2150,4 +2164,68 @@ model CashTransfer {
  @@unique([companyId,transferCode])
  @@index([companyId,transferDate,id])
  @@map("cash_transfers")
+}
+
+// Current DGC v61 input reconciliation; raw legacy records stay in staging until reviewed.
+model InputReconciliation {
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ inputReconCode String @map("input_recon_code")
+ period String @db.VarChar(7)
+ sourceRevenueId String @map("source_revenue_id") @db.Uuid
+ serviceId String @map("service_id") @db.Uuid
+ outputPartnerId String @map("output_partner_id") @db.Uuid
+ outputContractId String @map("output_contract_id") @db.Uuid
+ inputPartnerId String @map("input_partner_id") @db.Uuid
+ inputContractId String @map("input_contract_id") @db.Uuid
+ currency String @db.VarChar(3)
+ baseUsd Decimal @map("base_usd") @db.Decimal(20,2)
+ shareRate Decimal @map("share_rate") @db.Decimal(9,6)
+ foreignAmount Decimal @map("foreign_amount") @db.Decimal(20,2)
+ fxRate Decimal @map("fx_rate") @db.Decimal(20,8)
+ localAmount Decimal @map("local_amount") @db.Decimal(20,2)
+ taxRate Decimal @map("tax_rate") @db.Decimal(9,6)
+ taxAmount Decimal @map("tax_amount") @db.Decimal(20,2)
+ whtAmount Decimal @default(0) @map("wht_amount") @db.Decimal(20,2)
+ payableAmount Decimal @map("payable_amount") @db.Decimal(20,2)
+ sourceDigest String @map("source_digest") @db.Char(64)
+ sourceSnapshot Json @map("source_snapshot")
+ status String @default("DRAFT") @db.VarChar(20)
+ documentId String? @map("document_id") @db.Uuid
+ createdById String @map("created_by_id") @db.Uuid
+ approvedById String? @map("approved_by_id") @db.Uuid
+ approvedAt DateTime? @map("approved_at")
+ createdAt DateTime @default(now()) @map("created_at")
+ updatedAt DateTime @updatedAt @map("updated_at")
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ sourceRevenue Revenue @relation(fields:[companyId,sourceRevenueId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ service Service @relation(fields:[companyId,serviceId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ inputPartner Partner @relation("InputReconPartner",fields:[companyId,inputPartnerId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ outputPartner Partner @relation("InputReconOutputPartner",fields:[companyId,outputPartnerId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ inputContract Contract @relation("InputReconContract",fields:[companyId,inputContractId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ outputContract Contract @relation("InputReconOutputContract",fields:[companyId,outputContractId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ document Document? @relation(fields:[companyId,documentId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ payable AccountPayable?
+ @@unique([companyId,id])
+ @@unique([companyId,inputReconCode])
+ @@unique([companyId,sourceRevenueId])
+ @@index([companyId,period,inputPartnerId,inputContractId])
+ @@map("input_reconciliations")
+}
+model AccountPayable {
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ inputReconId String @map("input_recon_id") @db.Uuid
+ currency String @db.VarChar(3)
+ originalAmount Decimal @map("original_amount") @db.Decimal(20,2)
+ paidAmount Decimal @default(0) @map("paid_amount") @db.Decimal(20,2)
+ outstandingAmount Decimal @map("outstanding_amount") @db.Decimal(20,2)
+ status String @default("OPEN") @db.VarChar(20)
+ createdAt DateTime @default(now()) @map("created_at")
+ updatedAt DateTime @updatedAt @map("updated_at")
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ inputReconciliation InputReconciliation @relation(fields:[companyId,inputReconId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([companyId,inputReconId])
+ @@index([companyId,status,currency])
+ @@map("account_payables")
 }

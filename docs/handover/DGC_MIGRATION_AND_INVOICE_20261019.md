@@ -1,5 +1,7 @@
 # Đợt chuyển dữ liệu thử và Invoice DGC — 19/10/2026
 
+Cập nhật tiếp theo: [InputRecon/AP ngày 20/10](DGC_INPUT_RECON_AP_20261020.md), gồm runtime, PDF, kiểm thử DB/UI và điểm SOA cần xác nhận.
+
 Tài liệu này cập nhật trạng thái sau PROGRESS_20261019.md. Chưa triển khai production, chưa nghiệm thu toàn bộ DGC và chưa đưa số liệu tài chính thật vào các bảng vận hành.
 
 ## Nguồn đã kiểm tra lại

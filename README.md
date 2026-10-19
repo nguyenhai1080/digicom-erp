@@ -4,6 +4,8 @@
 
 Đã có [migration staging, Invoice và ký đối soát DGC](docs/handover/DGC_MIGRATION_AND_INVOICE_20261019.md): 3.154 hàng nguồn được giữ ở vùng staging, nhập thử 10 dịch vụ/4 đối tác/9 hợp đồng/14 liên kết. Đối soát DGC hỗ trợ ảnh ghép dấu/chữ ký/chức danh theo xác nhận owner; chưa nhập số liệu tài chính thật vào các bảng vận hành. Tài liệu này cập nhật trạng thái tiếp nhận ban đầu.
 
+Đã bổ sung [InputRecon/AP và PDF biên bản](docs/handover/DGC_INPUT_RECON_AP_20261020.md), có kiểm thử DB/PDF và browser với fixture riêng. SOA/cutover và nhập financial records thật còn pending.
+
 ## Phát triển địa phương
 
 Dùng Node 22 và pnpm 10.18.3: `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm build`. Generate/build không cần kết nối database. Các suite tài chính tích hợp chỉ được chạy với database dùng thử đúng tiền tố mà từng suite yêu cầu.

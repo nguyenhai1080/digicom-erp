@@ -47,6 +47,7 @@ const server = createServer(async (request, response) => {
       const readPdf = request.method === 'POST' && (pathname === '/api/v1/output-recon/inspect' || /^\/api\/v1\/output-recon\/uploads\/[0-9a-f-]{36}\/read$/i.test(pathname));
       const preview = request.method === 'GET' && /^\/api\/v1\/output-recon\/uploads\/[0-9a-f-]{36}\/preview$/i.test(pathname);
       const financialPdf = request.method === 'POST' && (pathname.startsWith('/api/v1/invoices/') || /\/(finalize|signed-preview)$/.test(pathname));
+      const inputRecon = pathname.startsWith('/api/v1/input-recon');
       const manualRevenueUpload = request.method === 'POST' && ['/api/v1/manual-revenue/import-preview', '/api/v1/manual-revenue/drafts'].includes(pathname);
       const cashHistoryImport = request.method === 'POST' && pathname === '/api/v1/cash-history/import';
       const expenseUpload = request.method === 'POST' && (pathname === '/api/v1/expenses' || /^\/api\/v1\/expenses\/[0-9a-f-]{36}\/update$/i.test(pathname));
@@ -69,7 +70,7 @@ const server = createServer(async (request, response) => {
       const upstream = await fetch(target, {
         method: request.method, headers,
         body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
-        redirect: 'manual', signal: AbortSignal.timeout(readPdf ? 120000 : financialPdf ? 65000 : upload ? 60000 : preview || cashHistoryImport || expenseUpload ? 45000 : 15000)
+        redirect: 'manual', signal: AbortSignal.timeout(readPdf ? 120000 : financialPdf || inputRecon ? 65000 : upload ? 60000 : preview || cashHistoryImport || expenseUpload ? 45000 : 15000)
       });
       const outputHeaders = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
       if (upstream.headers.get('content-type')?.split(';')[0] === 'application/pdf') {

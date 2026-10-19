@@ -40,10 +40,11 @@ export async function preflight(tx:Prisma.TransactionClient,companyId:string,inp
   AND:[{OR:[{effectiveDate:null},{effectiveDate:{lte:end}}]},{OR:[{expiryDate:null},{expiryDate:{gte:start}}]}],
   services:{some:{serviceId:s.serviceId,dgcStatus:'ACTIVE'}}},select:{id:true,contractCode:true,contractNumber:true,contractName:true,updatedAt:true},orderBy:{id:'asc'}});
  const businessKey=[partner.partnerKey.trim().toUpperCase(),normalizeReconService(service.serviceKey),s.period].join('|');
- const snapshot={businessKey,uploads,reconciliations,invoiceScopes,contracts};
- const action=invoiceScopes.length?'BLOCK_FINANCIAL_DEPENDENCY':uploads.length||reconciliations.length?'CONFIRM_REPLACE':'ALLOW_INTAKE';
+ const inputDependencies=await tx.inputReconciliation.findMany({where:{companyId,sourceRevenue:{companyId,reconciliationId:{in:reconciliations.map(r=>r.id)}}},select:{id:true,status:true,updatedAt:true},orderBy:{id:'asc'}});
+ const snapshot={businessKey,uploads,reconciliations,invoiceScopes,contracts,inputDependencies};
+ const action=invoiceScopes.length||inputDependencies.length?'BLOCK_FINANCIAL_DEPENDENCY':uploads.length||reconciliations.length?'CONFIRM_REPLACE':'ALLOW_INTAKE';
  return {...snapshot,partner,service,action,fingerprint:checksum(JSON.stringify(snapshot)),
-  message:invoiceScopes.length?'Đã có hồ sơ Invoice trong kỳ này. Chưa thể xác minh toàn bộ payment; không nhận bản thay thế.':
+  message:inputDependencies.length?'Doanh thu đã có đối soát đầu vào/AP. Không nhận bản thay thế làm mất liên kết nguồn.':invoiceScopes.length?'Đã có hồ sơ Invoice trong kỳ này. Chưa thể xác minh toàn bộ payment; không nhận bản thay thế.':
   uploads.length||reconciliations.length?'Đã có PDF hoặc đối soát cùng đối tác, dịch vụ và kỳ. Bản mới chỉ được nhận để kiểm tra; lịch sử cũ được giữ nguyên.':
   'Có thể nhận PDF để kiểm tra. Nội dung, dịch vụ và kỳ trên PDF phải được xác minh trước khi chốt doanh thu.'};
 }

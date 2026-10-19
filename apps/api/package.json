@@ -21,7 +21,8 @@
     "test:dgc-invoice": "node tests/dgc-invoice.characterization.mjs",
     "test:dgc-invoice:integration": "node tests/dgc-invoice.integration.mjs",
     "test:recon-invoice": "node tests/recon-invoice.integration.mjs",
-    "test:dgc-recon": "node tests/dgc-recon.integration.mjs"
+    "test:dgc-recon": "node tests/dgc-recon.integration.mjs",
+    "test:input-recon": "node tests/input-recon.characterization.mjs && node tests/input-recon-pdf.characterization.mjs && node tests/input-recon.integration.mjs"
   },
   "dependencies": {
     "@erp/db": "workspace:*",

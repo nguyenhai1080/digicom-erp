@@ -18,7 +18,7 @@ const storage=await mkdtemp(resolve(tmpdir(),'dgc-recon-synthetic-'));process.en
 const company=await prisma.company.upsert({where:{companyCode:'DGC'},create:{companyCode:'DGC',companyName:'Synthetic DGC',defaultCurrency:'USD'},update:{}});
 assert.equal(await prisma.outputReconUpload.count(),0,'Fresh synthetic database required');
 const marker=randomUUID(),origin='https://dgc-recon.example.test',raw=randomBytes(32).toString('hex');
-const permissions=['SYSTEM_CONFIG_EDIT','RECON_VIEW','RECON_UPLOAD','RECON_REVIEW','RECON_APPROVE','RECON_RESTAMP'];
+const permissions=['SYSTEM_CONFIG_EDIT','RECON_VIEW','RECON_UPLOAD','RECON_REVIEW','RECON_APPROVE','RECON_RESTAMP','INPUT_RECON_VIEW','INPUT_RECON_GENERATE','INPUT_RECON_APPROVE','AP_VIEW'];
 const ps=await Promise.all(permissions.map(code=>prisma.permission.upsert({where:{code},create:{code,name:code,module:'FIXTURE'},update:{}})));
 const role=await prisma.role.create({data:{companyId:company.id,code:marker,name:'Synthetic capability fixture',permissions:{create:ps.map(p=>({permissionId:p.id}))}}});
 const user=await prisma.user.create({data:{companyId:company.id,email:marker+'@example.test',fullName:'Synthetic DGC actor',passwordHash:'unused fixture'}});
@@ -98,10 +98,16 @@ try{
  const final=await ok(url+'/finalize',confirm(),201);eq(final.finalization.signingMode,'DGC_COMPOSITE');eq(final.finalization.signingAssetId,composite.id);eq(final.finalization.signingAssetVersion,2);
  const rec=await prisma.reconciliation.findUniqueOrThrow({where:{id:final.finalization.reconciliationId},include:{items:true}});eq(rec.currency,'USD');eq(rec.totalGrossRevenue.toFixed(2),'17.98');eq(rec.totalNetRevenue.toFixed(2),'1.40');eq(rec.items[0].netRevenue.toFixed(2),'1.40');eq(rec.approvedSnapshot.financial.mzn.partnerRevenue,'90.00');
  const revenue=await prisma.revenue.findFirstOrThrow({where:{reconciliationId:rec.id}});eq(revenue.currency,'USD');eq(revenue.netAmount.toFixed(2),'1.40');eq(await prisma.invoice.count(),0);eq(await prisma.accountReceivable.count(),0);eq(await prisma.cashEntry.count(),0);
+ const inputPartner=await prisma.partner.create({data:{companyId:company.id,partnerCode:'SYNTHETIC_INPUT',partnerKey:'SYNTHETIC_INPUT',legalName:'Synthetic input supplier',partnerType:'SUPPLIER',status:'ACTIVE'}});
+ await prisma.contract.create({data:{companyId:company.id,partnerId:inputPartner.id,contractCode:'SYNTHETIC_INPUT',contractName:'Synthetic PDF-source input',currency:'USD',status:'ACTIVE',dgcDirection:'Input',businessType:'REVENUE_SHARE',contractType:'OTHER',valueType:'REVENUE_SHARE',revenueShareRate:'.4',taxRate:'0',services:{create:{companyId:company.id,serviceId:service.id,dgcStatus:'ACTIVE',businessModel:'REVENUE_SHARE',revenueShareRate:'.4'}}}});
+ const inputPreview=await ok('/api/v1/input-recon/preview',{revenueId:revenue.id});eq(inputPreview.baseUsd,'1.40');eq(inputPreview.payableAmount,'0.56');
+ const inputRow=await ok('/api/v1/input-recon/generate',{revenueId:revenue.id,digest:inputPreview.digest,confirmed:true},201);
+ const inputApproval=await ok('/api/v1/input-recon/'+inputRow.item.id+'/approve',{expectedUpdatedAt:inputRow.item.updatedAt,confirmed:true});eq(inputApproval.payable.originalAmount,'0.56');eq(await prisma.accountPayable.count(),1);eq(await prisma.cashEntry.count(),0);
  const sourceAttachment=await prisma.attachment.findUniqueOrThrow({where:{id:uploadResult.item.attachmentId}});eq(hash(await readFile(resolve(storage,sourceAttachment.storagePath))),hash(original));
  v=await review();await capability('RECON_RESTAMP',false);eq((await post(url+'/signed-preview',confirm())).statusCode,403);eq((await post(url+'/finalize',confirm())).statusCode,403);await capability('RECON_RESTAMP',true);
  const oldDownload=await request('GET',url+'/signed-download');eq(oldDownload.statusCode,200);
  const replaced=await ok(url+'/finalize',{...confirm(),placement:{page:2,x:.12,y:.4,width:.3}},201);eq(replaced.finalization.documentVersion,2);eq(await prisma.revenue.count(),1);eq(await prisma.reconciliation.count(),1);eq((await prisma.document.findUniqueOrThrow({where:{id:final.finalization.documentId}})).status,'SUPERSEDED');
+ eq((await ok('/api/v1/input-recon/preview',{revenueId:revenue.id})).digest,inputPreview.digest);eq(await prisma.accountPayable.count(),1);
  const stale=confirm();await upload('SIGNING_COMPOSITE',await png('#555555'),composite.id);eq((await post(url+'/signed-preview',stale)).statusCode,409);
  if(process.env.FINANCE_PROOF_ROOT){await mkdir(process.env.FINANCE_PROOF_ROOT,{recursive:true});await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-dgc-composite.png'),Buffer.from(preview.base64,'base64'));await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-dgc-composite-recon.pdf'),signed.rawPayload);}
  console.log('PASS: '+checks+' DGC composition, original-image preservation, source/version/digest/CSRF/permissions, rollback, all-page signing, USD provenance and placement-only invariants.');
