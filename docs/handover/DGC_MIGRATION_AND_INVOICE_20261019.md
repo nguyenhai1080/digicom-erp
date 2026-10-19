@@ -21,20 +21,21 @@ PostgreSQL riêng trong container **dgc-erp-acceptance-postgres**, cổng loopba
 | Hàng nguồn giữ nguyên trong staging | 3.154 |
 | Dịch vụ đã nhập vào danh mục | 10 |
 | Đối tác đã nhập vào danh mục | 4 |
-| Khóa ánh xạ đã lưu | 14 |
-| Hợp đồng đã nhập thật | 0 |
+| Khóa ánh xạ đã lưu | 37 |
+| Hợp đồng đã nhập vào staging | 9 |
+| Liên kết dịch vụ hợp đồng đã nhập | 14 |
 | Revenue / Invoice / cash account / cash entry vận hành từ nguồn thật | 0 |
 | User đăng nhập từ nguồn thật | 0 |
 
 Chạy lại staging không tăng 3.154 hàng. Chạy lại services trả về 0 created/10 unchanged; partners trả về 0 created/4 unchanged. Raw rows vẫn giữ ID trùng theo sheet ID/hàng nguồn. Không tạo công nợ từ cả AR_AP và INVOICES, không nhân đôi dòng tiền payment/transaction.
 
-Chủ sở hữu đã xác nhận ánh xạ **Movitel.Status → Active**. Source là `21_DM_PARTNER!R2`, hàng có `Partner_ID=Movitel`, ô trống. Mapping chỉ áp dụng với đúng snapshot/row hash, lưu reason/approvedBy/approvedAt, digest vào kế hoạch và audit `DGC_IMPORT_DECISION`; không sửa Google Sheet. Có đúng một decision audit sau replay.
+Chủ sở hữu đã xác nhận ánh xạ **Movitel.Status → Active**. Source là `21_DM_PARTNER!R2`, hàng có `Partner_ID=Movitel`, ô trống. Mapping chỉ áp dụng với đúng snapshot/row hash, lưu reason/approvedBy/approvedAt, digest vào kế hoạch và audit `DGC_IMPORT_DECISION`; không sửa Google Sheet. Có đúng một decision audit cho Movitel sau replay.
 
-Còn **8 hàng chờ quyết định trước import contracts**: Tax_Rate ở sáu hợp đồng CTR0003–CTR0008 vượt miền 0–1 của hệ mới; liên kết CTS0008/MYCLIP và CTS0009/MEU PAR chưa khớp danh mục. Không chia tỷ lệ cho 100 hoặc tạo dịch vụ mới tự động. Xem báo cáo private `prepared/pending-master-decisions.json` để đối chiếu giá trị raw/display và vị trí nguồn.
+Chủ sở hữu đã xác nhận đủ **8 quyết định hợp đồng**: CTR0003–CTR0008 dùng chính xác **Tax_Rate = 0.1**, bao gồm CTR0005 có nguồn raw 9.9997; CTS0008 **MYCLIP → MEUCLIP**, CTS0009 **MEU PAR → MEUPAR**. Đã nhập 9 hợp đồng và 14 liên kết, không tạo dịch vụ mới. Raw 10/9.9997 và tên alias nguồn được giữ nguyên; không tính lại số tiền lịch sử. Tổng cộng có 9 decision audit gồm Movitel; replay trả về **0 created / 37 unchanged**, không thêm audit. Kế hoạch master không còn vấn đề chờ xử lý; 40 diagnostics raw toàn chuỗi vẫn còn, chưa được coi là đã giải quyết bởi mapping master.
 
 Preflight có **40 cảnh báo**: 7 nhóm ID trùng, 14 tham chiếu không khớp và 19 tham chiếu có nhiều ứng viên. Đây là số diagnostics theo trường, không phải 40 hồ sơ độc lập. Chưa có resolver toàn chuỗi tài chính. Bộ đếm tìm 474 Drive ID từ 2.087 tham chiếu theo phạm vi/thuật toán mới, có thêm approval packages; không so trực tiếp với 465/1.939 ở kiểm kê cũ và không coi là file đã tải.
 
-Đã tạo pg_dump custom, SHA-256 và manifest trong `backup/`; restore sang **dgc_migration_staging_restore_20261019** giữ đúng 3.154 hàng nguồn, 14 mapping, 10 dịch vụ, 4 đối tác, không có Invoice/cash entry vận hành. Container thử chưa có chính sách vận hành/backup định kỳ; snapshot và dump riêng là nguồn phục hồi của đợt này.
+Đã tạo pg_dump custom, SHA-256 và manifest trong `backup/`; restore sang **dgc_migration_staging_restore_20261019** giữ đúng 3.154 hàng nguồn, 14 mapping, 10 dịch vụ, 4 đối tác, không có Invoice/cash entry vận hành. Đây là backup trước import contracts, được giữ lại. Backup bổ sung `dgc-contracts-20261019.dump` và `contracts-manifest.json` đã restore sang **dgc_migration_staging_restore_contracts_20261019**; kiểm tra lại đủ 3.154 hàng raw, 37 mapping, 10 dịch vụ, 4 đối tác, 9 hợp đồng, 14 liên kết, 9 decision audit, sáu thuế 0.1 và hai alias đúng; vẫn không có financial posting. Container thử chưa có chính sách vận hành/backup định kỳ; snapshot và dump riêng là nguồn phục hồi của đợt này.
 
 ## Công cụ migration đã triển khai
 
@@ -78,4 +79,4 @@ Luồng đối soát đầu ra hiện vẫn dùng composite và quy tắc chọn
 - Linux Node 22/PostgreSQL/Poppler/Tesseract: **264** checks trong luồng chung đối soát–Invoice–AR/payment, **101** checks hợp đồng dịch vụ, **72** assertions DGC API gồm cả preview PNG và mặc định hạn thanh toán đều đạt. API được biên dịch từ source hiện tại trong container kiểm thử, DB fixture riêng; không dùng bản deploy hoặc DB GST.
 - Ba kỳ vọng lỗi thời trong suite cũ được đối chiếu với code HEAD/donor trước sửa test: PDF mở inline; register AR chỉ liệt kê khoản còn dư; người có quyền được duyệt draft trực tiếp như UI hiện tại và donor generic status helper. Bổ sung kiểm tra quyền và direct-approval đúng hành vi. Không đổi nghiệp vụ runtime để chạy theo các kỳ vọng cũ.
 
-Ưu tiên tiếp tục: (1) quyết định tám hàng contracts/alias, import contracts với provenance; (2) tách signing policy đối soát DGC, kiểm quyền từng action; (3) port InputRecon/AP và SOA từ donor với fixture, ghi rõ as-of; (4) resolver và importer financial/file toàn chuỗi, đối soát lại theo tiền tệ/kỳ/đối tác; (5) nghiệm thu staging, cấp remote/host DGC đúng tài khoản rồi mới cutover. Chưa có dịch vụ, DNS hoặc production DGC được tạo trong đợt này.
+Ưu tiên tiếp tục: (1) contracts/alias đã nhập staging, replay và restore đạt; (2) tách signing policy đối soát DGC, kiểm quyền từng action; (3) port InputRecon/AP và SOA từ donor với fixture, ghi rõ as-of; (4) resolver và importer financial/file toàn chuỗi, đối soát lại theo tiền tệ/kỳ/đối tác; (5) nghiệm thu staging, cấp remote/host DGC đúng tài khoản rồi mới cutover. Chưa có dịch vụ, DNS hoặc production DGC được tạo trong đợt này.
