@@ -29,6 +29,6 @@ Lưu tỷ giá thành công sẽ làm InputRecon tải lại dữ liệu, giữ 
 - Role/manual/FX/receipt/accounting integration **223 assertions đạt**: bốn mẫu role, kế toán nhập cả hai API tỷ giá, actor audit đúng, preview/tạo nháp InputRecon với rate mới, AP chưa phát sinh; chặn duyệt đầu vào/đầu ra, cấu hình ký và cash; giữ Staff thường/GST và các guard hiện có.
 - DGC output/source/PDF integration **105 assertions đạt**, thêm actor kế toán thật trong fixture: upload được, sửa số OCR nháp được và audit đúng actor; signed-preview/finalize bị chặn. Actor có quyền duyệt vẫn hoàn tất luồng, giữ file gốc, all-page composite, AP và restamp guards.
 - Financial characterization **85** đạt. Các con số chỉ là assertions fixture, không phải nghiệm thu toàn bộ nghiệp vụ hoặc migration.
-- Chưa kiểm browser thao tác phần tỷ giá mới. Source extraction trong suite PDF được freeze bằng fixture đã characterization; không tuyên bố chạy lại toàn bộ OCR thật cho kế toán.
+- Đã kiểm browser phần tỷ giá và tạo nháp đầu vào bằng tài khoản kế toán giả lập; xem [bằng chứng UI](DGC_ACCOUNTING_UI_20261020.md). Source extraction trong suite PDF được freeze bằng fixture đã characterization; không tuyên bố chạy lại toàn bộ OCR thật cho kế toán.
 
 Chưa deploy/push, nhập financial records thật, đổi quyền người dùng thật, SOA cutoff, timezone, snapshot hoặc các proposal liên kết lịch sử đang chờ owner.
