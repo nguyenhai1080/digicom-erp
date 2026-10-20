@@ -4,6 +4,8 @@ Cập nhật ngày 20/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–20/10
 
+[Quyền doanh thu và mẫu vai trò DGC](docs/handover/DGC_ROLE_ACCESS_20261020.md): đã tách năm quyền nhập tay khỏi OCR, thêm Gửi kiểm tra và mẫu Staff/Manager/BOD có dẫn nguồn. Mẫu chỉ điền biểu mẫu, chưa tự tạo/gán cho người dùng thật; full role parity và kiểm UI mới vẫn chưa nghiệm thu.
+
 [Bộ lọc Invoice quá hạn](docs/handover/DGC_INVOICE_OVERDUE_20261020.md) đã sửa theo ngày chốt explicit, giữ nguyên stored status/số tiền; 149 assertions DGC và 264 hồi quy đạt. Tương tác browser của bộ lọc mới chưa kiểm trọn do phiên bị gián đoạn; SOA cutoff vẫn chờ owner.
 
 [Luồng hủy Invoice chưa thanh toán](docs/handover/DGC_INVOICE_CANCEL_20261020.md) đã có API/UI và kiểm thử DB/browser fixture: giữ lịch sử/file/AR amounts, ngừng công nợ hiện hành, mở nguồn lập lại; không cash posting. SOA/package mới có guard tham chiếu để tích hợp tiếp, chưa phải runtime SOA hoàn chỉnh.

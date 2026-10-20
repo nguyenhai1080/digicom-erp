@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { Prisma } from '@erp/db';
-import { csrfToken, projectAccessWhere, requireOrigin, requirePermission, sameSecret, SESSION_COOKIE, type AuthConfig, type Identity } from '../auth/access.js';
+import { authenticate, csrfToken, projectAccessWhere, requireOrigin, requirePermission, sameSecret, SESSION_COOKIE, type AuthConfig, type Identity } from '../auth/access.js';
 export class CommandError extends Error {
   constructor(public statusCode: number, message: string) { super(message); }
 }
@@ -18,9 +18,14 @@ export function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   if (!result.success) throw new CommandError(400, 'Thông tin chưa hợp lệ. Kiểm tra số tiền, ngày và các trường bắt buộc.');
   return result.data;
 }
-export function writeGuard(permission: string, config: AuthConfig) {
+export function writeGuard(permission: string | ((identity:Identity)=>string), config: AuthConfig) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    await requirePermission(permission)(request, reply);
+    if(typeof permission==='string')await requirePermission(permission)(request, reply);
+    else {
+      await authenticate(request,reply);
+      if(reply.sent)return;
+      if(!request.auth!.permissions.includes(permission(request.auth!)))return reply.code(403).send({message:'Bạn không có quyền thực hiện thao tác này.'});
+    }
     if (reply.sent || !requireOrigin(config, request, reply)) return;
     const supplied = request.headers['x-csrf-token'];
     if (typeof supplied !== 'string' || !sameSecret(supplied, csrfToken(request.cookies[SESSION_COOKIE]!, config.secret))) {
