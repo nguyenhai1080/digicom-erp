@@ -7,6 +7,7 @@ import {prisma} from '@erp/db';
 import {buildApp} from '../dist/app.js';
 import {hashPassword} from '../dist/modules/auth/password.js';
 import {csrfToken,tokenHash} from '../dist/modules/auth/access.js';
+import {seedSoaCutoff} from './soa-cutoff.fixtures.mjs';
 
 assert.equal(process.env.DGC_UI_FIXTURE,'true');
 const mode=process.env.DGC_UI_FIXTURE_MODE??'setup';assert.ok(['setup','serve'].includes(mode));
@@ -24,6 +25,7 @@ app.get('/fixture/',async(_req,reply)=>reply.type('text/html').send(await readFi
 app.get('/assets/:name',async(req,reply)=>{const name=req.params.name;if(!assets.has(name))return reply.code(404).send();return reply.type(name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'application/octet-stream').send(await readFile(resolve(web,'assets',name)));});
 async function headers(user){const raw=randomBytes(32).toString('hex');await prisma.authSession.create({data:{companyId:company.id,userId:user.id,tokenHash:tokenHash(raw),expiresAt:new Date(Date.now()+3600000)}});return {origin,cookie:'erp_session='+raw,'x-csrf-token':csrfToken(raw,config.secret)};}
 if(mode==='setup'){
+await seedSoaCutoff(prisma,company.id,accounting.id);
 const managerHeaders=await headers(await actor('MANAGER_FIXTURE')),configHeaders=await headers(await actor('CONFIG_ONLY_FIXTURE')),accountingHeaders=await headers(accounting);
 async function post(path,payload,h,status=200){const r=await app.inject({method:'POST',url:'/api/v1'+path,payload,headers:h});assert.equal(r.statusCode,status,r.body);return r.json();}
 const output=await prisma.contract.findFirstOrThrow({where:{companyId:company.id,dgcDirection:'Output'},include:{services:true}});

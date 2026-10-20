@@ -23,6 +23,7 @@
     "test:recon-invoice": "node tests/recon-invoice.integration.mjs",
     "test:dgc-recon": "node tests/dgc-recon.integration.mjs",
     "test:dgc-roles": "node tests/dgc-role-access.integration.mjs",
+    "test:soa-cutoff": "node tests/soa-cutoff-review.integration.mjs",
     "test:input-recon": "node tests/input-recon.characterization.mjs && node tests/input-recon-pdf.characterization.mjs && node tests/input-recon.integration.mjs"
   },
   "dependencies": {
