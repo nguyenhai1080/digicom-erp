@@ -50,3 +50,5 @@ node scripts/dgc-migration.mjs review-references --snapshot artifacts/<snapshot.
 `--decisions` tùy chọn; digest snapshot bắt buộc. Output bị giới hạn trong `artifacts/` của checkout. `pnpm test:migration` chạy core và graph fixtures: duplicate/context/file, ứng viên thiếu metadata, bundle/child, Invoice nhiều kỳ, danh sách ID, alias đã duyệt, ngày serial thiếu format, determinism và tamper/stale decision guards. Các fixture tổng hợp không chứa dữ liệu thật.
 
 Việc tiếp theo: kiểm số tiền/trạng thái/revision và đối soát Invoice–payment–AR theo graph, đóng các ngoại lệ bằng bằng chứng, rồi mới thiết kế/import tài chính. SOA vẫn chờ quyết định khoản thu sau ngày chốt. Staging thực tế vẫn chỉ có master data; không post cash lịch sử.
+
+Đã bổ sung [kết quả đối chiếu số tiền](DGC_FINANCE_REVIEW_20261020.md): 91 Invoice/53 AR cân bằng, nhưng vẫn có sai khác làm tròn, lỗi nguồn và lịch sử revision cần xử lý. Kết quả chưa cho phép posting.
