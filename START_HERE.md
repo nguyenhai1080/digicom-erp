@@ -4,6 +4,8 @@ Cập nhật ngày 20/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–20/10
 
+Đã chạy [rà soát liên kết migration](docs/handover/DGC_REFERENCE_REVIEW_20261020.md): 3.154 hàng/10.894 liên kết, giữ 7 nhóm trùng ID; còn 63 liên kết cần đối chiếu. Đây là báo cáo đọc snapshot, chưa cho phép nhập tài chính.
+
 Đã có [InputRecon/AP và kiểm thử UI mới nhất](docs/handover/DGC_INPUT_RECON_AP_20261020.md): tính theo hợp đồng Input, generate Draft, PDF biên bản và approve tạo AP, giữ provenance và không phát sinh cash posting. SOA đang chờ xác nhận cách tính khoản thu theo ngày chốt; migration tài chính/toàn chuỗi chưa hoàn tất.
 
 Đợt tiếp tục đã lấy snapshot 25 bảng/3.154 hàng vào staging riêng, nhập thử 10 dịch vụ, 4 đối tác (Movitel Active), 9 hợp đồng và 14 liên kết dịch vụ theo xác nhận owner, triển khai adapter Invoice DGC, ảnh ghép ký đối soát theo xác nhận owner và kiểm thử DB/PDF Linux. Đọc [kết quả migration và Invoice mới nhất](docs/handover/DGC_MIGRATION_AND_INVOICE_20261019.md) trước các nhận định lịch sử bên dưới. Chưa nhập financial record thật; thuế/alias hợp đồng đã được xử lý và kiểm tra replay/restore, InputRecon/AP/SOA và migration toàn chuỗi chưa hoàn tất.

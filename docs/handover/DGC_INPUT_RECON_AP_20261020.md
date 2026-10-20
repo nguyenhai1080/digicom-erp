@@ -47,3 +47,5 @@ Các quyền mới: INPUT_RECON_VIEW, INPUT_RECON_GENERATE (capability Manager/B
 SOA: đã đọc donor `52_StateOfAccount.js`, đặc biệt DGC_buildSoaData_ 353–452. Donor lọc Invoice_Date theo asOfDate nhưng DGC_sumPaymentsForInvoice_ không nhận cutoff; đây là điểm đã ghi trong baseline cần owner xác nhận. Câu hỏi đang chờ: Invoice 100 USD ngày 10/01, thu 60 USD ngày 05/02 thì SOA tại 31/01 còn 100 USD hay 40 USD. Chưa mặc định chọn một cách tính.
 
 Trong khi chờ, tiếp tục kiểm kê/resolver chuỗi dữ liệu lịch sử, không nhập financial records khi quan hệ/phiên bản còn mơ hồ. Vẫn cần SOA, Invoice cancel/regeneration và các guard liên quan, full role mapping, importer financial/file, đối soát cuối kỳ và cutover trên tài khoản DGC đúng. Không push remote/deploy hoặc thay nguồn Google Sheet trong đợt này.
+
+Đã có [báo cáo reference review](DGC_REFERENCE_REVIEW_20261020.md): resolver giữ mọi hàng trùng, 19 liên kết được phân biệt theo ngữ cảnh; còn 63 liên kết thiếu/mâu thuẫn/chưa rõ trên phạm vi mở rộng. Không nhập financial record.

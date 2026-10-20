@@ -125,4 +125,3 @@ ALTER TABLE account_payables ADD CONSTRAINT payable_domain CHECK (
  AND paid_amount<=original_amount AND outstanding_amount=original_amount-paid_amount
  AND status IN ('OPEN','PARTIALLY_PAID','PAID')
 );
-

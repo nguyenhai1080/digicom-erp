@@ -5,7 +5,8 @@
   "packageManager": "pnpm@10.18.3",
   "scripts": {
     "migration:prepare": "node scripts/dgc-migration.mjs prepare",
-    "test:migration": "node scripts/dgc-migration/core.test.mjs",
+    "migration:review-references": "node scripts/dgc-migration.mjs review-references",
+    "test:migration": "node scripts/dgc-migration/core.test.mjs && node scripts/dgc-migration/graph.test.mjs",
     "test:migration:staging": "node scripts/dgc-migration/staging.integration.mjs",
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
