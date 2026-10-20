@@ -4,6 +4,8 @@ Cập nhật ngày 20/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–20/10
 
+[Kế toán nhập tỷ giá và chuẩn bị đối soát](docs/handover/DGC_ACCOUNTING_PREPARATION_20261020.md): theo chỉ đạo mới, có mẫu DGC_ACCOUNTANT và phần tỷ giá tại cả hai màn hình đối soát; chuẩn bị nháp được, không mở duyệt cuối/cấu hình ký/quỹ. Build, 223 kiểm tra quyền và 105 đối soát DGC đạt; chưa gán tài khoản thật.
+
 [Đọc lịch sử thu Invoice](docs/handover/DGC_RECEIPT_READ_20261020.md): đã tách INVOICE_PAYMENT_VIEW cho Staff/Manager/BOD; reader Staff không mở cash accounts/balances, payment writer hoặc tải chứng từ ngân hàng. Mẫu quyền chưa gán cho tài khoản thật.
 
 [Quyền tỷ giá DGC](docs/handover/DGC_FX_ACCESS_20261020.md): Manager/BOD có quyền tạo tỷ giá riêng, UI truy cập ngoài cấu hình ký, phân trang 10; 149 kiểm tra role/manual/FX, 187 InputRecon/AP và 264 hồi quy đạt. Chưa mở sửa tỷ giá đã có hoặc cấp quyền tài khoản thật.

@@ -45,9 +45,17 @@ export const dgcRoleMappings:readonly Mapping[]=[
  {permissions:['ROLE_VIEW','ROLE_CREATE'],roles:bod,source:source('03_Auth.js','requireRole',150,'TARGET_ADAPTATION'),note:'Target custom RBAC administration; donor has fixed role names.'}
 ];
 export function dgcRolePresets(){
- return all.map(role=>({code:'DGC_'+role.toUpperCase(),name:role+' — DGC Finance',donorRole:role,proposalOnly:true,fullParity:false,
+ const donorPresets=all.map(role=>({code:'DGC_'+role.toUpperCase(),name:role+' — DGC Finance',donorRole:role,proposalOnly:true,fullParity:false,
   permissionCodes:[...new Set(dgcRoleMappings.filter(m=>m.roles.includes(role)).flatMap(m=>m.permissions))].sort(),
   coverage:'IMPLEMENTED_SERVICE_FINANCE_ONLY',
   reviewNotes:['No automatic assignment, seed or existing-role update.','Projects, SOA/package runtime, diagnostics/repair, complete read separation and FX revisions remain outside this template.'],
   evidence:dgcRoleMappings.filter(m=>m.roles.includes(role))}));
+ // Owner explicitly delegated FX entry and input/output preparation to accounting.
+ // Keep this target role distinct from generic Staff and from final approvers.
+ const preparation=['REVENUE_FX_CREATE','RECON_REVIEW','INPUT_RECON_VIEW','INPUT_RECON_GENERATE'];
+ const accountant={...donorPresets[0],code:'DGC_ACCOUNTANT',name:'Nhân viên kế toán — DGC Finance',donorRole:null,inheritsDonorRole:'Staff',
+  permissionCodes:[...new Set([...donorPresets[0].permissionCodes,...preparation])].sort(),
+  ownerInstruction:{date:'2026-10-20',reference:'docs/handover/DGC_ACCOUNTING_PREPARATION_20261020.md',basis:'OWNER_INSTRUCTION',permissions:preparation},
+  reviewNotes:[...donorPresets[0].reviewNotes,'Owner accounting preparation role; no output/input final approval, restamp, cash posting or signing configuration.']};
+ return [...donorPresets,accountant];
 }

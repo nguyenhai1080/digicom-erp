@@ -1,14 +1,14 @@
 import React,{useEffect,useState} from 'react';
 import {pdfPreview} from './FinancialReview';
-type Props={request:(path:string,body?:unknown,csrf?:string)=>Promise<any>;csrf:string;permissions:string[];payables?:boolean};
+type Props={request:(path:string,body?:unknown,csrf?:string)=>Promise<any>;csrf:string;permissions:string[];payables?:boolean;ratesVersion?:number};
 const localDate=()=>{const n=new Date();return [n.getFullYear(),String(n.getMonth()+1).padStart(2,'0'),String(n.getDate()).padStart(2,'0')].join('-');};
 const money=(v:string|undefined)=>v===undefined?'—':new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v as any);
 const labels:Record<string,string>={DRAFT:'Nháp',GENERATED:'Đã tạo PDF',APPROVED:'Đã duyệt',OPEN:'Chưa thanh toán',PARTIALLY_PAID:'Thanh toán một phần',PAID:'Đã thanh toán'};
-export function InputRecon({request,csrf,permissions,payables=false}:Props){
+export function InputRecon({request,csrf,permissions,payables=false,ratesVersion=0}:Props){
  const [tab,setTab]=useState<'sources'|'records'>('sources'),[period,setPeriod]=useState(localDate().slice(0,7)),[page,setPage]=useState(1),[data,setData]=useState<any>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[review,setReview]=useState<any>(null),[confirmed,setConfirmed]=useState(false),[previewUrl,setPreviewUrl]=useState(''),[linePage,setLinePage]=useState(1),[reconDate,setReconDate]=useState(localDate());
  const path=payables?'/payables':tab==='sources'?'/input-recon/sources':'/input-recon';
  async function load(){const d=await request(path+'?'+new URLSearchParams({page:String(page),...(period?{period}:{})}));setData(d);}
- useEffect(()=>{let done=false;setData(null);setReview(null);setConfirmed(false);setPreviewUrl('');void request(path+'?'+new URLSearchParams({page:String(page),...(period?{period}:{})})).then(d=>{if(!done)setData(d);}).catch(e=>{if(!done)setMessage(e.message);});return()=>{done=true;};},[path,page,period]);
+ useEffect(()=>{let done=false;setData(null);setReview(null);setConfirmed(false);setPreviewUrl('');void request(path+'?'+new URLSearchParams({page:String(page),...(period?{period}:{})})).then(d=>{if(!done)setData(d);}).catch(e=>{if(!done)setMessage(e.message);});return()=>{done=true;};},[path,page,period,ratesVersion]);
  useEffect(()=>()=>{if(previewUrl)URL.revokeObjectURL(previewUrl);},[previewUrl]);
  const canGenerate=permissions.includes('INPUT_RECON_GENERATE'),canApprove=permissions.includes('INPUT_RECON_APPROVE');
  async function inspect(row:any){setBusy(true);setMessage('');try{const p=await request('/input-recon/preview',{revenueId:row.sourceRevenueId??row.id},csrf);setReview({kind:'generate',data:p});setConfirmed(false);setPreviewUrl('');}catch(e){setMessage(e instanceof Error?e.message:'Không đọc được cơ sở tính.');}finally{setBusy(false);}}

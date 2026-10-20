@@ -12,6 +12,7 @@ import {parseReconFinancial} from '../dist/modules/projects/recon-financial.js';
 import {prepareReconDocument,reconSigningMode} from '../dist/modules/projects/recon-signing.js';
 import {previewReconPage} from '../dist/modules/projects/recon-reader.js';
 import {singleText} from './recon-financial.characterization.mjs';
+import {dgcRolePresets} from '../dist/modules/auth/dgc-role-presets.js';
 
 if(!new URL(process.env.DATABASE_URL).pathname.startsWith('/erp_execution_acceptance_dgc_recon'))throw Error('Use a disposable DGC recon acceptance database');
 const storage=await mkdtemp(resolve(tmpdir(),'dgc-recon-synthetic-'));process.env.STORAGE_ROOT=storage;
@@ -24,6 +25,10 @@ const role=await prisma.role.create({data:{companyId:company.id,code:marker,name
 const user=await prisma.user.create({data:{companyId:company.id,email:marker+'@example.test',fullName:'Synthetic DGC actor',passwordHash:'unused fixture'}});
 await prisma.userRole.create({data:{userId:user.id,roleId:role.id}});await prisma.authSession.create({data:{companyId:company.id,userId:user.id,tokenHash:tokenHash(raw),expiresAt:new Date(Date.now()+3600000)}});
 const config={secret:randomBytes(32).toString('hex'),appOrigin:origin,secureCookies:false,bootstrapEnabled:false,bootstrapToken:'disabled',defaultCompanyCode:'DGC'};
+const accountantPreset=dgcRolePresets().find(p=>p.code==='DGC_ACCOUNTANT'),accountantPermissions=await Promise.all(accountantPreset.permissionCodes.map(code=>prisma.permission.upsert({where:{code},create:{code,name:code,module:'FIXTURE'},update:{}})));
+const accountant=await prisma.user.create({data:{companyId:company.id,email:randomUUID()+'@example.test',fullName:'Synthetic accountant',passwordHash:'unused fixture'}}),accountantRole=await prisma.role.create({data:{companyId:company.id,code:'ACCOUNTING_FIXTURE',name:'Synthetic accountant',permissions:{create:accountantPermissions.map(p=>({permissionId:p.id}))}}});
+await prisma.userRole.create({data:{userId:accountant.id,roleId:accountantRole.id}});const accountantRaw=randomBytes(32).toString('hex');await prisma.authSession.create({data:{companyId:company.id,userId:accountant.id,tokenHash:tokenHash(accountantRaw),expiresAt:new Date(Date.now()+3600000)}});
+const accountantHeaders={cookie:'erp_session='+accountantRaw,'x-csrf-token':csrfToken(accountantRaw,config.secret)};
 const app=await buildApp({auth:config,logger:false});let checks=0;
 const eq=(a,b)=>{assert.deepEqual(a,b);checks++;},hash=b=>createHash('sha256').update(b).digest('hex');
 const request=(method,url,payload,extra={})=>app.inject({method,url,payload,headers:{origin,cookie:'erp_session='+raw,'x-csrf-token':csrfToken(raw,config.secret),...extra}});
@@ -76,11 +81,15 @@ try{
  const pdf=await PDFDocument.create();for(const rot of [0,90,180,270]){const page=pdf.addPage([500,500]);page.setCropBox(20,15,460,470);page.setRotation(degrees(rot));}
  const original=Buffer.from(await pdf.save({useObjectStreams:false})),selection={partnerId:partner.id,serviceId:service.id,period:'2026-01'};
  const pre=(await request('GET','/api/v1/output-recon/preflight?'+new URLSearchParams(selection))).json();
- const uploadResult=await ok('/api/v1/output-recon/uploads',{...selection,filename:'Synthetic.pdf',base64:original.toString('base64'),fingerprint:pre.fingerprint},201),id=uploadResult.item.id,url='/api/v1/output-recon/uploads/'+id;
+ const uploadResponse=await post('/api/v1/output-recon/uploads',{...selection,filename:'Synthetic.pdf',base64:original.toString('base64'),fingerprint:pre.fingerprint},accountantHeaders);eq(uploadResponse.statusCode,201);
+ const uploadResult=uploadResponse.json(),id=uploadResult.item.id,url='/api/v1/output-recon/uploads/'+id;eq((await prisma.outputReconUpload.findUniqueOrThrow({where:{id}})).createdById,accountant.id);
  // Isolate finalization from OCR: freeze a characterized synthetic extraction on
  // an actual uploaded PDF. The full reader is covered by recon-invoice integration.
  await prisma.outputReconUpload.update({where:{id},data:{rawText:singleText,status:'OCR_EXTRACTED',extractionData:{financial:parseReconFinancial(singleText),pages:[{},{},{},{}]}}});
  const review=async()=>(await request('GET',url+'/financial')).json();let v=await review();eq(v.signingMode,'DGC_COMPOSITE');eq(v.restampPermission,'RECON_RESTAMP');eq(v.operationalCurrency,'USD');eq(v.errors,[]);eq(v.canFinalize,true);
+ const corrected=await post(url+'/correct-financial',{expectedUpdatedAt:v.item.updatedAt,changes:[{lineNo:1,revenueMzn:'101.00'}],reason:'Synthetic accounting preparation'},accountantHeaders);eq(corrected.statusCode,200);
+ eq((await prisma.auditLog.findFirstOrThrow({where:{entityId:id,action:'RECON_CORRECT_FINANCIAL'}})).userId,accountant.id);
+ for(const action of ['signed-preview','finalize'])eq((await post(url+'/'+action,{},accountantHeaders)).statusCode,403);
  await prisma.outputReconUpload.update({where:{id},data:{extractionData:{financial:{...parseReconFinancial(singleText),source:'DIGICOM_VND_STATEMENT'}}}});
  eq((await review()).errors.includes('Mẫu đối soát này ghi phần thực nhận của GST; không dùng làm doanh thu DGC.'),true);
  await prisma.outputReconUpload.update({where:{id},data:{extractionData:{financial:parseReconFinancial(singleText),pages:[{},{},{},{}]}}});v=await review();

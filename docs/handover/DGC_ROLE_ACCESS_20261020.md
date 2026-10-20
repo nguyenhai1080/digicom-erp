@@ -1,5 +1,7 @@
 # Quyền DGC Finance — 20/10/2026
 
+Theo chỉ đạo owner tiếp theo, đã bổ sung mẫu target [Nhân viên kế toán](DGC_ACCOUNTING_PREPARATION_20261020.md) có FX và quyền chuẩn bị đối soát; không mở duyệt cuối. Danh sách ba mẫu bên dưới mô tả đợt đầu, hiện API/UI có thêm mẫu DGC_ACCOUNTANT.
+
 Cập nhật tiếp: quyền tạo tỷ giá của Manager đã được tách và kiểm thử tại [DGC_FX_ACCESS_20261020.md](DGC_FX_ACCESS_20261020.md); quyền Staff đọc lịch sử thu đã được tách tại [DGC_RECEIPT_READ_20261020.md](DGC_RECEIPT_READ_20261020.md). Các nhận định hai quyền này cần tách bên dưới mô tả khoảng trống tại thời điểm đợt đầu; upsert/revision tỷ giá và toàn bộ quyền chứng từ donor vẫn chưa được port.
 
 ## Phạm vi đã triển khai

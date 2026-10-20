@@ -1,5 +1,7 @@
 # Quyền nhập tỷ giá DGC — 20/10/2026
 
+**Owner cập nhật:** [nhân viên kế toán được nhập tỷ giá và chuẩn bị đối soát](DGC_ACCOUNTING_PREPARATION_20261020.md). Có mẫu DGC_ACCOUNTANT và phần nhập tỷ giá ở hai màn hình đối soát. Giới hạn Manager/BOD bên dưới là mapping ban đầu từ donor, không còn là giới hạn cho kế toán target.
+
 Đã tách tạo tỷ giá DGC khỏi SYSTEM_CONFIG_EDIT bằng REVENUE_FX_CREATE. Donor `53_InputRecon_AP.js:6`, `createFxRate`, cho Manager/BOD thao tác. Target chỉ tạo tỷ giá báo cáo VND/USD theo tháng; Staff đọc qua REVENUE_VIEW, theo generic fxRates reader `01_AppShell.js:276`. Tất cả target readers vẫn yêu cầu đăng nhập.
 
 Hai POST `/revenue-fx` và `/revenue-fx/import` dùng quyền mới cho company DGC từ session, giữ Origin/CSRF và strict payload. DGC có riêng SYSTEM_CONFIG_EDIT không tự được quyền FX; tenant GST giữ quyền cũ. API GET trả canCreate, UI dùng flag này thay vì đoán từ quyền cấu hình chung.
