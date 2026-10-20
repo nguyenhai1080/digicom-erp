@@ -1,5 +1,5 @@
 import {manualRevenueActions,manualRevenuePermission} from './manual-revenue-access.js';
-import {reportingFxRoutes} from './reporting-fx.js';
+import {reportingFxRoutes,reportingFxCreatePermission} from './reporting-fx.js';
 import {randomUUID} from 'node:crypto';
 import {mkdir,open,rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -107,5 +107,5 @@ export async function manualRevenueRoutes(app:FastifyInstance,config:AuthConfig)
   },{timeout:30000});
  });
  app.get('/api/v1/manual-revenue/:id/source',{preHandler:requirePermission('REVENUE_VIEW')},async(req,reply)=>{const r=await prisma.reconciliation.findFirst({where:{companyId:req.auth!.companyId,id:id(req.params),sourceType:'MANUAL_ENTRY',isCurrent:true,status:{not:'CANCELLED'}},include:{sourceAttachment:true}}),a=r?.sourceAttachment;if(!a||a.companyId!==req.auth!.companyId)throw new CommandError(404,'Không có chứng từ nguồn.');const bytes=await checkedFile(a,`manual-revenue/${a.companyId}/${a.id}.${a.storedFilename.split('.').at(-1)}`,5*1024*1024);return reply.type(a.mimeType!).header('Content-Disposition','attachment; filename="'+a.originalFilename.replace(/[^A-Za-z0-9_.-]/g,'_')+'"').send(bytes);});
- app.post('/api/v1/revenue-fx',{onRequest:writeGuard('SYSTEM_CONFIG_EDIT',config)},async req=>{const b=parse(z.object({period,rate:fx,source:z.string().trim().min(1).max(500),confirmed:z.literal(true)}).strict(),req.body),user=req.auth!;return prisma.$transaction(async tx=>{const item=await tx.configuration.create({data:{companyId:user.companyId,configKey:'REVENUE_FX:'+b.period,configValue:JSON.stringify({rate:D(b.rate).toFixed(),source:b.source,approvedById:user.userId}),description:'Tỷ giá báo cáo VND/USD theo kỳ, không sửa số tiền gốc.'}});await audit(tx,user,'REPORTING_FX_CREATE','Configuration',item.id,null,b);return {message:'Đã lưu tỷ giá báo cáo theo kỳ. Tỷ giá này không thay đổi Invoice/công nợ gốc.'};});});
+ app.post('/api/v1/revenue-fx',{onRequest:writeGuard(reportingFxCreatePermission,config)},async req=>{const b=parse(z.object({period,rate:fx,source:z.string().trim().min(1).max(500),confirmed:z.literal(true)}).strict(),req.body),user=req.auth!;return prisma.$transaction(async tx=>{const item=await tx.configuration.create({data:{companyId:user.companyId,configKey:'REVENUE_FX:'+b.period,configValue:JSON.stringify({rate:D(b.rate).toFixed(),source:b.source,approvedById:user.userId}),description:'Tỷ giá báo cáo VND/USD theo kỳ, không sửa số tiền gốc.'}});await audit(tx,user,'REPORTING_FX_CREATE','Configuration',item.id,null,b);return {message:'Đã lưu tỷ giá báo cáo theo kỳ. Tỷ giá này không thay đổi Invoice/công nợ gốc.'};});});
 }

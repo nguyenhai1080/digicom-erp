@@ -12,7 +12,7 @@ if(!new URL(process.env.DATABASE_URL).pathname.startsWith('/erp_execution_accept
 const storage=await mkdtemp(resolve(tmpdir(),'input-recon-fixture-'));process.env.STORAGE_ROOT=storage;
 const company=await prisma.company.upsert({where:{companyCode:'DGC'},create:{companyCode:'DGC',companyName:'Synthetic DGC',defaultCurrency:'USD'},update:{}}),marker=randomUUID();
 assert.equal(await prisma.inputReconciliation.count(),0,'Fresh synthetic database required');
-const permissions=['MANUAL_REVENUE_CREATE','MANUAL_REVENUE_EDIT','MANUAL_REVENUE_SUBMIT','MANUAL_REVENUE_APPROVE','MANUAL_REVENUE_CANCEL','INPUT_RECON_VIEW','INPUT_RECON_GENERATE','INPUT_RECON_APPROVE','AP_VIEW','REVENUE_VIEW','RECON_UPLOAD','RECON_REVIEW','RECON_APPROVE','RECON_VIEW','SYSTEM_CONFIG_EDIT'];
+const permissions=['REVENUE_FX_CREATE','MANUAL_REVENUE_CREATE','MANUAL_REVENUE_EDIT','MANUAL_REVENUE_SUBMIT','MANUAL_REVENUE_APPROVE','MANUAL_REVENUE_CANCEL','INPUT_RECON_VIEW','INPUT_RECON_GENERATE','INPUT_RECON_APPROVE','AP_VIEW','REVENUE_VIEW','RECON_UPLOAD','RECON_REVIEW','RECON_APPROVE','RECON_VIEW','SYSTEM_CONFIG_EDIT'];
 const ps=await Promise.all(permissions.map(code=>prisma.permission.upsert({where:{code},create:{code,name:code,module:'FIXTURE'},update:{}})));
 const user=await prisma.user.create({data:{companyId:company.id,email:marker+'@example.test',fullName:'Synthetic input actor',passwordHash:'unused'}});
 const role=await prisma.role.create({data:{companyId:company.id,code:marker,name:'Synthetic capability test',permissions:{create:ps.map(p=>({permissionId:p.id}))}}});await prisma.userRole.create({data:{userId:user.id,roleId:role.id}});

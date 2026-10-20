@@ -33,19 +33,20 @@ export const dgcRoleMappings:readonly Mapping[]=[
  {permissions:['PAYMENT_CREATE','PAYMENT_APPROVE','PAYMENT_POST'],roles:managers,source:source('51_Payment_Transaction.js','recordInvoicePayment',149)},
  {permissions:['INPUT_RECON_VIEW','INPUT_RECON_GENERATE'],roles:managers,source:source('53_InputRecon_AP.js','generateInputReconciliation',99),note:'INPUT_RECON_VIEW also exposes pending source inspection, which donor restricts to Manager/BOD.'},
  {permissions:['INPUT_RECON_APPROVE'],roles:bod,source:source('53_InputRecon_AP.js','approveInputReconciliation',377)},
+ {permissions:['REVENUE_FX_CREATE'],roles:managers,source:source('53_InputRecon_AP.js','createFxRate',6),note:'Create-only target USD/VND monthly reporting rate; donor also updates an existing active rate, which is not implemented here.'},
  {permissions:['REPORT_VIEW'],roles:managers,source:source('01_AppShell.js','getEntityData',276,'READER_CASE')},
  {permissions:['USER_VIEW'],roles:bod,source:source('01_AppShell.js','getEntityData',276,'READER_CASE')},
  {permissions:['USER_CREATE'],roles:bod,source:source('03_Auth.js','manageCreateUser',167,'BOD_HELPER')},
  {permissions:['USER_EDIT'],roles:bod,source:source('03_Auth.js','manageResetUserPassword',214,'TARGET_ADAPTATION'),note:'Donor password reset uses DGC_assertBod_; target USER_EDIT also permits profile/role edits.'},
  {permissions:['USER_DISABLE'],roles:bod,source:source('03_Auth.js','manageUpdateUserStatus',195,'BOD_HELPER')},
  {permissions:['AUDIT_VIEW'],roles:bod,source:source('01_AppShell.js','getEntityData',276,'READER_CASE')},
- {permissions:['SYSTEM_CONFIG_EDIT'],roles:bod,source:source('01_AppShell.js','getEntityData',276,'TARGET_ADAPTATION'),note:'Conservative BOD scope for bundled config writes/signing assets; donor reader is not evidence for all write actions. Manager FX creation needs a dedicated capability before parity.'},
+ {permissions:['SYSTEM_CONFIG_EDIT'],roles:bod,source:source('01_AppShell.js','getEntityData',276,'TARGET_ADAPTATION'),note:'Conservative BOD scope for bundled config writes/signing assets; donor reader is not evidence for all write actions.'},
  {permissions:['ROLE_VIEW','ROLE_CREATE'],roles:bod,source:source('03_Auth.js','requireRole',150,'TARGET_ADAPTATION'),note:'Target custom RBAC administration; donor has fixed role names.'}
 ];
 export function dgcRolePresets(){
  return all.map(role=>({code:'DGC_'+role.toUpperCase(),name:role+' — DGC Finance',donorRole:role,proposalOnly:true,fullParity:false,
   permissionCodes:[...new Set(dgcRoleMappings.filter(m=>m.roles.includes(role)).flatMap(m=>m.permissions))].sort(),
   coverage:'IMPLEMENTED_SERVICE_FINANCE_ONLY',
-  reviewNotes:['No automatic assignment, seed or existing-role update.','Projects, SOA/package runtime, diagnostics/repair and complete read/FX separation remain outside this template.'],
+  reviewNotes:['No automatic assignment, seed or existing-role update.','Projects, SOA/package runtime, diagnostics/repair, complete read separation and FX revisions remain outside this template.'],
   evidence:dgcRoleMappings.filter(m=>m.roles.includes(role))}));
 }

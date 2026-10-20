@@ -4,6 +4,8 @@ Cập nhật ngày 20/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–20/10
 
+[Quyền tỷ giá DGC](docs/handover/DGC_FX_ACCESS_20261020.md): Manager/BOD có quyền tạo tỷ giá riêng, UI truy cập ngoài cấu hình ký, phân trang 10; 149 kiểm tra role/manual/FX, 187 InputRecon/AP và 264 hồi quy đạt. Chưa mở sửa tỷ giá đã có hoặc cấp quyền tài khoản thật.
+
 [Quyền doanh thu và mẫu vai trò DGC](docs/handover/DGC_ROLE_ACCESS_20261020.md): đã tách năm quyền nhập tay khỏi OCR, thêm Gửi kiểm tra và mẫu Staff/Manager/BOD có dẫn nguồn. Mẫu chỉ điền biểu mẫu, chưa tự tạo/gán cho người dùng thật; full role parity và kiểm UI mới vẫn chưa nghiệm thu.
 
 [Bộ lọc Invoice quá hạn](docs/handover/DGC_INVOICE_OVERDUE_20261020.md) đã sửa theo ngày chốt explicit, giữ nguyên stored status/số tiền; 149 assertions DGC và 264 hồi quy đạt. Tương tác browser của bộ lọc mới chưa kiểm trọn do phiên bị gián đoạn; SOA cutoff vẫn chờ owner.

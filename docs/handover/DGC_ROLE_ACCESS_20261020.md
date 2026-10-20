@@ -1,5 +1,7 @@
 # Quyền DGC Finance — 20/10/2026
 
+Cập nhật tiếp: quyền tạo tỷ giá của Manager đã được tách và kiểm thử tại [DGC_FX_ACCESS_20261020.md](DGC_FX_ACCESS_20261020.md). Các nhận định Manager FX cần tách bên dưới mô tả khoảng trống tại thời điểm đợt đầu; upsert/revision tỷ giá donor vẫn chưa được port.
+
 ## Phạm vi đã triển khai
 
 Tách quyền doanh thu nhập tay khỏi quyền xử lý OCR cho tenant DGC. Trước đây submit dùng `RECON_REVIEW`, cũng mở sửa số tài chính OCR. Donor `30_Revenue.js:74` cho Staff gửi doanh thu, trong khi `22_Recon_PDF_Approval.js:397` chỉ cho Manager/BOD sửa OCR. Không cấp `RECON_REVIEW` cho Staff để giải quyết submit.
