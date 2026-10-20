@@ -13,6 +13,7 @@ import { serviceContractRoutes } from './service-contracts.js';
 import { outputReconRoutes } from './output-recon.js';
 import { reconFinalizeRoutes } from './recon-finalize.js';
 import { invoiceRoutes } from './invoices.js';
+import { invoiceCancelRoutes } from './invoice-cancel.js';
 import { invoicePaymentRoutes } from './invoice-payments.js';
 import {manualRevenueRoutes} from './manual-revenue.js';
 import {dgcInvoiceProfileRoutes} from './dgc-invoice-profile.js';
@@ -44,6 +45,7 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   await app.register(outputReconRoutes, config);
   await app.register(reconFinalizeRoutes, config);
   await app.register(invoiceRoutes, config);
+  await app.register(invoiceCancelRoutes, config);
   await app.register(dgcInvoiceProfileRoutes, config);
   await app.register(financeLedgerRoutes, config);
   await app.register(invoicePaymentRoutes, config);

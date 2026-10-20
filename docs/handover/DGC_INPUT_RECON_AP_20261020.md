@@ -49,3 +49,5 @@ SOA: đã đọc donor `52_StateOfAccount.js`, đặc biệt DGC_buildSoaData_ 3
 Trong khi chờ, tiếp tục kiểm kê/resolver chuỗi dữ liệu lịch sử, không nhập financial records khi quan hệ/phiên bản còn mơ hồ. Vẫn cần SOA, Invoice cancel/regeneration và các guard liên quan, full role mapping, importer financial/file, đối soát cuối kỳ và cutover trên tài khoản DGC đúng. Không push remote/deploy hoặc thay nguồn Google Sheet trong đợt này.
 
 Đã có [báo cáo reference review](DGC_REFERENCE_REVIEW_20261020.md): resolver giữ mọi hàng trùng, 19 liên kết được phân biệt theo ngữ cảnh; còn 63 liên kết thiếu/mâu thuẫn/chưa rõ trên phạm vi mở rộng. Không nhập financial record.
+
+Đã bổ sung [hủy Invoice chưa thanh toán](DGC_INVOICE_CANCEL_20261020.md) và lập lại từ nguồn, giữ lịch sử/AR cũ. SOA vẫn chờ cutoff; không xem guard tham chiếu SOA/package là runtime hoàn chỉnh.

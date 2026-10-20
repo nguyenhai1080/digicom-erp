@@ -1,4 +1,5 @@
 import {assertDraftInvoiceDeletion} from './draft-deletion.js';
+import {assertInvoiceUnused} from './invoice-cancel.js';
 import {randomUUID} from 'node:crypto';
 import {financialFilename,invoiceServices} from './document-filename.js';
 import type {FastifyInstance} from 'fastify';
@@ -86,7 +87,7 @@ export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
   if(!kind)throw new CommandError(400,'Chọn dấu hoặc chữ ký DGC.');
   const a=await prisma.$transaction(tx=>asset(tx,request.auth!.companyId,kind,q.v));return reply.type(a.document.attachment.mimeType!).header('Cache-Control','no-store').send(a.bytes);
  });
- app.get('/api/v1/invoices/references',{preHandler:requirePermission('INVOICE_VIEW')},async request=>({partners:await prisma.partner.findMany({where:{companyId:request.auth!.companyId},select:{id:true,partnerKey:true,legalName:true,paymentTermDays:true},orderBy:{legalName:'asc'},take:1000}),services:await prisma.service.findMany({where:{companyId:request.auth!.companyId,status:'ACTIVE'},select:{id:true,serviceKey:true,serviceName:true},orderBy:{serviceKey:'asc'},take:1000})}));
+ app.get('/api/v1/invoices/references',{preHandler:requirePermission('INVOICE_VIEW')},async request=>({canCancelUnpaid:request.auth!.companyCode==='DGC',partners:await prisma.partner.findMany({where:{companyId:request.auth!.companyId},select:{id:true,partnerKey:true,legalName:true,paymentTermDays:true},orderBy:{legalName:'asc'},take:1000}),services:await prisma.service.findMany({where:{companyId:request.auth!.companyId,status:'ACTIVE'},select:{id:true,serviceKey:true,serviceName:true},orderBy:{serviceKey:'asc'},take:1000})}));
  app.get('/api/v1/invoices',{preHandler:requirePermission('INVOICE_VIEW')},async request=>{
   const q=parse(z.object({page:z.coerce.number().int().min(1).max(100000).default(1),limit:z.coerce.number().int().min(1).max(100).default(10),publication:z.enum(['issued','unissued']).optional(),period:z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/).optional(),partnerId:z.uuid().optional(),status:z.enum(['ISSUED','OVERDUE','PARTIALLY_PAID','PAID','SUPERSEDED']).optional()}).strict(),request.query),where:Prisma.InvoiceWhereInput={companyId:request.auth!.companyId,status:{not:'CANCELLED'},...(q.period?{period:q.period}:{}),...(q.partnerId?{partnerId:q.partnerId}:{}),...(q.publication==='issued'?{OR:[{issuedAt:{not:null}},{status:{in:['ISSUED','OVERDUE','PARTIALLY_PAID','PAID']}}]}:q.publication==='unissued'?{issuedAt:null,status:{notIn:['CANCELLED','ISSUED','OVERDUE','PARTIALLY_PAID','PAID']}}:{}),...(q.status?{AND:[{status:q.status}]}:{})};
   const [items,total]=await prisma.$transaction([prisma.invoice.findMany({where,select:{id:true,invoiceNumber:true,invoiceDate:true,dueDate:true,period:true,invoiceMode:true,status:true,revisionNo:true,updatedAt:true,isCurrent:true,revenueAmount:true,whtAmount:true,payableAmount:true,paidAmount:true,currency:true,partner:{select:{legalName:true,partnerKey:true}}},orderBy:[{period:'desc'},{invoiceNumber:'asc'},{id:'asc'}],skip:(q.page-1)*q.limit,take:q.limit}),prisma.invoice.count({where})]);return {items,total,page:q.page,limit:q.limit};
@@ -98,6 +99,7 @@ export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
    await financialPeriodLock(tx,user.companyId,initial.partnerId,initial.period);
    await tx.$queryRaw`SELECT id FROM invoices WHERE id=${id}::uuid AND company_id=${user.companyId}::uuid FOR UPDATE`;
    const item=await tx.invoice.findFirstOrThrow({where:{id,companyId:user.companyId},include:{receivable:true}});unchanged(item,body.expectedUpdatedAt);assertDraftInvoiceDeletion(item);
+   if(user.companyCode==='DGC')await assertInvoiceUnused(tx,user.companyId,id);
    await tx.invoiceScopeItem.updateMany({where:{companyId:user.companyId,scope:{invoiceId:id}},data:{isCurrent:false}});
    await tx.invoiceScope.updateMany({where:{companyId:user.companyId,invoiceId:id},data:{isCurrent:false,status:'CANCELLED'}});
    await tx.document.updateMany({where:{companyId:user.companyId,entityType:'Invoice',entityId:id},data:{status:'CANCELLED'}});

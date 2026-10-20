@@ -6,6 +6,8 @@
 
 Đã bổ sung [InputRecon/AP và PDF biên bản](docs/handover/DGC_INPUT_RECON_AP_20261020.md), có kiểm thử DB/PDF và browser với fixture riêng. SOA/cutover và nhập financial records thật còn pending.
 
+[Hủy Invoice chưa thanh toán](docs/handover/DGC_INVOICE_CANCEL_20261020.md) đã có API/UI, giữ lịch sử/AR cũ và mở nguồn lập lại, không ghi cash; SOA/package mới có guard tham chiếu cho bước tích hợp tiếp.
+
 ## Phát triển địa phương
 
 Dùng Node 22 và pnpm 10.18.3: `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm build`. Generate/build không cần kết nối database. Các suite tài chính tích hợp chỉ được chạy với database dùng thử đúng tiền tố mà từng suite yêu cầu.

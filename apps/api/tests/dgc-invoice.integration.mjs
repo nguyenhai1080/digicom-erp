@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {randomBytes,randomUUID} from 'node:crypto';
-import {mkdtemp,writeFile,mkdir,readdir} from 'node:fs/promises';
+import {mkdtemp,writeFile,mkdir,readdir,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {resolve} from 'node:path';
 import sharp from 'sharp';
@@ -9,6 +9,7 @@ import {PDFDocument} from 'pdf-lib';
 import {prisma} from '@erp/db';
 import {buildApp} from '../dist/app.js';
 import {csrfToken,tokenHash} from '../dist/modules/auth/access.js';
+import {linkInvoiceDocument,linkInvoiceDocuments} from '../dist/modules/projects/invoice-cancel.js';
 if(!new URL(process.env.DATABASE_URL).pathname.startsWith('/erp_execution_acceptance_dgc'))throw Error('Use a disposable DGC acceptance database');
 const storage=await mkdtemp(resolve(tmpdir(),'dgc-invoice-synthetic-'));process.env.STORAGE_ROOT=storage;
 const company=await prisma.company.findUniqueOrThrow({where:{companyCode:'DGC'}});
@@ -60,6 +61,10 @@ try{
  const created=await ok('/api/v1/invoices/create',payload(p),201),firstId=created.items[0].id;eq(await prisma.accountReceivable.count(),0);eq(await prisma.cashEntry.count(),0);
  const first=await prisma.invoice.findUniqueOrThrow({where:{id:firstId}});eq(first.snapshot.layout,'DGC_V61_V1');eq(first.snapshot.resourceVersions.template.version,2);eq(first.snapshot.resourceVersions.stamp.id,p.dgcSigningAssets.stamp.id);
  const book=await request('GET','/api/v1/invoices/'+firstId+'/download?format=workbook');eq(book.statusCode,200);const zip=new AdmZip(book.rawPayload);assert.ok(zip.readAsText('xl/workbook.xml').includes('DGC Invoice'));assert.ok(zip.readAsText('xl/worksheets/sheet1.xml').includes('90.00'));
+ const draftWorkflow=await prisma.approvalWorkflow.create({data:{companyId:company.id,workflowCode:randomUUID(),workflowName:'Synthetic draft approval',entityType:'Invoice'}});
+ const draftApproval=await prisma.approvalRequest.create({data:{companyId:company.id,workflowId:draftWorkflow.id,entityType:'Invoice',entityId:firstId}});
+ eq((await post('/api/v1/invoices/'+firstId+'/delete',{expectedUpdatedAt:first.updatedAt.toISOString(),confirmed:true})).statusCode,409);
+ await prisma.approvalRequest.delete({where:{id:draftApproval.id}});
  await ok('/api/v1/invoices/'+firstId+'/delete',{expectedUpdatedAt:first.updatedAt.toISOString(),confirmed:true});
  // Simulate a preserved historical number with a stale sequence, including cancelled history.
  await prisma.invoice.update({where:{id:firstId},data:{invoiceNumber:'09/02/2026/DGC-INV'}});
@@ -77,5 +82,69 @@ try{
  const issue=await ok('/api/v1/invoices/'+currentId+'/issue-preview',{});await ok('/api/v1/invoices/'+currentId+'/issue',{digest:issue.digest,confirmedHistorical:true,historicalReason:'Synthetic source fixture; no email sent'});
  eq(await prisma.accountReceivable.count({where:{invoiceId:currentId}}),1);eq((await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:currentId}})).outstandingAmount.toFixed(2),'90.00');eq((await post('/api/v1/invoices/'+currentId+'/issue',{digest:issue.digest,confirmedSent:true})).statusCode,409);eq(await prisma.cashEntry.count(),0);
  await approvedRevenue('VND','2026-03','1000000','0');const vndSelection={...selection,currency:'VND',period:'2026-03',invoiceDate:'2026-04-01'};const vndPlan=await ok('/api/v1/invoices/preview',vndSelection);eq(vndPlan.invoices[0].invoice.invoiceNumber,'01/04/2026/DGC-INV');const vnd=await ok('/api/v1/invoices/create',payload(vndPlan,vndSelection),201);const vndIssue=await ok('/api/v1/invoices/'+vnd.items[0].id+'/issue-preview',{});await ok('/api/v1/invoices/'+vnd.items[0].id+'/issue',{digest:vndIssue.digest,confirmedHistorical:true,historicalReason:'Synthetic VND issue characterization'});eq((await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:vnd.items[0].id}})).originalAmount.toFixed(),'1000000');
+
+ // Cancellation retains financial history and files, releases source billing,
+ // and excludes the old AR rather than erasing its original balanced amounts.
+ const cancelUrl='/api/v1/invoices/'+currentId+'/cancel',previewUrl=cancelUrl+'-preview';
+ eq((await request('GET','/api/v1/invoices/references')).json().canCancelUnpaid,true);
+ eq((await post(previewUrl,{}, {cookie:''})).statusCode,401);
+ eq((await post(previewUrl,{}, {'x-csrf-token':'invalid'})).statusCode,403);
+ eq((await post('/api/v1/invoices/'+randomUUID()+'/cancel-preview',{})).statusCode,404);
+ const cancelPermission=await prisma.permission.findUniqueOrThrow({where:{code:'INVOICE_CANCEL'}});
+ await prisma.rolePermission.delete({where:{roleId_permissionId:{roleId:role.id,permissionId:cancelPermission.id}}});
+ eq((await post(previewUrl,{})).statusCode,403);await prisma.rolePermission.create({data:{roleId:role.id,permissionId:cancelPermission.id}});
+ for(const status of ['PAID','PARTIALLY_PAID','SUPERSEDED']){await prisma.invoice.update({where:{id:currentId},data:{status}});eq((await post(previewUrl,{})).statusCode,409);}
+ await prisma.invoice.update({where:{id:currentId},data:{status:'ISSUED',isCurrent:false}});eq((await post(previewUrl,{})).statusCode,409);await prisma.invoice.update({where:{id:currentId},data:{isCurrent:true}});
+ let cancelPreview=await ok(previewUrl,{});eq(cancelPreview.hasReceivable,true);
+ eq((await post(cancelUrl,{digest:cancelPreview.digest,reason:'too short',confirmed:true})).statusCode,400);
+ eq((await post(cancelUrl,{digest:'0'.repeat(64),reason:'Synthetic wrong digest',confirmed:true})).statusCode,409);
+ const activeAr=await prisma.accountReceivable.findFirstOrThrow({where:{invoiceId:currentId}});
+ await prisma.accountReceivable.update({where:{id:activeAr.id},data:{paidAmount:'1',outstandingAmount:'89'}});eq((await post(previewUrl,{})).statusCode,409);
+ await prisma.accountReceivable.update({where:{id:activeAr.id},data:{paidAmount:'0',outstandingAmount:'90'}});
+ const pdfDocument=await prisma.document.findUniqueOrThrow({where:{id:(await prisma.invoice.findUniqueOrThrow({where:{id:currentId}})).documentId},include:{attachment:true}});
+ const pdfPath=resolve(storage,pdfDocument.attachment.storagePath),pdfBytes=await readFile(pdfPath);
+ await writeFile(pdfPath,Buffer.from('tampered fixture'));eq((await post(previewUrl,{})).statusCode,409);await writeFile(pdfPath,pdfBytes);
+ for(const kind of ['SOA','APPROVAL_PACKAGE']){
+  const doc=await prisma.document.create({data:{companyId:company.id,documentCode:randomUUID(),documentType:kind,entityType:kind,entityId:randomUUID(),attachmentId:pdfDocument.attachmentId}});
+  await assert.rejects(()=>prisma.invoiceDocumentLink.create({data:{companyId:randomUUID(),invoiceId:currentId,documentId:doc.id,kind}}));checks++;
+  await prisma.$transaction(tx=>linkInvoiceDocument(tx,company.id,currentId,doc.id,kind));
+  await prisma.$transaction(tx=>linkInvoiceDocument(tx,company.id,currentId,doc.id,kind));
+  eq(await prisma.invoiceDocumentLink.count({where:{invoiceId:currentId}}),1);eq((await post(previewUrl,{})).statusCode,409);
+  await prisma.invoiceDocumentLink.deleteMany({where:{invoiceId:currentId}});
+ }
+ const batchDoc=await prisma.document.create({data:{companyId:company.id,documentCode:randomUUID(),documentType:'SOA',entityType:'SOA',entityId:randomUUID(),attachmentId:pdfDocument.attachmentId}});
+ await prisma.$transaction(tx=>linkInvoiceDocuments(tx,company.id,[currentId,vnd.items[0].id,currentId],batchDoc.id,'SOA'));
+ eq(await prisma.invoiceDocumentLink.count({where:{documentId:batchDoc.id}}),2);eq((await post(previewUrl,{})).statusCode,409);
+ await prisma.invoiceDocumentLink.deleteMany({where:{documentId:batchDoc.id}});
+ const workflow=await prisma.approvalWorkflow.create({data:{companyId:company.id,workflowCode:randomUUID(),workflowName:'Synthetic approval',entityType:'Invoice'}});
+ const approval=await prisma.approvalRequest.create({data:{companyId:company.id,workflowId:workflow.id,entityType:'Invoice',entityId:currentId}});
+ eq((await post(previewUrl,{})).statusCode,409);await prisma.approvalRequest.delete({where:{id:approval.id}});
+ // A recorded payment blocks cancellation even if cached header/AR still show zero paid.
+ const zeroPayment=await prisma.invoicePayment.create({data:{companyId:company.id,invoiceId:currentId,paymentCode:randomUUID(),requestId:randomUUID(),requestDigest:'synthetic',paymentDate:new Date('2026-02-01'),paidUsd:1,allocationAmount:1,cashAmount:1,cashCurrency:'USD',historicalSource:{reference:'Synthetic payment guard fixture'},swiftNo:'SYNTHETIC',bankAccount:'SYNTHETIC',paymentMethod:'SYNTHETIC',note:'Synthetic guard fixture',approvedById:user.id}});
+ eq((await post(previewUrl,{})).statusCode,409);await prisma.invoicePayment.delete({where:{id:zeroPayment.id}});
+ cancelPreview=await ok(previewUrl,{});const oldStatus=(await prisma.revenue.findUniqueOrThrow({where:{id:source.id}})).status;
+ await prisma.revenue.update({where:{id:source.id},data:{status:oldStatus}});
+ eq((await post(cancelUrl,{digest:cancelPreview.digest,reason:'Synthetic stale preview',confirmed:true})).statusCode,409);
+ cancelPreview=await ok(previewUrl,{});
+ const beforeCancelFiles=await files();
+ await prisma.$executeRawUnsafe("CREATE FUNCTION dgc_cancel_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='INVOICE_CANCEL_UNPAID' THEN RAISE EXCEPTION 'synthetic cancel rollback'; END IF; RETURN NEW; END $$");
+ await prisma.$executeRawUnsafe('CREATE TRIGGER dgc_cancel_failure BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION dgc_cancel_failure()');
+ try{eq((await post(cancelUrl,{digest:cancelPreview.digest,reason:'Synthetic audit rollback',confirmed:true})).statusCode,500);eq((await prisma.invoice.findUniqueOrThrow({where:{id:currentId}})).status,'ISSUED');eq((await prisma.accountReceivable.findUniqueOrThrow({where:{id:activeAr.id}})).status,'OPEN');eq((await prisma.revenue.findUniqueOrThrow({where:{id:source.id}})).status,'INVOICED');eq(await files(),beforeCancelFiles);}finally{await prisma.$executeRawUnsafe('DROP TRIGGER dgc_cancel_failure ON audit_logs');await prisma.$executeRawUnsafe('DROP FUNCTION dgc_cancel_failure()');}
+ const cancelRace=await Promise.all([post(cancelUrl,{digest:cancelPreview.digest,reason:'Synthetic concurrent cancel',confirmed:true}),post(cancelUrl,{digest:cancelPreview.digest,reason:'Synthetic concurrent cancel',confirmed:true})]);
+ eq(cancelRace.map(r=>r.statusCode).sort(),[200,409]);
+ const cancelled=await prisma.invoice.findUniqueOrThrow({where:{id:currentId}});eq(cancelled.status,'CANCELLED');eq(cancelled.isCurrent,false);eq(cancelled.issuedAt!==null,true);
+ const cancelledAr=await prisma.accountReceivable.findUniqueOrThrow({where:{id:activeAr.id}});eq(cancelledAr.status,'CANCELLED');eq(cancelledAr.originalAmount.toFixed(2),'90.00');eq(cancelledAr.outstandingAmount.toFixed(2),'90.00');
+ eq((await prisma.revenue.findUniqueOrThrow({where:{id:source.id}})).status,'INVOICE_READY');eq(await prisma.invoiceScopeItem.count({where:{scope:{invoiceId:currentId},isCurrent:true}}),0);
+ eq(await files(),beforeCancelFiles);eq(await readFile(pdfPath),pdfBytes);eq((await request('GET','/api/v1/invoices/'+currentId+'/download')).statusCode,404);
+ eq((await request('GET','/api/v1/receivables?asOf=2026-10-20')).json().items.some(i=>i.invoiceId===currentId),false);
+ eq(await prisma.auditLog.count({where:{entityId:currentId,action:'INVOICE_CANCEL_UNPAID'}}),1);eq(await prisma.cashEntry.count(),0);
+ const newPlan=await ok('/api/v1/invoices/preview',selection),replacement=await ok('/api/v1/invoices/create',payload(newPlan),201);eq(replacement.items[0].revisionNo,4);
+ const replacementIssue=await ok('/api/v1/invoices/'+replacement.items[0].id+'/issue-preview',{});await ok('/api/v1/invoices/'+replacement.items[0].id+'/issue',{digest:replacementIssue.digest,confirmedHistorical:true,historicalReason:'Synthetic replacement after unpaid cancellation'});
+ eq(await prisma.accountReceivable.count({where:{invoice:{companyId:company.id,partnerId:partner.id,period:'2026-01',isCurrent:true}}}),1);
+ eq(await prisma.accountReceivable.count({where:{invoiceId:currentId}}),1);
+ const overdueStored=await prisma.invoice.findUniqueOrThrow({where:{id:vnd.items[0].id}});eq(overdueStored.status,'ISSUED');eq(overdueStored.dueDate<new Date('2026-10-20'),true);
+ const overdueUrl='/api/v1/invoices/'+vnd.items[0].id+'/cancel',overdue=await ok(overdueUrl+'-preview',{});
+ await ok(overdueUrl,{digest:overdue.digest,reason:'Synthetic overdue VND cancellation',confirmed:true});
+ eq((await prisma.accountReceivable.findFirstOrThrow({where:{invoiceId:vnd.items[0].id}})).originalAmount.toFixed(),'1000000');eq(await prisma.cashEntry.count(),0);
  console.log('PASS: '+checks+' DGC API assertions for profile/version/permissions, separate assets, draft/PDF/workbook, monthly sequence, stale source, rollback, issue/AR and USD/VND with no cash posting.');
 }finally{await app.close();await prisma.$disconnect();}

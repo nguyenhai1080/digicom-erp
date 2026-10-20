@@ -4,6 +4,8 @@ Cập nhật ngày 20/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–20/10
 
+[Luồng hủy Invoice chưa thanh toán](docs/handover/DGC_INVOICE_CANCEL_20261020.md) đã có API/UI và kiểm thử DB/browser fixture: giữ lịch sử/file/AR amounts, ngừng công nợ hiện hành, mở nguồn lập lại; không cash posting. SOA/package mới có guard tham chiếu để tích hợp tiếp, chưa phải runtime SOA hoàn chỉnh.
+
 [Chuẩn bị lịch sử Invoice và PDF gốc](docs/handover/DGC_INVOICE_HISTORY_20261020.md): gói 91 Invoice (53 hiện hành, 5 nháp, 33 lịch sử), 5 bản cần đối chiếu cấu trúc. Đã sao lưu/kiểm bytes 91 PDF riêng; ba ánh xạ liên kết tài chính đang chờ owner, chưa áp dụng. Chưa nhập financial records.
 
 Đã chạy [rà soát liên kết migration](docs/handover/DGC_REFERENCE_REVIEW_20261020.md): 3.154 hàng/10.894 liên kết, giữ 7 nhóm trùng ID; còn 63 liên kết cần đối chiếu. Đây là báo cáo đọc snapshot, chưa cho phép nhập tài chính.

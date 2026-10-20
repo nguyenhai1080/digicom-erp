@@ -813,6 +813,7 @@ model Attachment {
 }
 
 model Document {
+  invoiceLinks InvoiceDocumentLink[]
   inputReconciliations InputReconciliation[]
   @@unique([companyId,id])
   invoicePayments InvoicePayment[]
@@ -1915,6 +1916,7 @@ model InvoiceScope {
 // DGC invoice header. Scope items keep the authoritative Revenue links; the
 // immutable snapshot retains billing details, child lines and asset versions.
 model Invoice {
+  documentLinks InvoiceDocumentLink[]
   id String @id @default(uuid()) @db.Uuid
   companyId String @map("company_id") @db.Uuid
   invoiceNumber String @map("invoice_number")
@@ -1953,6 +1955,21 @@ model Invoice {
   @@unique([companyId,businessKey,revisionNo])
   @@index([companyId,partnerId,period])
   @@map("invoices")
+}
+
+// SOA/approval PDF references prevent cancellation of an invoice in use.
+// Future creators must register links atomically through linkInvoiceDocument.
+model InvoiceDocumentLink {
+  companyId String @map("company_id") @db.Uuid
+  invoiceId String @map("invoice_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  kind String @db.VarChar(30)
+  createdAt DateTime @default(now()) @map("created_at")
+  invoice Invoice @relation(fields:[companyId,invoiceId],references:[companyId,id],onDelete:Restrict)
+  document Document @relation(fields:[companyId,documentId],references:[companyId,id],onDelete:Restrict)
+  @@id([companyId,invoiceId,documentId])
+  @@index([companyId,documentId])
+  @@map("invoice_document_links")
 }
 
 // One AR is created atomically on explicit Invoice issue, never on draft creation.
