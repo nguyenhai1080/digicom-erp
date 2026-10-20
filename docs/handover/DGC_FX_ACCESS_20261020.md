@@ -23,4 +23,4 @@ UI có mục Tỷ giá báo cáo riêng cho DGC có REVENUE_VIEW. Manager truy c
 - InputRecon/AP **187**; tài chính nền **264** và characterization **85** đạt.
 - DB fixture mới schema 21, kết nối trực tiếp namespace PostgreSQL container, connection_limit=5. Không thay schema, staging snapshot, source Sheets hoặc tài khoản thật. Không push/deploy.
 
-Phần đọc lịch sử thu cho Staff vẫn cần tách khỏi PAYMENT_VIEW, vì quyền này còn mở báo cáo quỹ.
+Cập nhật tiếp: [đọc lịch sử thu cho Staff](DGC_RECEIPT_READ_20261020.md) đã tách khỏi PAYMENT_VIEW; quyền này còn mở báo cáo quỹ và không được gán cho Staff.

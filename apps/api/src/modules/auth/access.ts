@@ -63,11 +63,12 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   request.auth = { userId: user.id, companyId: user.companyId, companyCode: user.company.companyCode,
     fullName: user.fullName, email: user.email, permissions };
 }
-export function requirePermission(permission: string) {
+export function requirePermission(permission: string | ((identity:Identity)=>string)) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     await authenticate(request, reply);
     if (reply.sent) return;
-    if (!request.auth?.permissions.includes(permission)) return reply.code(403).send({ message: 'Bạn không có quyền thực hiện thao tác này.' });
+    const code=typeof permission==='string'?permission:permission(request.auth!);
+    if (!request.auth?.permissions.includes(code)) return reply.code(403).send({ message: 'Bạn không có quyền thực hiện thao tác này.' });
   };
 }
 export function projectAccessWhere(identity: Identity) {

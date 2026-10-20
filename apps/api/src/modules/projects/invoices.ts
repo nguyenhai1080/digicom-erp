@@ -1,5 +1,6 @@
 import {assertDraftInvoiceDeletion} from './draft-deletion.js';
 import {assertInvoiceUnused} from './invoice-cancel.js';
+import {canReadInvoicePayments} from './invoice-payment-access.js';
 import {randomUUID} from 'node:crypto';
 import {financialFilename,invoiceServices} from './document-filename.js';
 import type {FastifyInstance} from 'fastify';
@@ -87,7 +88,7 @@ export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
   if(!kind)throw new CommandError(400,'Chọn dấu hoặc chữ ký DGC.');
   const a=await prisma.$transaction(tx=>asset(tx,request.auth!.companyId,kind,q.v));return reply.type(a.document.attachment.mimeType!).header('Cache-Control','no-store').send(a.bytes);
  });
- app.get('/api/v1/invoices/references',{preHandler:requirePermission('INVOICE_VIEW')},async request=>({canCancelUnpaid:request.auth!.companyCode==='DGC',canReviewOverdue:request.auth!.companyCode==='DGC',partners:await prisma.partner.findMany({where:{companyId:request.auth!.companyId},select:{id:true,partnerKey:true,legalName:true,paymentTermDays:true},orderBy:{legalName:'asc'},take:1000}),services:await prisma.service.findMany({where:{companyId:request.auth!.companyId,status:'ACTIVE'},select:{id:true,serviceKey:true,serviceName:true},orderBy:{serviceKey:'asc'},take:1000})}));
+ app.get('/api/v1/invoices/references',{preHandler:requirePermission('INVOICE_VIEW')},async request=>({canViewPaymentHistory:canReadInvoicePayments(request.auth!),canCancelUnpaid:request.auth!.companyCode==='DGC',canReviewOverdue:request.auth!.companyCode==='DGC',partners:await prisma.partner.findMany({where:{companyId:request.auth!.companyId},select:{id:true,partnerKey:true,legalName:true,paymentTermDays:true},orderBy:{legalName:'asc'},take:1000}),services:await prisma.service.findMany({where:{companyId:request.auth!.companyId,status:'ACTIVE'},select:{id:true,serviceKey:true,serviceName:true},orderBy:{serviceKey:'asc'},take:1000})}));
  app.get('/api/v1/invoices',{preHandler:requirePermission('INVOICE_VIEW')},async request=>{
   const q=parse(z.object({page:z.coerce.number().int().min(1).max(100000).default(1),limit:z.coerce.number().int().min(1).max(100).default(10),publication:z.enum(['issued','unissued']).optional(),period:z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/).optional(),partnerId:z.uuid().optional(),status:z.enum(['ISSUED','OVERDUE','PARTIALLY_PAID','PAID','SUPERSEDED']).optional(),asOf:z.iso.date().optional()}).strict(),request.query);
   const dgc=request.auth!.companyCode==='DGC',asOf=q.asOf?new Date(q.asOf+'T00:00:00Z'):null;

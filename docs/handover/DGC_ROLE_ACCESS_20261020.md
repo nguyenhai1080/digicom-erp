@@ -1,6 +1,6 @@
 # Quyền DGC Finance — 20/10/2026
 
-Cập nhật tiếp: quyền tạo tỷ giá của Manager đã được tách và kiểm thử tại [DGC_FX_ACCESS_20261020.md](DGC_FX_ACCESS_20261020.md). Các nhận định Manager FX cần tách bên dưới mô tả khoảng trống tại thời điểm đợt đầu; upsert/revision tỷ giá donor vẫn chưa được port.
+Cập nhật tiếp: quyền tạo tỷ giá của Manager đã được tách và kiểm thử tại [DGC_FX_ACCESS_20261020.md](DGC_FX_ACCESS_20261020.md); quyền Staff đọc lịch sử thu đã được tách tại [DGC_RECEIPT_READ_20261020.md](DGC_RECEIPT_READ_20261020.md). Các nhận định hai quyền này cần tách bên dưới mô tả khoảng trống tại thời điểm đợt đầu; upsert/revision tỷ giá và toàn bộ quyền chứng từ donor vẫn chưa được port.
 
 ## Phạm vi đã triển khai
 

@@ -8,6 +8,7 @@ import {audit,code,CommandError,date,parse,timestamp,unchanged,writeGuard} from 
 import {checkedFile,persistPdf,persistPaymentImage,rollbackFiles,sha} from './financial-documents.js';
 import {financialPeriodLock} from './recon-finalize.js';
 import {historicalPaymentSchema,historicalPaymentAmounts,historicalPaymentDate} from './historical-payment.js';
+import {invoicePaymentReadPermission,canPostInvoicePayment} from './invoice-payment-access.js';
 
 const amount=z.string().regex(/^(0|[1-9]\d{0,13})(\.\d{1,2})?$/);
 const bodySchema=z.object({requestId:z.uuid(),expectedUpdatedAt:timestamp,paymentDate:date,paidUsd:amount,paidVnd:z.string().regex(/^[1-9]\d{0,15}$/),fxRate:z.string().regex(/^(0|[1-9]\d{0,11})(\.\d{1,4})?$/).optional(),swiftNo:z.string().trim().max(200),cashAccountId:z.uuid(),bankAccount:z.string().trim().max(200).default(''),paymentMethod:z.enum(['Bank Transfer','Cash','Other']),note:z.string().trim().max(2000),confirmed:z.literal(true),swiftFile:z.object({filename:z.string().trim().min(1).max(200),base64:z.string().max(7*1024*1024)}).strict().optional()}).strict();
@@ -27,12 +28,13 @@ export function paymentAmounts(original:string,alreadyPaid:string,usd:string,vnd
 }
 export function nativeVndPayment(original:string,paid:string,next:string){const total=D(original),old=D(paid),cash=D(next);if(!total.isInteger()||!old.isInteger()||!cash.isInteger()||!cash.gt(0)||old.lt(0)||cash.gt(total.minus(old)))fail('Tiền thu VND vượt số dư hoặc không hợp lệ.');const paidAfter=old.plus(cash),outstanding=total.minus(paidAfter);return {paidAfter,outstanding,rate:D('1'),status:outstanding.isZero()?'PAID' as const:'PARTIALLY_PAID' as const};}
 export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig){
- app.get('/api/v1/invoices/:id/payments',{preHandler:requirePermission('PAYMENT_VIEW')},async request=>{
+ app.get('/api/v1/invoices/:id/payments',{preHandler:requirePermission(invoicePaymentReadPermission)},async request=>{
   const invoice=await prisma.invoice.findFirst({where:{companyId:request.auth!.companyId,id:id(request.params)},include:{receivable:true}});
   if(!invoice)throw new CommandError(404,'Không tìm thấy Invoice.');
   const items=await prisma.invoicePayment.findMany({where:{companyId:invoice.companyId,invoiceId:invoice.id},orderBy:[{paymentDate:'desc'},{createdAt:'desc'}]});
-  const accounts=await prisma.cashAccount.findMany({where:{companyId:invoice.companyId,status:'ACTIVE',currency:'VND'},select:{id:true,accountCode:true,name:true,kind:true,currency:true,bankName:true,accountNumber:true},orderBy:{accountCode:'asc'},take:1000});
-  return {accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items};
+  const canPost=canPostInvoicePayment(request.auth!);
+  const accounts=request.auth!.companyCode==='DGC'&&!canPost?[]:await prisma.cashAccount.findMany({where:{companyId:invoice.companyId,status:'ACTIVE',currency:'VND'},select:{id:true,accountCode:true,name:true,kind:true,currency:true,bankName:true,accountNumber:true},orderBy:{accountCode:'asc'},take:1000});
+  return {canPost,accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items};
  });
  app.post('/api/v1/invoices/:id/payments',{bodyLimit:8*1024*1024,onRequest:writeGuard('PAYMENT_POST',config)},async request=>{
   const user=request.auth!,invoiceId=id(request.params),body=parse(z.union([bodySchema,historicalPaymentSchema]),request.body),historical='mode' in body,digest=sha(JSON.stringify({invoiceId,...body}));
