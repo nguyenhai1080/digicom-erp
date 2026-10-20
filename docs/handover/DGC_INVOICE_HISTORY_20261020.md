@@ -59,4 +59,4 @@ node scripts/dgc-migration.mjs verify-invoice-history --snapshot artifacts/<snap
 node scripts/dgc-migration.mjs verify-invoice-files --snapshot artifacts/<snapshot.json> --snapshot-hash <sha256> --manifest artifacts/<all-invoices-manifest.json> --root artifacts/<source-invoices>
 ```
 
-Tiếp tục: quyết định ba liên kết và SOA cutoff, kho lịch sử immutable/runtime tra cứu, importer khôi phục số tiền và PDF thay vì generator mới, rehearsal trên staging riêng; giữ ngoại lệ revision và source thiếu. Chưa deploy/push hoặc tạo tài chính thật.
+Đã tiếp tục tạo [gói evidence riêng cho 33 Invoice lịch sử](DGC_INVOICE_ARCHIVE_20261020.md), có byte PDF gốc, source identity, verify/replay và tra cứu CLI; chưa có model/runtime trong ứng dụng hoặc nhập DB. Tiếp tục: quyết định ba liên kết và SOA cutoff, runtime tra cứu kho, importer khôi phục số tiền và PDF thay vì generator mới, rehearsal trên staging riêng; giữ ngoại lệ revision và source thiếu. Chưa deploy/push hoặc tạo tài chính thật.

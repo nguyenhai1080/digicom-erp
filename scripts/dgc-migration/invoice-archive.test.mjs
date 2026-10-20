@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {mkdtemp,mkdir,writeFile,readFile,rm,unlink,stat,rename,symlink,rmdir} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve,sep} from 'node:path';
+import {fixture,cell} from './fixtures.mjs';
+import {normalizeCapture,digest,canonical} from './core.mjs';
+import {invoiceHistoryPlan} from './invoice-history.mjs';
+import {createInvoiceArchive,verifyInvoiceArchive,inspectInvoiceArchive,listInvoiceArchive} from './invoice-archive.mjs';
+let checks=0;const eq=(a,b)=>{assert.deepEqual(a,b);checks++;},reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
+const capture=fixture();
+function set(name,headers,rows){const c=capture.find(c=>c.data.sheets[0].properties.title===name),s=c.data.sheets[0];s.properties.gridProperties={rowCount:rows.length+1,columnCount:headers.length};c.requestedRange=`'${name}'!A1:${String.fromCharCode(64+headers.length)}${rows.length+1}`;s.data[0].rowData=[{values:headers.map(cell)},...rows.map(row=>({values:row.map(cell)}))];}
+const header=['Invoice_ID','Invoice_Number','Business_Key','Revision_No','Status','Is_Current','Superseded_By_Invoice_ID','Partner_ID','Currency','Total_Payable_USD','Pdf_File_ID'];
+set('48_INVOICE_HEADER',header,Array.from({length:14},(_,i)=>['INV'+i,i<=1||i===12?'DUPLICATE-NUMBER':'NUMBER'+i,'BUS'+i,1,i<11?'Superseded':i===11?'Cancelled':i===12?'Issued':'Draft',i>=12,i===0?'MISSING-SUCCESSOR':'','SYNTH_PARTNER','USD',i===0?'-90':'90','FILE'+i]));
+set('49_INVOICE_DETAIL',['Invoice_Detail_ID','Invoice_ID','Revenue_ID','Payable_USD'],Array.from({length:14},(_,i)=>['LINE'+i,'INV'+i,'MISSING-REV',i===0?'-90':'90']));
+const snapshot=normalizeCapture(capture),plan=invoiceHistoryPlan(snapshot),before=canonical(snapshot),base=await mkdtemp(join(tmpdir(),'dgc-history-archive-')),sourceRoot=join(base,'source'),root=join(base,'archive');
+await mkdir(sourceRoot);
+const bytes=i=>Buffer.from('%PDF-1.7\nSynthetic checksum fixture '+(i===1?0:i));
+const body={format:'dgc-source-invoice-files-v1',snapshotHash:snapshot.snapshotHash,acceptance:false,files:snapshot.tables['48_INVOICE_HEADER'].rows.map((r,i)=>({sourceRow:r.sourceRow,rowHash:r.rowHash,legacyId:r.legacyId,fileId:'FILE'+i,relativePath:'FILE'+i+'.pdf',mimeType:'application/pdf',size:bytes(i).length,sha256:createHash('sha256').update(bytes(i)).digest('hex')}))};
+const manifest={...body,manifestHash:digest(body)},options={snapshot,plan,manifest,sourceRoot,root};
+try{
+ for(let i=0;i<14;i++)await writeFile(join(sourceRoot,'FILE'+i+'.pdf'),bytes(i));
+ const created=await createInvoiceArchive(options);eq(created.entries,12);eq(created.files,11);eq(created.replayed,false);eq(created.postingAllowed,false);eq(created.acceptance,false);
+ const index=JSON.parse(await readFile(join(root,'archive.json'),'utf8')),entry=index.entries[0],payload=JSON.parse(await readFile(join(root,entry.payloadPath),'utf8'));
+ eq(payload.capturedHeader.values.Total_Payable_USD,'-90');eq(payload.capturedDetails[0].values.Payable_USD,'-90');eq(payload.revisionLinks[0].target,null);eq(payload.integrity,'REVIEW_REQUIRED');eq(canonical(payload),canonical(plan.entries[0]));
+ eq(index.entries.some(e=>e.source.legacyId==='INV12'),false);eq(new Set(index.entries.map(e=>e.archiveId)).size,12);eq(entry.archiveId,digest({snapshotHash:snapshot.snapshotHash,source:entry.source}));
+ eq((await readFile(join(root,entry.pdf.path))).equals(bytes(0)),true);eq(canonical(snapshot),before);
+ const mtime=(await stat(join(root,'archive.json'))).mtimeMs;eq((await createInvoiceArchive(options)).replayed,true);eq((await stat(join(root,'archive.json'))).mtimeMs,mtime);
+ eq((await verifyInvoiceArchive(options)).archiveHash,created.archiveHash);
+ const page1=await listInvoiceArchive(root,created.archiveHash),page2=await listInvoiceArchive(root,created.archiveHash,{page:2});eq(page1.total,12);eq(page1.items.length,10);eq(page1.pages,2);eq(page2.items.length,2);eq(page2.page,2);
+ eq((await listInvoiceArchive(root,created.archiveHash,{page:999})).page,2);eq((await listInvoiceArchive(root,created.archiveHash,{invoiceNumber:'DUPLICATE-NUMBER'})).total,2);eq((await listInvoiceArchive(root,created.archiveHash,{invoiceNumber:'ABSENT'})).total,0);
+ await reject(()=>listInvoiceArchive(root,'0'.repeat(64)),/expected digest/);await reject(()=>listInvoiceArchive(root,created.archiveHash,{page:0}),/Invalid archive search/);
+ const originalPayload=await readFile(join(root,entry.payloadPath));const changed=structuredClone(payload);changed.capturedDetails[0].values.Payable_USD='90';await writeFile(join(root,entry.payloadPath),JSON.stringify(changed));await reject(()=>verifyInvoiceArchive(options),/payload checksum/);await writeFile(join(root,entry.payloadPath),originalPayload);
+ const originalPdf=await readFile(join(root,entry.pdf.path));await writeFile(join(root,entry.pdf.path),Buffer.from(originalPdf.toString().replace('Synthetic','Changed!!')));await reject(()=>createInvoiceArchive(options),/PDF byte checksum/);await writeFile(join(root,entry.pdf.path),originalPdf);
+ const changedIndex=structuredClone(index);changedIndex.entries[0].payloadPath='../escape.json';const {archiveHash,...changedBody}=changedIndex;changedIndex.archiveHash=digest(changedBody);await writeFile(join(root,'archive.json'),JSON.stringify(changedIndex));await reject(()=>inspectInvoiceArchive(root,changedIndex.archiveHash),/identity or paths/);await writeFile(join(root,'archive.json'),JSON.stringify(index));
+ const rehashed=structuredClone(index);rehashed.entries[0].invoiceNumber='ALTERED';const {archiveHash:oldHash,...rehashedBody}=rehashed;rehashed.archiveHash=digest(rehashedBody);await writeFile(join(root,'archive.json'),JSON.stringify(rehashed));await reject(()=>verifyInvoiceArchive(options),/expected digest/);await writeFile(join(root,'archive.json'),JSON.stringify(index));
+ await writeFile(join(root,'unexpected.txt'),'extra');await reject(()=>verifyInvoiceArchive(options),/unexpected or missing files/);await unlink(join(root,'unexpected.txt'));
+ const marker=await readFile(join(root,'COMPLETE.json'));await unlink(join(root,'COMPLETE.json'));await reject(()=>createInvoiceArchive(options),/ENOENT/);await writeFile(join(root,'COMPLETE.json'),marker);
+ const partial=join(base,'partial');await mkdir(partial);await writeFile(join(partial,'keep.txt'),'untouched');await reject(()=>createInvoiceArchive({...options,root:partial}),/ENOENT/);eq(await readFile(join(partial,'keep.txt'),'utf8'),'untouched');
+ await reject(()=>createInvoiceArchive({...options,root:join(sourceRoot,'nested')}),/must be separate/);
+ await reject(()=>createInvoiceArchive({...options,root:join(sourceRoot,'new-parent','nested')}),/must be separate/);await reject(()=>stat(join(sourceRoot,'new-parent')),/ENOENT/);
+ const realRecords=join(root,'records-real');await rename(join(root,'records'),realRecords);await symlink(realRecords,join(root,'records'),process.platform==='win32'?'junction':'dir');await reject(()=>inspectInvoiceArchive(root,created.archiveHash),/symbolic link/);await (process.platform==='win32'?rmdir(join(root,'records')):unlink(join(root,'records')));await rename(realRecords,join(root,'records'));
+ const planTamper=structuredClone(plan);planTamper.entries[0].disposition='PREPARE_CURRENT_LEDGER';const {planHash,...planBody}=planTamper;planTamper.planHash=digest(planBody);await reject(()=>createInvoiceArchive({...options,plan:planTamper}),/differs from its verified snapshot/);
+ await writeFile(join(sourceRoot,'FILE0.pdf'),Buffer.from('changed source'));await reject(()=>verifyInvoiceArchive(options),/PDF byte checksum/);await writeFile(join(sourceRoot,'FILE0.pdf'),bytes(0));
+ eq((await verifyInvoiceArchive(options)).verified,true);
+ console.log('PASS: '+checks+' invoice archive assertions: source-bound history, original PDFs, negative amounts, unresolved links, immutable replay, pagination and tamper/path/incomplete guards.');
+}finally{
+ if(!resolve(base).startsWith(resolve(tmpdir())+sep+'dgc-history-archive-'))throw Error('Refusing cleanup outside fixture directory');
+ await rm(base,{recursive:true,force:true});
+}

@@ -4,6 +4,8 @@ Cập nhật ngày 20/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–20/10
 
+[Gói Invoice lịch sử](docs/handover/DGC_INVOICE_ARCHIVE_20261020.md): đã tách 33 bản Superseded/Cancelled cùng PDF gốc vào kho evidence private, giữ số âm/liên kết thiếu và nhận dạng theo hàng nguồn; verify/replay/tra cứu 10 dòng đạt. Chưa nhập DB hoặc có màn tra cứu kho trong ứng dụng.
+
 [Đối chiếu ngày chốt SOA](docs/handover/DGC_SOA_CUTOFF_REVIEW_20261020.md): đã có màn/API chỉ đọc so sánh hai chính sách khoản thu, tổng USD/VND riêng, 10 dòng/trang; 56 kiểm tra SOA và 223 hồi quy quyền đạt, đã kiểm browser. Chưa chọn cutoff hoặc phát hành SOA.
 
 [Kiểm tra UI kế toán](docs/handover/DGC_ACCOUNTING_UI_20261020.md): đã chạy browser lưu tỷ giá tại màn đối soát → tự tải nguồn → tạo nháp đầu vào; sửa mở form từ kỳ thiếu và bỏ xác nhận khi chỉnh dữ liệu. Kiểm phân trang 10 dòng, audit đúng kế toán, AP/cash vẫn 0 trong DB giả lập.
