@@ -52,3 +52,5 @@ node scripts/dgc-migration.mjs review-finance --snapshot artifacts/<snapshot.jso
 Output private trong `artifacts/`; digest bắt buộc trước chạy. `pnpm test:migration` gồm core, reference graph và financial fixtures: cộng Decimal 10,1 + 19,9, nguồn dòng, không lọc ngày thu, AR active, chênh lệch trong donor tolerance vẫn hiển thị, missing/invalid/negative amount, overpayment không clamp, invoice/AR mồ côi và MZN không quy đổi. Không chạy DB và không dùng dữ liệu thật làm fixture.
 
 Tiếp theo: đường nhập revision/negative historical row và chứng từ immutable, đối chiếu file để đóng lỗi nguồn, mapping quyền, SOA sau quyết định cutoff và rehearsal financial import trên staging riêng. Chưa nhập financial record thật hoặc triển khai.
+
+Đã bổ sung [gói lịch sử Invoice và bản sao PDF](DGC_INVOICE_HISTORY_20261020.md): 91 PDF gốc đã lưu riêng/kiểm checksum; phát hiện trùng số giữa hai phạm vi Invoice và chuẩn bị ba ánh xạ theo PDF đang chờ owner. Gói chưa cho phép posting.
