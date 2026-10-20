@@ -39,3 +39,5 @@ Migration additive `20261020002000_dgc_invoice_document_links` thêm liên kết
 - Đã thao tác browser localhost: Invoice USD 90 → kiểm điều kiện → nhập lý do/xác nhận → hủy → danh sách Invoice và phải thu hiện hành trống → doanh thu “Đã chốt · Chờ Invoice”. Đã đăng xuất/đóng tab. Proof private: `artifacts/dgc-migration/20261020/proofs/invoice-cancel/browser-cancelled.png`, `browser-ar-after-cancel.png`; chỉ chứa dữ liệu tổng hợp.
 
 Chưa nghiệm thu với người dùng thật/Staff/Manager/BOD, chưa triển khai. Lịch sử Invoice import, ba ánh xạ và SOA cutoff tiếp tục theo tài liệu bàn giao riêng.
+
+Đã có [bản sửa bộ lọc quá hạn](DGC_INVOICE_OVERDUE_20261020.md) sau phát hiện stored status ISSUED: 149 assertions DGC trên mã cuối, giữ nguyên ngày/số tiền và không quyết định SOA cutoff.

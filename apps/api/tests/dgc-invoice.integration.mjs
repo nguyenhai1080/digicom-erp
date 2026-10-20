@@ -83,6 +83,18 @@ try{
  eq(await prisma.accountReceivable.count({where:{invoiceId:currentId}}),1);eq((await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:currentId}})).outstandingAmount.toFixed(2),'90.00');eq((await post('/api/v1/invoices/'+currentId+'/issue',{digest:issue.digest,confirmedSent:true})).statusCode,409);eq(await prisma.cashEntry.count(),0);
  await approvedRevenue('VND','2026-03','1000000','0');const vndSelection={...selection,currency:'VND',period:'2026-03',invoiceDate:'2026-04-01'};const vndPlan=await ok('/api/v1/invoices/preview',vndSelection);eq(vndPlan.invoices[0].invoice.invoiceNumber,'01/04/2026/DGC-INV');const vnd=await ok('/api/v1/invoices/create',payload(vndPlan,vndSelection),201);const vndIssue=await ok('/api/v1/invoices/'+vnd.items[0].id+'/issue-preview',{});await ok('/api/v1/invoices/'+vnd.items[0].id+'/issue',{digest:vndIssue.digest,confirmedHistorical:true,historicalReason:'Synthetic VND issue characterization'});eq((await prisma.accountReceivable.findFirstOrThrow({where:{companyId:company.id,invoiceId:vnd.items[0].id}})).originalAmount.toFixed(),'1000000');
 
+ // DGC overdue is a read-only view against an explicit date, not a DB status.
+ eq((await request('GET','/api/v1/invoices?status=OVERDUE')).statusCode,400);
+ eq((await request('GET','/api/v1/invoices?status=OVERDUE&asOf=2026-02-30')).statusCode,400);
+ const dueDay=(await request('GET','/api/v1/invoices?status=OVERDUE&asOf=2026-03-18')).json();eq(dueDay.total,0);
+ const nextDay=(await request('GET','/api/v1/invoices?status=OVERDUE&asOf=2026-03-19')).json();eq(nextDay.total,1);eq(nextDay.items[0].id,currentId);eq(nextDay.items[0].status,'ISSUED');eq(nextDay.items[0].displayStatus,'OVERDUE');eq(nextDay.limit,10);eq(nextDay.asOf,'2026-03-19');
+ const lateOne=(await request('GET','/api/v1/invoices?status=OVERDUE&asOf=2026-05-17&limit=1&page=1')).json(),lateTwo=(await request('GET','/api/v1/invoices?status=OVERDUE&asOf=2026-05-17&limit=1&page=2')).json();
+ eq(lateOne.total,2);eq(lateTwo.total,2);eq(new Set([...lateOne.items,...lateTwo.items].map(i=>i.id)).size,2);
+ eq((await request('GET','/api/v1/invoices?status=OVERDUE&asOf=2026-05-17&period=2026-03')).json().items[0].id,vnd.items[0].id);
+ eq((await request('GET','/api/v1/invoices?status=OVERDUE&asOf=2026-05-17&partnerId='+randomUUID())).json().total,0);
+ eq((await request('GET','/api/v1/invoices?status=OVERDUE&asOf=2026-05-17&publication=unissued')).json().total,0);
+ eq((await prisma.invoice.findUniqueOrThrow({where:{id:currentId}})).status,'ISSUED');eq(await prisma.cashEntry.count(),0);
+ eq((await request('GET','/api/v1/invoices/references')).json().canReviewOverdue,true);
  // Cancellation retains financial history and files, releases source billing,
  // and excludes the old AR rather than erasing its original balanced amounts.
  const cancelUrl='/api/v1/invoices/'+currentId+'/cancel',previewUrl=cancelUrl+'-preview';
