@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {revenueCaptures,changeRevenueCapture} from './revenue-fixtures.mjs';
+import {normalizeCapture} from './core.mjs';
+import {cell} from './fixtures.mjs';
+import {reconLifecycleReview,reconSourceFileTags,reconNoteTags,donorReconServiceKey,donorInvoiceCurrent} from './recon-lifecycle.mjs';
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+eq(reconSourceFileTags('Recon_Doc_ID=DOC_LONG; https://example.invalid'),['DOC_LONG']);eq(reconSourceFileTags('prefixRecon_Doc_ID=DOC'),[]);eq(reconSourceFileTags('Recon_Doc_ID=DOC; Recon_Doc_ID=DOC'),['DOC']);eq(reconNoteTags('Imported from Movitel PDF DOC_LONG / child'),['DOC_LONG']);eq(reconNoteTags('NotImported from Movitel PDF DOC'),[]);
+eq(donorReconServiceKey(' MCAVM – ISIGN '),'MCAVM-ISIGN');eq(donorReconServiceKey('MYCLIP')===donorReconServiceKey('MEUCLIP'),false);
+eq(donorInvoiceCurrent({Status:'Issued',Is_Current:''}),true);eq(donorInvoiceCurrent({Status:'Superseded',Is_Current:true}),false);eq(donorInvoiceCurrent({Status:'Paid',Is_Current:false}),false);
+function table(c,name,headers,data){const e=c.find(e=>e.data.sheets[0].properties.title===name),s=e.data.sheets[0];let col='',v=headers.length;while(v){col=String.fromCharCode(65+(v-1)%26)+col;v=Math.floor((v-1)/26);}s.properties.gridProperties={rowCount:data.length+1,columnCount:headers.length};e.requestedRange=`'${name}'!A1:${col}${data.length+1}`;s.data[0].rowData=[{values:headers.map(cell)},...data.map(v=>({values:v.map(cell)}))];}
+const inactive=()=>{const c=revenueCaptures();changeRevenueCapture(c,'43_RECON_PDF_HEADER',1,'Status','Cancelled');changeRevenueCapture(c,'40_MONTHLY_REVENUE',1,'Include_In_Monthly_Total','N');for(const row of [1,2])changeRevenueCapture(c,'41_RECONCILIATION',row,'Status','Cancelled');return c;};
+const run=c=>reconLifecycleReview(normalizeCapture(c)),chain=c=>run(c).chains[0];
+const c=inactive(),good=chain(c);eq(good.sourcePattern,'INACTIVE_PATTERN_OBSERVED');eq(good.revenue.map(r=>r.status),['Approved','Approved']);eq(good.revenue.map(r=>r.includeInMonthlyTotal),['N','N']);eq(good.replacementBlockedByCapturedPayments,false);eq(good.replacementRelationshipAccepted,false);eq(good.targetLifecycleMapped,false);eq(good.readyToImport,false);eq(run(c).postingAllowed,false);
+const flag=inactive();changeRevenueCapture(flag,'40_MONTHLY_REVENUE',1,'Include_In_Monthly_Total','Y');eq(chain(flag).issues.includes('INACTIVE_REVENUE_NOT_EXCLUDED_FROM_MONTHLY'),true);
+const status=inactive();changeRevenueCapture(status,'41_RECONCILIATION',1,'Status','Approved');eq(chain(status).issues.includes('INACTIVE_RECON_NOT_CANCELLED_OR_MISSING'),true);
+const invoice=inactive();table(invoice,'48_INVOICE_HEADER',['Invoice_ID','Partner_ID','Revenue_Month','Currency','Status','Is_Current','Needs_Regeneration'],[['INV','SYNTH_PARTNER','2026-01','USD','Issued',true,true]]);table(invoice,'49_INVOICE_DETAIL',['Invoice_Detail_ID','Invoice_ID','Revenue_ID','Service_ID','Source_Recon_Doc_ID'],[['LINE','INV','REV_TOTAL','SYNTH_SERVICE','DOC']]);
+eq(chain(invoice).sourcePattern,'INACTIVE_PATTERN_OBSERVED');eq(chain(invoice).invoices[0].needsRegeneration,true);
+changeRevenueCapture(invoice,'48_INVOICE_HEADER',1,'Needs_Regeneration',false);eq(chain(invoice).issues.includes('CURRENT_INVOICE_NOT_MARKED_FOR_REGENERATION'),true);changeRevenueCapture(invoice,'48_INVOICE_HEADER',1,'Needs_Regeneration',true);
+table(invoice,'52_INVOICE_PAYMENT',['Payment_ID','Invoice_ID','Partner_ID','Paid_Amount_USD'],[['ZERO_PAYMENT','INV','SYNTH_PARTNER',0]]);eq(chain(invoice).replacementBlockedByCapturedPayments,true);eq(chain(invoice).issues.includes('PAYMENT_ON_INACTIVE_CHAIN_REQUIRES_TIMELINE_REVIEW'),true);eq(chain(invoice).payments.length,1);
+changeRevenueCapture(invoice,'49_INVOICE_DETAIL',1,'Source_Recon_Doc_ID','DOC_OTHER');eq(chain(invoice).issues.includes('INVOICE_DETAIL_DOCUMENT_CONFLICT'),true);
+const duplicate=inactive(),hs=duplicate.find(e=>e.data.sheets[0].properties.title==='43_RECON_PDF_HEADER').data.sheets[0].data[0].rowData[1].values.map(c=>c.effectiveValue.stringValue??c.effectiveValue.numberValue);
+const headers=['Recon_Doc_ID','Upload_ID','Partner_ID','Period_Month','Service_Header','Source_File_URL','Status'];table(duplicate,'43_RECON_PDF_HEADER',headers,[hs,[...hs.slice(0,6),'Approved']]);eq(chain(duplicate).issues.includes('HEADER_ID_NOT_UNIQUE'),true);
+const counterpart=inactive();table(counterpart,'43_RECON_PDF_HEADER',headers,[hs,['DOC_NEW','UPLOAD','SYNTH_PARTNER','2026-01','SYNTH_SERVICE',hs[5],'Approved']]);eq(chain(counterpart).counterpartCandidates.length,1);eq(chain(counterpart).replacementRelationshipAccepted,false);eq(run(counterpart).chains[1].donorActivity,'ACTIVE');
+console.log(`Recon lifecycle characterization: ${n} assertions passed`);

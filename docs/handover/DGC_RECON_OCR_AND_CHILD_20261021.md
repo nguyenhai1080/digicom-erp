@@ -1,5 +1,7 @@
 # OCR bản scan và đối chiếu dòng con đối soát
 
+Cập nhật 22/10: [đã đọc source lifecycle và audit replacement](DGC_RECON_GATES_20261022.md). Donor cố ý giữ revenue Approved khi đặt cờ tháng N và chuyển header/Recon sang Cancelled; hai chain snapshot khớp mẫu này. Không xem riêng status khác nhau là lỗi. Những chênh lệch số tiền và mapping/import đích vẫn chưa được nghiệm thu.
+
 Ngày 21/10/2026, giờ Việt Nam. Tiếp nối [bảng tổng USD](DGC_RECON_SEMANTICS_20261021.md). Chỉ đọc snapshot/PDF private; không đổi nguồn, status, master mapping hoặc historical amounts.
 
 ## Sáu bản scan
