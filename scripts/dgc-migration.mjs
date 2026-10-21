@@ -13,6 +13,7 @@ import {verifyInputFiles} from './dgc-migration/input-files.mjs';
 import {revenueReview,verifyRevenueReview} from './dgc-migration/revenue-review.mjs';
 import {revenueTargetPlan,verifyRevenueTargetPlan} from './dgc-migration/revenue-target.mjs';
 import {rehearseRevenue} from './dgc-migration/revenue-rehearsal.mjs';
+import {reconFilePlan,verifyReconFiles,reviewRevenueCustody} from './dgc-migration/recon-files.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -46,6 +47,17 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
+}else if(['prepare-recon-files','verify-recon-files','review-revenue-custody'].includes(command)){
+ const snapshot=verifySnapshot(await json(option('snapshot')));
+ if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
+ const out=await privateArchivePath(option('out'));
+ let report;
+ if(command==='prepare-recon-files')report=reconFilePlan(snapshot);
+ else {const manifest=await json(await privateArchivePath(option('manifest'))),root=await privateArchivePath(option('root'));
+  report=command==='verify-recon-files'?await verifyReconFiles(snapshot,manifest,root,option('manifest-hash')):await reviewRevenueCustody(snapshot,await json(await privateArchivePath(option('plan'))),manifest,root,option('manifest-hash'),resolutions);
+ }
+ await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});
+ console.log(JSON.stringify({command,planHash:report.planHash,reviewHash:report.reviewHash,integrityVerified:report.integrityVerified??report.files?.integrityVerified,complete:report.complete??report.files?.complete,files:typeof report.files==='number'?report.files:Array.isArray(report.files)?report.files.length:report.files?.files,missingFiles:report.missingFiles?.length??report.files?.missingFiles?.length,sourceHeaders:report.sourceHeaders??report.files?.sourceHeaders,bytes:report.bytes??report.files?.bytes,counts:report.counts,nextReviewGroups:report.nextReviewGroups,nextReviewRevenueRows:report.nextReviewRevenueRows,postingAllowed:false,acceptance:false,privateReport:out}));
 }else if(command==='rehearse-revenue'){
  requireStaging(process.env.DATABASE_URL??'');
  const snapshot=verifySnapshot(await json(option('snapshot')));
@@ -86,4 +98,4 @@ if(command==='prepare'){
   const result=command==='stage'?await stageSnapshot(prisma,snapshot,c.id):await applyMasters(prisma,snapshot,c.id,option('scope'),option('plan-hash'),resolutions);
   console.log(JSON.stringify({command,...result}));
  }finally{await prisma.$disconnect();}
-}else throw Error('Usage: dgc-migration.mjs prepare | review-references | review-finance | review-revenue | verify-revenue | prepare-revenue-target | verify-revenue-target | rehearse-revenue | review-input-finance | verify-input-finance | verify-input-files | prepare-invoice-history | verify-invoice-history | verify-invoice-files | create-invoice-archive | verify-invoice-archive | list-invoice-archive | stage | apply-masters. Revenue rehearsal requires --snapshot --snapshot-hash --plan --plan-hash --group-keys --out [--decisions] and a dedicated local staging DATABASE_URL; it always rolls back. See docs/handover/DGC_REVENUE_REHEARSAL_20261021.md. Revenue/Input review/verification requires --snapshot --snapshot-hash [--decisions] and --out or --plan; input files require --snapshot --snapshot-hash --manifest --root. See docs/handover/DGC_REVENUE_MIGRATION_20261021.md and docs/handover/DGC_INPUT_FINANCE_MIGRATION_20261021.md. Archive creation/verification requires --snapshot --snapshot-hash --plan --manifest --source-root --root [--decisions]; listing requires --root --archive-hash [--invoice-number] [--page]. See docs/handover/DGC_INVOICE_ARCHIVE_20261020.md.');
+}else throw Error('Usage: dgc-migration.mjs prepare | review-references | review-finance | review-revenue | verify-revenue | prepare-revenue-target | verify-revenue-target | rehearse-revenue | prepare-recon-files | verify-recon-files | review-revenue-custody | review-input-finance | verify-input-finance | verify-input-files | prepare-invoice-history | verify-invoice-history | verify-invoice-files | create-invoice-archive | verify-invoice-archive | list-invoice-archive | stage | apply-masters. Recon custody requires --snapshot --snapshot-hash --out; verification additionally --manifest --manifest-hash --root; revenue custody additionally --plan [--decisions]. See docs/handover/DGC_RECON_FILES_20261021.md. Revenue rehearsal requires --snapshot --snapshot-hash --plan --plan-hash --group-keys --out [--decisions] and a dedicated local staging DATABASE_URL; it always rolls back. See docs/handover/DGC_REVENUE_REHEARSAL_20261021.md. Revenue/Input review/verification requires --snapshot --snapshot-hash [--decisions] and --out or --plan; input files require --snapshot --snapshot-hash --manifest --root. See docs/handover/DGC_REVENUE_MIGRATION_20261021.md and docs/handover/DGC_INPUT_FINANCE_MIGRATION_20261021.md. Archive creation/verification requires --snapshot --snapshot-hash --plan --manifest --source-root --root [--decisions]; listing requires --root --archive-hash [--invoice-number] [--page]. See docs/handover/DGC_INVOICE_ARCHIVE_20261020.md.');
