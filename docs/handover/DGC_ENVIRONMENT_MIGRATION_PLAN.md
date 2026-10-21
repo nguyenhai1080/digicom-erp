@@ -40,6 +40,8 @@ Nguồn duy nhất: `DGC_ERP_2026_PROD_RC1_CLONE`, workbook `1xDrNhKbLTSSidbX6R1
 
 Importer, bảng mapping và công cụ đối soát toàn chuỗi **chưa được triển khai**. Không sử dụng các script import lịch sử riêng GST trong ignored artifacts của checkout khác cho DGC.
 
+Cập nhật 21/10: đã có master importer/provenance và [diễn tập ánh xạ đối soát–revenue rollback-only](DGC_REVENUE_REHEARSAL_20261021.md) trên bản backup phục hồi riêng (169 nhóm/205 dòng, replay và rollback đạt). Chưa có importer tài chính toàn chuỗi được phép commit; PDF custody, lifecycle/revision, actor/date và Invoice/payment/AR vẫn cần hoàn tất. Không dùng kết quả rehearsal như nghiệm thu chuyển dữ liệu.
+
 ## Điều kiện nghiệm thu và cutover
 
 - Staging hoàn thành Invoice DGC, input recon/AP/PDF, SOA, USD/VND, quyền, lịch sử thay thế/hủy, audit và báo cáo; có fixture từ donor và kiểm tra đầy đủ tác động DB/file.
