@@ -40,7 +40,7 @@ Hai Invoice detail không đủ bằng chứng chọn revenue nguồn được g
 - Donor `51_Payment_Transaction.js:DGC_paymentSummaryByInvoiceV180_`: cộng mọi payment cùng Invoice_ID; không lọc theo ngày/Status. Không gọi các hàm sync có side effect transaction/cash.
 - Chỉ kiểm các cột USD đã có của Invoice/detail/payment/AR; currency Invoice khác USD ghi unsupported, không tự đổi. USD/VND runtime vẫn giữ phạm vi đã xác nhận. Số VND nhận thực tế không dùng suy ngược số USD và không post tài khoản.
 - Dùng Decimal precision 120, giữ giá trị capture, không rounding khi so sánh; ô trống/giá trị sai cú pháp là UNAVAILABLE và có issue. Số âm được giữ và đánh dấu. Giới hạn 80 chữ số đầu vào nhằm tránh phép cộng âm thầm mất precision.
-- AR hiện hành theo Is_Current và status, chỉ loại ARAP_Type=AR. AP và InputRecon lịch sử chưa được đối chiếu số tiền trong lệnh này.
+- AR hiện hành theo Is_Current và status, chỉ loại ARAP_Type=AR. AP và InputRecon lịch sử nằm ngoài lệnh này; đã bổ sung [report riêng ngày 21/10](DGC_INPUT_FINANCE_MIGRATION_20261021.md): ba Generated/0 AP, một sai khác 0,5 VND được giữ với PDF nguồn, chưa nhập tài chính.
 - Invoice có thể chứa nhiều kỳ, bản superseded/cancelled vẫn có phép kiểm riêng. Không dùng việc Paid/balance khớp để bỏ qua sai nguồn, revision hoặc file thiếu. Không kiểm ngày đến hạn, phân bổ cash hay báo cáo theo timezone chưa xác nhận.
 
 ## Chạy và kiểm chứng

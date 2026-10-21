@@ -71,6 +71,10 @@ export function referenceGraph(snapshot,resolutions){
    const from={...context(sheet,row)};
    if(targetSheet==='21_DM_PARTNER')from.partner=lookupId;
    if(targetSheet==='30_CONTRACTS'){from.contract=lookupId;if(field.startsWith('Input_'))from.partner=text(row.values.Input_Partner_ID)||null;delete from.service;}
+   // Input AP belongs to the input partner/contract. Its Revenue_ID points to
+   // output revenue, whose counterparty/contract are different by design.
+   if(sheet==='56_INPUT_RECONCILIATION'&&targetSheet==='50_AR_AP'){from.partner=text(row.values.Input_Partner_ID)||null;from.contract=text(row.values.Input_Contract_ID)||null;}
+   if(sheet==='50_AR_AP'&&text(row.values.ARAP_Type).toUpperCase()==='AP'&&targetSheet==='40_MONTHLY_REVENUE'){delete from.partner;delete from.contract;}
    if(targetSheet==='20_DM_SERVICE')from.service=service(lookupId);
    // A PDF header/upload may cover multiple child services and contracts.
    // These dimensions cannot contradict a child's explicit parent reference.
