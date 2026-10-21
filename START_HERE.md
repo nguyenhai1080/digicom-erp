@@ -4,6 +4,8 @@ Cập nhật ngày 21/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–21/10
 
+[Nội dung bảng tổng USD PDF nguồn](docs/handover/DGC_RECON_SEMANTICS_20261021.md): đọc được tổng của 255/261 PDF; 249 revenue Total khớp, bốn dòng khác PDF, sáu PDF không có text layer. Một nhóm từng REHEARSABLE theo cấu trúc cần review chênh lệch mới. Giữ toàn bộ business HELD và số tiền nguồn; 12 suite/32 assertions mới đạt, chưa nhập tài chính hoặc nghiệm thu child/lifecycle.
+
 [PDF đối soát nguồn và custody](docs/handover/DGC_RECON_FILES_20261021.md): đã lưu/kiểm bytes 261/266 file (231.836.275 bytes), năm ID chưa truy cập được qua Drive (404). Cấu trúc 261 PDF đọc được; 166 nhóm/202 revenue có bytes để review tiếp, 96 nhóm nghiệp vụ HELD không tự mở. Manifest ghim hash, 60 assertions mới đạt; chưa kiểm toàn bộ nội dung PDF hoặc nhập financial records.
 
 [Diễn tập ghi đối soát → revenue trên PostgreSQL](docs/handover/DGC_REVENUE_REHEARSAL_20261021.md): 169 nhóm/205 dòng của snapshot thật đã ghi thử, replay không trùng và rollback toàn bộ trên DB phục hồi riêng; 96 nhóm/204 dòng giữ lại. Đã tách basis MZN tham chiếu trong legacy Recon khỏi money USD và bảo toàn serial ngày qua JSON. 48 kiểm tra target/217 PostgreSQL đạt; chưa có commit financial import hoặc xác minh PDF gốc của các nhóm này.
