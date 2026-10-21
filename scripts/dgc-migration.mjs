@@ -10,6 +10,7 @@ import {verifyInvoiceFiles} from './dgc-migration/invoice-files.mjs';
 import {createInvoiceArchive,verifyInvoiceArchive,listInvoiceArchive} from './dgc-migration/invoice-archive.mjs';
 import {inputFinanceReview,verifyInputFinanceReview} from './dgc-migration/input-finance-review.mjs';
 import {verifyInputFiles} from './dgc-migration/input-files.mjs';
+import {revenueReview,verifyRevenueReview} from './dgc-migration/revenue-review.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -43,23 +44,24 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
-}else if(command==='verify-input-finance'){
+}else if(['verify-input-finance','verify-revenue'].includes(command)){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
- const report=verifyInputFinanceReview(await json(await privateArchivePath(option('plan'))),snapshot,resolutions);
- console.log(JSON.stringify({command,verified:true,snapshotHash:report.snapshotHash,planHash:report.planHash,inputRows:report.inputRows,apRows:report.apRows,postingAllowed:false}));
+ const report=(command==='verify-revenue'?verifyRevenueReview:verifyInputFinanceReview)(await json(await privateArchivePath(option('plan'))),snapshot,resolutions);
+ console.log(JSON.stringify({command,verified:true,snapshotHash:report.snapshotHash,planHash:report.planHash,inputRows:report.inputRows,apRows:report.apRows,revenueRows:report.revenueRows,postingAllowed:false}));
 }else if(command==='verify-invoice-history'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  const report=verifyInvoiceHistoryPlan(await json(option('plan')),snapshot,resolutions);
  console.log(JSON.stringify({command,verified:true,snapshotHash:report.snapshotHash,planHash:report.planHash,entries:report.entries.length,postingAllowed:false}));
-}else if(['review-references','review-finance','review-input-finance','prepare-invoice-history'].includes(command)){
+}else if(['review-references','review-finance','review-input-finance','review-revenue','prepare-invoice-history'].includes(command)){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
- const out=command==='review-input-finance'?await privateArchivePath(option('out')):privateOutput(option('out')),report=command==='review-references'?referenceGraph(snapshot,resolutions):command==='review-finance'?financeReview(snapshot,resolutions):command==='review-input-finance'?inputFinanceReview(snapshot,resolutions):invoiceHistoryPlan(snapshot,resolutions);
+ const out=['review-input-finance','review-revenue'].includes(command)?await privateArchivePath(option('out')):privateOutput(option('out'));
+ const review={'review-references':referenceGraph,'review-finance':financeReview,'review-input-finance':inputFinanceReview,'review-revenue':revenueReview,'prepare-invoice-history':invoiceHistoryPlan},report=review[command](snapshot,resolutions);
  await mkdir(resolve(out,'..'),{recursive:true});
  await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});
- console.log(JSON.stringify({command,snapshotHash:report.snapshotHash,planHash:report.planHash,physicalRows:report.nodes?.length,duplicateGroups:report.duplicatesRetained?.length,links:report.links?.length,inputRows:report.inputRows,apRows:report.apRows,counts:report.counts,unresolved:report.unresolved??report.unresolvedReferences,calendarIssues:report.calendarIssues?.length,issueCounts:report.issueCounts,postingAllowed:false,privateReport:out}));
+ console.log(JSON.stringify({command,snapshotHash:report.snapshotHash,planHash:report.planHash,physicalRows:report.nodes?.length,duplicateGroups:report.duplicatesRetained?.length,links:report.links?.length,inputRows:report.inputRows,apRows:report.apRows,revenueRows:report.revenueRows,reviewStates:report.reviewStates,counts:report.counts,unresolved:report.unresolved??report.unresolvedReferences,calendarIssues:report.calendarIssues?.length,issueCounts:report.issueCounts,postingAllowed:false,privateReport:out}));
 }else if(['stage','apply-masters'].includes(command)){
  requireStaging(process.env.DATABASE_URL??'');
  const snapshot=verifySnapshot(await json(option('snapshot'))),expected=option('snapshot-hash');
@@ -70,4 +72,4 @@ if(command==='prepare'){
   const result=command==='stage'?await stageSnapshot(prisma,snapshot,c.id):await applyMasters(prisma,snapshot,c.id,option('scope'),option('plan-hash'),resolutions);
   console.log(JSON.stringify({command,...result}));
  }finally{await prisma.$disconnect();}
-}else throw Error('Usage: dgc-migration.mjs prepare | review-references | review-finance | review-input-finance | verify-input-finance | verify-input-files | prepare-invoice-history | verify-invoice-history | verify-invoice-files | create-invoice-archive | verify-invoice-archive | list-invoice-archive | stage | apply-masters. Input review/verification requires --snapshot --snapshot-hash [--decisions] and --out or --plan; input files require --snapshot --snapshot-hash --manifest --root. See docs/handover/DGC_INPUT_FINANCE_MIGRATION_20261021.md. Archive creation/verification requires --snapshot --snapshot-hash --plan --manifest --source-root --root [--decisions]; listing requires --root --archive-hash [--invoice-number] [--page]. See docs/handover/DGC_INVOICE_ARCHIVE_20261020.md.');
+}else throw Error('Usage: dgc-migration.mjs prepare | review-references | review-finance | review-revenue | verify-revenue | review-input-finance | verify-input-finance | verify-input-files | prepare-invoice-history | verify-invoice-history | verify-invoice-files | create-invoice-archive | verify-invoice-archive | list-invoice-archive | stage | apply-masters. Revenue/Input review/verification requires --snapshot --snapshot-hash [--decisions] and --out or --plan; input files require --snapshot --snapshot-hash --manifest --root. See docs/handover/DGC_REVENUE_MIGRATION_20261021.md and docs/handover/DGC_INPUT_FINANCE_MIGRATION_20261021.md. Archive creation/verification requires --snapshot --snapshot-hash --plan --manifest --source-root --root [--decisions]; listing requires --root --archive-hash [--invoice-number] [--page]. See docs/handover/DGC_INVOICE_ARCHIVE_20261020.md.');

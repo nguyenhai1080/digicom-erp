@@ -4,6 +4,8 @@ Cập nhật ngày 21/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–21/10
 
+[Chuẩn bị lớp doanh thu migration](docs/handover/DGC_REVENUE_MIGRATION_20261021.md): giữ riêng hai cơ sở tiền của 409 hàng, chỉ 263 Approved/TOTAL/Y thuộc tổng tháng. 294 hàng vượt kiểm cấu trúc, 115 cần đối chiếu; giữ hai Total/N và các chênh lệch số tiền. Có review/verify và 86 assertions mới đạt; chưa ghi doanh thu tài chính vào staging/runtime.
+
 [Chuẩn bị migration InputRecon/AP lịch sử](docs/handover/DGC_INPUT_FINANCE_MIGRATION_20261021.md): ba bản Generated, không AP; 20 phép kiểm khớp và một chênh lệch 0,5 VND được giữ nguyên. Đã lưu/kiểm PDF gốc dùng chung cho cả ba hàng, số phải trả khớp nguồn. Tám suite migration đạt, gồm 76/13 assertions mới; chưa nhập tài chính hoặc duyệt đối soát.
 
 [Tra cứu Invoice lịch sử trong ứng dụng](docs/handover/DGC_INVOICE_HISTORY_RUNTIME_20261021.md): API/UI chỉ đọc từ kho ghim hash và UUID công ty; 63 kiểm tra API đạt. [Đã kiểm UI](docs/handover/DGC_INVOICE_HISTORY_UI_20261021.md) tìm số trùng, phân trang, chi tiết, retry và tải PDF khớp byte; sửa tìm lại cùng query không reload. PDF inline vẫn chưa nghiệm thu. Chưa cấu hình kho thật cho người dùng hoặc nhập DB.

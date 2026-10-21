@@ -54,3 +54,5 @@ Output private trong `artifacts/`; digest bắt buộc trước chạy. `pnpm te
 Tiếp theo: đường nhập revision/negative historical row và chứng từ immutable, đối chiếu file để đóng lỗi nguồn, mapping quyền, SOA sau quyết định cutoff và rehearsal financial import trên staging riêng. Chưa nhập financial record thật hoặc triển khai.
 
 Đã bổ sung [gói lịch sử Invoice và bản sao PDF](DGC_INVOICE_HISTORY_20261020.md): 91 PDF gốc đã lưu riêng/kiểm checksum; phát hiện trùng số giữa hai phạm vi Invoice và chuẩn bị ba ánh xạ theo PDF đang chờ owner. Gói chưa cho phép posting.
+
+Đã tiếp tục [đối chiếu lớp doanh thu riêng ngày 21/10](DGC_REVENUE_MIGRATION_20261021.md): giữ đủ 409 hàng, management/Invoice USD riêng, tổng tháng chỉ Approved/TOTAL/Y; các chênh lệch và Total/N giữ nguyên. Report/verify chưa cho phép financial posting.
