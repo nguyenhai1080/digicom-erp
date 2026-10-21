@@ -4,7 +4,7 @@ Cập nhật ngày 21/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–21/10
 
-[Tra cứu Invoice lịch sử trong ứng dụng](docs/handover/DGC_INVOICE_HISTORY_RUNTIME_20261021.md): đã có API/UI chỉ đọc từ kho evidence được ghim hash và UUID công ty; tìm số trùng, 10 dòng/trang, chi tiết và PDF gốc. Build và 63 kiểm tra API đạt; browser chưa mở được để nghiệm thu UI. Chưa cấu hình kho thật cho người dùng hoặc nhập DB.
+[Tra cứu Invoice lịch sử trong ứng dụng](docs/handover/DGC_INVOICE_HISTORY_RUNTIME_20261021.md): API/UI chỉ đọc từ kho ghim hash và UUID công ty; 63 kiểm tra API đạt. [Đã kiểm UI](docs/handover/DGC_INVOICE_HISTORY_UI_20261021.md) tìm số trùng, phân trang, chi tiết, retry và tải PDF khớp byte; sửa tìm lại cùng query không reload. PDF inline vẫn chưa nghiệm thu. Chưa cấu hình kho thật cho người dùng hoặc nhập DB.
 
 [Gói Invoice lịch sử](docs/handover/DGC_INVOICE_ARCHIVE_20261020.md): đã tách 33 bản Superseded/Cancelled cùng PDF gốc vào kho evidence private, giữ số âm/liên kết thiếu và nhận dạng theo hàng nguồn; verify/replay/tra cứu 10 dòng đạt. Reader filesystem đã bổ sung ngày 21/10, chưa nhập DB.
 

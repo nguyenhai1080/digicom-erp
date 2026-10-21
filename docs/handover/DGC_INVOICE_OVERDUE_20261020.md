@@ -24,4 +24,6 @@ Giao diện DGC có input “Ngày chốt quá hạn” để trống ban đầu
 - Browser đã đăng nhập fixture và quan sát được input ngày, option Quá hạn bị disable và dueDate trên bảng. Phiên browser bị gián đoạn trước khi kiểm trọn thay ngày/lọc; chưa xác nhận tương tác UI đầu cuối. Các tab lỗi nội bộ sau đó không được browser policy cho phép quan sát, đã dừng thử đường đó. Không dùng kết quả API/build thay cho nghiệm thu UI.
 - Server fixture đã dừng, không deploy/push hoặc sửa dữ liệu thật. Không có migration DB mới cho bản sửa này.
 
-Tiếp tục: hoàn tất kiểm tra tương tác ngày chốt trên browser khi phiên ổn định; SOA, financial link decisions/importer và mapping role vẫn theo các hạng mục đang chờ/chưa hoàn tất trong START_HERE.
+Cập nhật browser 21/10: đã chọn partner SYN, ngày 01/02 và 02/02, lọc Quá hạn vẫn không trả HISTORY_FIXTURE đã thu một phần, đúng precedence donor. Với SOA_SYN, ngày chốt 01/03 đúng dueDate trả 0 Invoice quá hạn. Browser gián đoạn khi chuyển sang 02/03; chưa quan sát được kết quả ngày kế tiếp hoặc thao tác xóa ngày. Không đổi source của bộ lọc trong đợt này.
+
+Tiếp tục: hoàn tất kiểm tra tương tác ngày kế tiếp/xóa ngày trên browser khi phiên ổn định; SOA, financial link decisions/importer và mapping role vẫn theo các hạng mục đang chờ/chưa hoàn tất trong START_HERE.
