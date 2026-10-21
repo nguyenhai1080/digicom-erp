@@ -4,6 +4,8 @@ Cập nhật ngày 21/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–21/10
 
+[OCR và dòng con đối soát](docs/handover/DGC_RECON_OCR_AND_CHILD_20261021.md): sáu scan có Payable USD khớp quan sát ảnh và hai pass OCR cục bộ; giữ riêng identity/Revenue/WHT chưa đủ evidence. Trong 144 child rows, 94 khớp printed native + USD link, 47 khác và ba thiếu bytes. Ba dòng lệch nhiều thuộc header Cancelled nhưng revenue vẫn Approved; giữ HELD và historical amounts, chưa nhập tài chính.
+
 [Nội dung bảng tổng USD PDF nguồn](docs/handover/DGC_RECON_SEMANTICS_20261021.md): đọc được tổng của 255/261 PDF; 249 revenue Total khớp, bốn dòng khác PDF, sáu PDF không có text layer. Một nhóm từng REHEARSABLE theo cấu trúc cần review chênh lệch mới. Giữ toàn bộ business HELD và số tiền nguồn; 12 suite/32 assertions mới đạt, chưa nhập tài chính hoặc nghiệm thu child/lifecycle.
 
 [PDF đối soát nguồn và custody](docs/handover/DGC_RECON_FILES_20261021.md): đã lưu/kiểm bytes 261/266 file (231.836.275 bytes), năm ID chưa truy cập được qua Drive (404). Cấu trúc 261 PDF đọc được; 166 nhóm/202 revenue có bytes để review tiếp, 96 nhóm nghiệp vụ HELD không tự mở. Manifest ghim hash, 60 assertions mới đạt; chưa kiểm toàn bộ nội dung PDF hoặc nhập financial records.

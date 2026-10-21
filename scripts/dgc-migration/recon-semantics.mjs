@@ -13,6 +13,7 @@ const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov',
 const money='(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)\\.[0-9]{2}';
 const norm=s=>text(s).toUpperCase().replace(/\s+/g,' ');
 const address=(sheet,t,r)=>({sheet,sheetId:t.sheetId,sourceRow:r.sourceRow,legacyId:r.legacyId,rowHash:r.rowHash});
+export function capturedMonth(row,field){const v=text(row.values[field]);if(/^\d{4}-(0[1-9]|1[0-2])$/.test(v))return v;try{return sourceDate(row,field)?.slice(0,7)??null;}catch{return null;}}
 
 // Deliberately bounded: one page, one explicitly labelled six-column USD row.
 // No OCR guesses, FX conversion, service aliasing, child allocation or tolerance.
@@ -36,8 +37,8 @@ export function parseUsdSummary(pages){
 export function compareCapturedUsd(values,summary,mapping){
  return mapping.map(([sourceField,pdfField])=>{
   const raw=values[sourceField],valid=['string','number'].includes(typeof raw)&&/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(String(raw));
-  const actual=valid?D(raw):null,expected=D(summary.values[pdfField]);
-  return {sourceField,pdfField,actual:actual?.toFixed()??null,expected:expected.toFixed(),difference:actual?.minus(expected).toFixed()??null,state:!actual?'UNAVAILABLE':actual.eq(expected)?'MATCH':'MISMATCH'};
+  const ev=summary.values[pdfField],expectedValid=['string','number'].includes(typeof ev)&&/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(String(ev)),actual=valid?D(raw):null,expected=expectedValid?D(ev):null;
+  return {sourceField,pdfField,actual:actual?.toFixed()??null,expected:expected?.toFixed()??null,difference:actual&&expected?actual.minus(expected).toFixed():null,state:!actual||!expected?'UNAVAILABLE':actual.eq(expected)?'MATCH':'MISMATCH'};
  });
 }
 
@@ -50,14 +51,19 @@ export function reconSemanticGroups(targetPlan,entries){
  });
 }
 
-export async function reviewReconSemantics(snapshot,manifest,root,pin,python,targetPlan,decisions){
- verifyRevenueTargetPlan(targetPlan,snapshot,decisions);
+export async function extractReconTexts(snapshot,manifest,root,pin,python){
  const custody=await verifyReconFiles(snapshot,manifest,root,pin);
  const {stdout}=await promisify(execFile)(python,[fileURLToPath(new URL('./extract-recon-text.py',import.meta.url)),root,...manifest.files.map(f=>f.fileId)],{encoding:'utf8',maxBuffer:32*1024*1024,timeout:120000,windowsHide:true});
  const extracted=JSON.parse(stdout),byId=new Map(extracted.files.map(f=>[f.fileId,f]));
  if(extracted.tool!=='pypdf'||extracted.mode!=='layout'||byId.size!==manifest.files.length||extracted.files.length!==byId.size||manifest.files.some(f=>byId.get(f.fileId)?.sha256!==f.sha256))throw Error('PDF extraction coverage or byte hash differs');
  // Recheck bytes after extraction; changed sources cannot inherit the first check.
  await verifyReconFiles(snapshot,manifest,root,pin);
+ return {custody,extracted};
+}
+
+export async function reviewReconSemantics(snapshot,manifest,root,pin,python,targetPlan,decisions){
+ verifyRevenueTargetPlan(targetPlan,snapshot,decisions);
+ const {custody,extracted}=await extractReconTexts(snapshot,manifest,root,pin,python),byId=new Map(extracted.files.map(f=>[f.fileId,f]));
  const files=manifest.files.map(f=>{const x=byId.get(f.fileId);return {fileId:f.fileId,sha256:f.sha256,sourceHeaders:f.sourceHeaders,pageCount:x.pages.length,parsed:x.error?{state:x.error}:parseUsdSummary(x.pages)};});
  const parsed=new Map(files.map(f=>[f.fileId,f])),headers=snapshot.tables['43_RECON_PDF_HEADER'],entries=[];
  const details=snapshot.tables['44_RECON_PDF_DETAIL'],revenues=snapshot.tables['40_MONTHLY_REVENUE'];
@@ -67,11 +73,11 @@ export async function reviewReconSemantics(snapshot,manifest,root,pin,python,tar
   if(hs.length===1){const ids=reconHeaderFileIds(hs[0]);fileId=ids.length===1?ids[0]:null;pdf=parsed.get(fileId)?.parsed;
    state=!fileId?'AMBIGUOUS_SOURCE_FILE':!pdf?'FILE_NOT_CAPTURED':pdf.state;
    if(pdf?.state==='EXPLICIT_USD_SUMMARY'){
-    const h=hs[0],hp=sourceDate(h,'Period_Month')?.slice(0,7),sameIdentity=norm(h.values.Service_Header)===norm(pdf.service)&&hp===pdf.period;
+    const h=hs[0],hp=capturedMonth(h,'Period_Month'),sameIdentity=norm(h.values.Service_Header)===norm(pdf.service)&&hp===pdf.period;
     if(!sameIdentity)state='HEADER_PDF_IDENTITY_DIFFERS';
     else if(!pdf.footerMatches)state='PDF_FOOTER_DIFFERS';
     else if(sheet==='40_MONTHLY_REVENUE'&&norm(v.Revenue_Row_Type)!=='TOTAL')state='CHILD_NOT_COMPARED_TO_DOCUMENT_TOTAL';
-    else if(sheet==='40_MONTHLY_REVENUE'&&(sourceDate(r,'Revenue_Month')?.slice(0,7)!==pdf.period||norm(v.Currency)!=='USD'))state='REVENUE_PERIOD_OR_CURRENCY_DIFFERS';
+    else if(sheet==='40_MONTHLY_REVENUE'&&(capturedMonth(r,'Revenue_Month')!==pdf.period||norm(v.Currency)!=='USD'))state='REVENUE_PERIOD_OR_CURRENCY_DIFFERS';
     // A detail must identify the document service literally; no substring/alias.
     else if(sheet==='44_RECON_PDF_DETAIL'&&norm(v.Service_Name)!==norm(pdf.service))state='DETAIL_NOT_DOCUMENT_TOTAL';
     else{checks=compareCapturedUsd(v,pdf,sheet==='40_MONTHLY_REVENUE'?[['Invoice_Revenue_USD',fields[3]],['Invoice_WHT_USD',fields[4]],['Invoice_Payable_USD',fields[5]]]:fields.map(f=>[f,f]));state=checks.every(c=>c.state==='MATCH')?'EXACT_USD_SUMMARY_MATCH':'CAPTURED_USD_DIFFERS';}
