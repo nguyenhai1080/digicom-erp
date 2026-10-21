@@ -24,7 +24,7 @@ Kiểm tra gồm trùng invoice ID/number, nhiều current trong business key, r
 
 Hai hàng 48_INVOICE_HEADER!56:57 cùng số `03/12/2022/DGC-INV`, nhưng là hai PDF và tổng tiền khác nhau: một bản MOVTV riêng đã Superseded, một bản tổng hợp hiện hành Paid. Đã kiểm trực quan cả hai PDF. Không gộp, đổi số hoặc dùng PDF này thay PDF kia.
 
-Target `Invoice` hiện unique(companyId, invoiceNumber), nên không thể nhập cả hai như hai operational Invoice bình thường. Cần kho lịch sử immutable riêng cho bản đã thay thế, có source identity độc lập và giữ nguyên số pháp lý. Đây là hướng khôi phục đề xuất; model/runtime đọc kho lịch sử chưa được triển khai. Bản cũ còn trỏ successor không có trong snapshot; giữ nguyên pointer thiếu, không tự đổi sang bản Paid chỉ vì cùng số.
+Target `Invoice` hiện unique(companyId, invoiceNumber), nên không thể nhập cả hai như hai operational Invoice bình thường. Cần kho lịch sử riêng cho bản đã thay thế, có source identity độc lập và giữ nguyên số pháp lý. Đã có gói evidence và [reader filesystem chỉ đọc ngày 21/10](DGC_INVOICE_HISTORY_RUNTIME_20261021.md), chưa có model/importer kho trong DB. Bản cũ còn trỏ successor không có trong snapshot; giữ nguyên pointer thiếu, không tự đổi sang bản Paid chỉ vì cùng số.
 
 Dòng âm trên một Invoice Superseded được giữ trong captured payload và đánh dấu. Không đưa qua generator/issue endpoint mới, không tạo AR hiện hành hoặc tính lại tiền lịch sử.
 
@@ -59,4 +59,4 @@ node scripts/dgc-migration.mjs verify-invoice-history --snapshot artifacts/<snap
 node scripts/dgc-migration.mjs verify-invoice-files --snapshot artifacts/<snapshot.json> --snapshot-hash <sha256> --manifest artifacts/<all-invoices-manifest.json> --root artifacts/<source-invoices>
 ```
 
-Đã tiếp tục tạo [gói evidence riêng cho 33 Invoice lịch sử](DGC_INVOICE_ARCHIVE_20261020.md), có byte PDF gốc, source identity, verify/replay và tra cứu CLI; chưa có model/runtime trong ứng dụng hoặc nhập DB. Tiếp tục: quyết định ba liên kết và SOA cutoff, runtime tra cứu kho, importer khôi phục số tiền và PDF thay vì generator mới, rehearsal trên staging riêng; giữ ngoại lệ revision và source thiếu. Chưa deploy/push hoặc tạo tài chính thật.
+Đã tiếp tục tạo [gói evidence riêng cho 33 Invoice lịch sử](DGC_INVOICE_ARCHIVE_20261020.md), có byte PDF gốc, source identity, verify/replay và tra cứu CLI; reader chỉ đọc trong ứng dụng đã thêm ngày 21/10, chưa nhập DB. Tiếp tục: quyết định ba liên kết và SOA cutoff, kiểm browser reader, importer khôi phục số tiền và PDF thay vì generator mới, rehearsal trên staging riêng; giữ ngoại lệ revision và source thiếu. Chưa deploy/push hoặc tạo tài chính thật.

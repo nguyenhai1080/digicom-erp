@@ -1,10 +1,12 @@
 # Bắt đầu làm việc với DGC Finance
 
-Cập nhật ngày 20/10/2026, giờ Việt Nam.
+Cập nhật ngày 21/10/2026, giờ Việt Nam.
 
-## Trạng thái sau tiếp nhận 19–20/10
+## Trạng thái sau tiếp nhận 19–21/10
 
-[Gói Invoice lịch sử](docs/handover/DGC_INVOICE_ARCHIVE_20261020.md): đã tách 33 bản Superseded/Cancelled cùng PDF gốc vào kho evidence private, giữ số âm/liên kết thiếu và nhận dạng theo hàng nguồn; verify/replay/tra cứu 10 dòng đạt. Chưa nhập DB hoặc có màn tra cứu kho trong ứng dụng.
+[Tra cứu Invoice lịch sử trong ứng dụng](docs/handover/DGC_INVOICE_HISTORY_RUNTIME_20261021.md): đã có API/UI chỉ đọc từ kho evidence được ghim hash và UUID công ty; tìm số trùng, 10 dòng/trang, chi tiết và PDF gốc. Build và 63 kiểm tra API đạt; browser chưa mở được để nghiệm thu UI. Chưa cấu hình kho thật cho người dùng hoặc nhập DB.
+
+[Gói Invoice lịch sử](docs/handover/DGC_INVOICE_ARCHIVE_20261020.md): đã tách 33 bản Superseded/Cancelled cùng PDF gốc vào kho evidence private, giữ số âm/liên kết thiếu và nhận dạng theo hàng nguồn; verify/replay/tra cứu 10 dòng đạt. Reader filesystem đã bổ sung ngày 21/10, chưa nhập DB.
 
 [Đối chiếu ngày chốt SOA](docs/handover/DGC_SOA_CUTOFF_REVIEW_20261020.md): đã có màn/API chỉ đọc so sánh hai chính sách khoản thu, tổng USD/VND riêng, 10 dòng/trang; 56 kiểm tra SOA và 223 hồi quy quyền đạt, đã kiểm browser. Chưa chọn cutoff hoặc phát hành SOA.
 

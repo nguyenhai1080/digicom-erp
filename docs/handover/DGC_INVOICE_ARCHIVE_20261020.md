@@ -46,4 +46,4 @@ node scripts/dgc-migration.mjs list-invoice-archive --root artifacts/dgc-migrati
 
 Có thể thêm `--invoice-number <số chính xác>`; kết quả không gộp các hàng trùng số. Không lấy archiveHash từ chính một kho chưa tin cậy để coi là đã kiểm nguồn.
 
-Runtime tra cứu trong ứng dụng và model/importer evidence riêng vẫn chưa có. Trước migration tài chính cần thiết kế kho bền vững/backup/quyền đọc, giữ source identity, rehearsal replay/rollback trên staging riêng và xử lý ngoại lệ liên kết hiện hành. SOA cutoff/timezone/ba mapping lịch sử vẫn chờ quyết định; chưa deploy/push hoặc nhập financial records thật.
+Đã bổ sung [API/UI reader chỉ đọc trong ứng dụng ngày 21/10](DGC_INVOICE_HISTORY_RUNTIME_20261021.md), mặc định chưa kết nối kho; kiểm browser còn chưa hoàn tất. Model/importer evidence trong PostgreSQL vẫn chưa có. Trước migration tài chính cần thiết kế kho bền vững/backup/quyền đọc, giữ source identity, rehearsal replay/rollback trên staging riêng và xử lý ngoại lệ liên kết hiện hành. SOA cutoff/timezone/ba mapping lịch sử vẫn chờ quyết định; chưa deploy/push hoặc nhập financial records thật.

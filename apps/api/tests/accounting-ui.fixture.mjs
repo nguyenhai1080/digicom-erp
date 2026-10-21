@@ -8,6 +8,7 @@ import {buildApp} from '../dist/app.js';
 import {hashPassword} from '../dist/modules/auth/password.js';
 import {csrfToken,tokenHash} from '../dist/modules/auth/access.js';
 import {seedSoaCutoff} from './soa-cutoff.fixtures.mjs';
+import {invoiceHistoryFixture} from './invoice-history.fixtures.mjs';
 
 assert.equal(process.env.DGC_UI_FIXTURE,'true');
 const mode=process.env.DGC_UI_FIXTURE_MODE??'setup';assert.ok(['setup','serve'].includes(mode));
@@ -15,6 +16,7 @@ assert.ok(new URL(process.env.DATABASE_URL).pathname.startsWith('/erp_execution_
 assert.ok(process.env.DGC_UI_FIXTURE_PASSWORD?.length>=12);
 const company=await prisma.company.findUniqueOrThrow({where:{companyCode:'DGC'}});
 assert.equal(company.companyName,'Synthetic DGC roles');
+if(process.env.DGC_UI_ARCHIVE_FIXTURE==='true'){const archive=await invoiceHistoryFixture('/tmp/dgc-history-ui');process.env.DGC_INVOICE_ARCHIVE_ROOT=archive.root;process.env.DGC_INVOICE_ARCHIVE_HASH=archive.index.archiveHash;process.env.DGC_INVOICE_ARCHIVE_COMPANY_ID=company.id;}
 const origin='http://127.0.0.1:3901',config={secret:'synthetic-accounting-ui-secret-20261020',appOrigin:origin,secureCookies:false,bootstrapEnabled:false,bootstrapToken:'disabled',defaultCompanyCode:'DGC'};
 const actor=code=>prisma.user.findFirstOrThrow({where:{companyId:company.id,roles:{some:{role:{code}}}}});
 const accounting=await actor('ACCOUNTING_FIXTURE');
