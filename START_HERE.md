@@ -4,6 +4,8 @@ Cập nhật ngày 22/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–22/10
 
+[Diễn tập khôi phục Invoice/AR](docs/handover/DGC_INVOICE_RESTORE_REHEARSAL_20261022.md): planner đủ 91 Invoice; bốn candidate đã ghi thử/replay 0 trùng/rollback sạch trên DB copy riêng. 49 held, 33 archive, năm nháp giữ riêng; không tạo payment approval hoặc cash. 21 suite/129 assertions mới + 56 PostgreSQL đạt. Provenance migration chỉ áp hai DB Invoice trial; chưa financial import/activation.
+
 [PDF gốc trong historical adapter](docs/handover/DGC_RECON_PDF_RUNTIME_20261022.md): runtime kiểm/tải PDF qua document row/file ID và manifest pin; đã kiểm đủ 261 originals/231.836.275 byte, năm thiếu trả 404. Chỉ technical review, không tạo attachment/upload/approval hoặc mở import. API build, 60 PDF + 94 source + 59 PostgreSQL assertions và 20 suite migration đạt; cấu hình thật/UI vẫn chưa bật.
 
 [Historical source adapter — lớp đọc evidence](docs/handover/DGC_HISTORICAL_SOURCE_ADAPTER_20261022.md): runtime/API technical review kiểm pinned row/link/target/item/document evidence, giữ source actor/date riêng và không tạo local approval. Chỉ SYSTEM_CONFIG_EDIT/DGC, mặc định chưa cấu hình; operational use vẫn chặn. API build, 92 HTTP/characterization + 59 PostgreSQL assertions và 20 suite migration đạt; DB synthetic rollback sạch, chưa nhập tài chính.

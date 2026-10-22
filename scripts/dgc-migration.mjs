@@ -21,6 +21,8 @@ import {reviewReconGates} from './dgc-migration/recon-gates.mjs';
 import {revenueLifecyclePlan} from './dgc-migration/revenue-lifecycle.mjs';
 import {revenueBillingPlan,verifyRevenueBillingPlan} from './dgc-migration/revenue-billing.mjs';
 import {revenueScopePlan,verifyRevenueScopePlan} from './dgc-migration/revenue-scopes.mjs';
+import {invoiceRestorePlan,verifyInvoiceRestorePlan} from './dgc-migration/invoice-restore.mjs';
+import {rehearseInvoiceRestore} from './dgc-migration/invoice-rehearsal.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -54,6 +56,14 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
+}else if(['prepare-invoice-restore','verify-invoice-restore','rehearse-invoice-restore'].includes(command)){
+ const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
+ const inputs=[snapshot,await json(await privateArchivePath(option('plan'))),await json(await privateArchivePath(option('review'))),option('review-hash'),await json(await privateArchivePath(option('manifest'))),option('manifest-hash'),resolutions];
+ if(command==='rehearse-invoice-restore'){
+  requireStaging(process.env.DATABASE_URL??'');const {PrismaClient}=createRequire(new URL('../packages/db/package.json',import.meta.url))('@prisma/client'),db=new PrismaClient();
+  try{const company=await db.company.findUniqueOrThrow({where:{companyCode:'DGC'}}),[snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions]=inputs,report=await rehearseInvoiceRestore(db,{snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions,restorePlan:await json(await privateArchivePath(option('restore-plan'))),root:await privateArchivePath(option('root')),sourceRows:option('source-rows').split(',').map(Number),companyId:company.id}),out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});console.log(JSON.stringify({command,rolledBack:report.rolledBack,first:report.first,replay:report.replay,postingAllowed:false,privateReport:out}));}finally{await db.$disconnect();}
+ }else if(command==='verify-invoice-restore'){const report=verifyInvoiceRestorePlan(await json(await privateArchivePath(option('restore-plan'))),...inputs);console.log(JSON.stringify({command,verified:true,planHash:report.planHash,counts:report.counts,postingAllowed:false}));}
+ else{const report=invoiceRestorePlan(...inputs),out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});console.log(JSON.stringify({command,planHash:report.planHash,counts:report.counts,postingAllowed:false,privateReport:out}));}
 }else if(['prepare-revenue-billing','verify-revenue-billing','prepare-revenue-scopes','verify-revenue-scopes'].includes(command)){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
