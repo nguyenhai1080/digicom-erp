@@ -23,6 +23,7 @@ import {revenueBillingPlan,verifyRevenueBillingPlan} from './dgc-migration/reven
 import {revenueScopePlan,verifyRevenueScopePlan} from './dgc-migration/revenue-scopes.mjs';
 import {invoiceRestorePlan,verifyInvoiceRestorePlan} from './dgc-migration/invoice-restore.mjs';
 import {rehearseInvoiceRestore} from './dgc-migration/invoice-rehearsal.mjs';
+import {invoiceReferenceReview,verifyInvoiceReferenceReview} from './dgc-migration/invoice-references.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -56,6 +57,16 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
+}else if(['review-invoice-references','verify-invoice-references'].includes(command)){
+ const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
+ if(command==='verify-invoice-references'){
+  const report=verifyInvoiceReferenceReview(await json(await privateArchivePath(option('review'))),snapshot);
+  console.log(JSON.stringify({command,verified:true,reviewHash:report.reviewHash,counts:report.counts,registryWritesAllowed:false}));
+ }else{
+  const report=invoiceReferenceReview(snapshot),out=await privateArchivePath(option('out'));
+  await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});
+  console.log(JSON.stringify({command,reviewHash:report.reviewHash,counts:report.counts,registryWritesAllowed:false,privateReport:out}));
+ }
 }else if(['prepare-invoice-restore','verify-invoice-restore','rehearse-invoice-restore'].includes(command)){
  const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  const inputs=[snapshot,await json(await privateArchivePath(option('plan'))),await json(await privateArchivePath(option('review'))),option('review-hash'),await json(await privateArchivePath(option('manifest'))),option('manifest-hash'),resolutions];

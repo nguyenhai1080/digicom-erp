@@ -4,6 +4,10 @@ Cập nhật ngày 22/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–22/10
 
+**[Roadmap hiện hành và mốc tiếp theo](docs/handover/DGC_ROADMAP_STATUS_20261022.md): đang diễn tập migration tài chính địa phương, chưa nhập chính thức hoặc go-live.** Đọc bảng này để xem toàn cảnh; các mục dưới là lịch sử từng đợt, không phải các chặng đã nghiệm thu.
+
+[Tham chiếu Invoice trong SOA/package](docs/handover/DGC_INVOICE_REFERENCES_20261022.md): đã rà ba SOA/21 detail và 74 package, 64 liên kết tới 50 Invoice đều bound cấu trúc. Cả bốn Invoice trial có tham chiếu, cần historical document lifecycle/registry trước activation/hủy. 22 suite đạt, gồm 49 assertions mới; chưa kiểm file SOA/package hoặc ghi registry.
+
 [Diễn tập khôi phục Invoice/AR](docs/handover/DGC_INVOICE_RESTORE_REHEARSAL_20261022.md): planner đủ 91 Invoice; bốn candidate đã ghi thử/replay 0 trùng/rollback sạch trên DB copy riêng. 49 held, 33 archive, năm nháp giữ riêng; không tạo payment approval hoặc cash. 21 suite/129 assertions mới + 56 PostgreSQL đạt. Provenance migration chỉ áp hai DB Invoice trial; chưa financial import/activation.
 
 [PDF gốc trong historical adapter](docs/handover/DGC_RECON_PDF_RUNTIME_20261022.md): runtime kiểm/tải PDF qua document row/file ID và manifest pin; đã kiểm đủ 261 originals/231.836.275 byte, năm thiếu trả 404. Chỉ technical review, không tạo attachment/upload/approval hoặc mở import. API build, 60 PDF + 94 source + 59 PostgreSQL assertions và 20 suite migration đạt; cấu hình thật/UI vẫn chưa bật.

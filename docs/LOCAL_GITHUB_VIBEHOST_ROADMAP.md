@@ -1,5 +1,7 @@
 # ERP Core Web - Local -> GitHub -> Vibehost Roadmap
 
+**DGC independent checkout, 22/10/2026:** current status and next steps are in [DGC roadmap status](handover/DGC_ROADMAP_STATUS_20261022.md). Deployment/release entries below describe upstream history; they do not authorize pushing DGC to GST remotes/services.
+
 ## Owner scope correction — 2026-10-08 (takes precedence)
 
 **ERP Core inherits the complete ERP DGC functionality and business behavior; Projects are the additional domain.** The previous project-first sequence below is historical, not the current implementation priority. A schema pack or green health check is not DGC business parity.
