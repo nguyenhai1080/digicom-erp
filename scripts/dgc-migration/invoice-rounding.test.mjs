@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {canonical,digest} from './core.mjs';
+import {invoiceRoundingInputs} from './invoice-rounding.fixtures.mjs';
+import {invoiceRoundingPlan,verifyInvoiceRoundingPlan} from './invoice-rounding.mjs';
+import {rehearseInvoiceRestore,rehearseInvoiceRounding} from './invoice-rehearsal.mjs';
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;},reject=async(f,re)=>{await assert.rejects(f,re);n++;};
+const o=invoiceRoundingInputs(),before=canonical(o),p=invoiceRoundingPlan(o),e=p.entries[0];
+eq(p.counts,{INVOICE_ROUNDING_SHAPE_CANDIDATE:1});eq(e.originalRestoreState,'RESTORE_HELD');eq(e.invoiceRounding.components,{revenue:'33.33',wht:'3.67',payable:'29.67'});eq(e.invoiceRounding.identityDelta,'0.01');eq(e.invoiceRounding.characterizedLineDelta,'0.01');eq(e.invoiceRounding.lines.length,1);eq(e.invoiceRounding.lines[0].revenueSource.sourceRow,3);eq(e.invoiceRounding.lines[0].totalSource.sourceRow,2);eq(e.receivable.outstandingAmount,'29.67');eq(p.originalGatesUnchanged,true);eq(p.commitAllowed,false);eq(verifyInvoiceRoundingPlan(p,o),p);eq(canonical(o),before);
+for(const mutate of [(c,ch)=>ch('50_AR_AP','Original_Amount',29.68),(c,ch)=>ch('40_MONTHLY_REVENUE','Status','Draft'),(c,ch)=>ch('48_INVOICE_HEADER','Total_Payable_USD',29.68),(c,ch)=>ch('48_INVOICE_HEADER','Status','Draft'),(c,ch)=>ch('44_RECON_PDF_DETAIL','Partner_Revenue_MZN',89.01)])eq(invoiceRoundingPlan(invoiceRoundingInputs(mutate)).entries[0].state,'INVOICE_ROUNDING_SHAPE_HELD');
+const paid=invoiceRoundingPlan(invoiceRoundingInputs(()=>{},true));eq(paid.entries[0].state,'INVOICE_ROUNDING_SHAPE_CANDIDATE');eq(paid.entries[0].receivable.paidAmount,'29.67');eq(paid.entries[0].receivable.outstandingAmount,'0');
+const forged=structuredClone(p);forged.entries[0].invoiceRounding.identityDelta='0';const {planHash,...body}=forged;forged.planHash=digest(body);assert.throws(()=>verifyInvoiceRoundingPlan(forged,o),/pinned source/);n++;
+const saved=process.env.DATABASE_URL;try{process.env.DATABASE_URL='postgresql://unused@127.0.0.1:55555/dgc_migration_staging_never_connect';await reject(()=>rehearseInvoiceRestore({}, {...o.invoiceOptions,sourceRows:[2]}),/held, draft/);await reject(()=>rehearseInvoiceRounding({}, {...o,invoiceExceptionPlan:p,sourceRows:[2,2]}),/unique whole/);process.env.DATABASE_URL='postgresql://unused@remote.invalid/dgc_migration_staging_bad';await reject(()=>rehearseInvoiceRounding({},o),/dedicated local/);}finally{if(saved===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=saved;}
+console.log(`Invoice rounding shape profile: ${n} assertions passed`);

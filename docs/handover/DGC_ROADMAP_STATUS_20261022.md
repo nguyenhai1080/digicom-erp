@@ -1,6 +1,6 @@
 # Roadmap DGC Finance → DGC-ERP
 
-Cập nhật 22/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
+Cập nhật 23/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
 
 **Đang ở bước diễn tập migration tài chính địa phương. Chưa nhập chính thức bản ghi tài chính; chưa go-live.** Không dùng số test hoặc schema coverage làm tỷ lệ nghiệm thu nghiệp vụ.
 
@@ -16,7 +16,7 @@ Cập nhật 22/10/2026. Đây là bảng trạng thái hiện hành, đọc cù
 ## Việc tiếp theo, theo thứ tự
 
 1. Xử lý Invoice/revenue blockers của các whole document sets, giữ guard SOA Draft và Invoice cũ. [Đợt kiểm tham chiếu](DGC_INVOICE_REFERENCES_20261022.md) và [custody 77/77 PDF](DGC_REFERENCE_FILES_20261022.md) đã hoàn tất phần binding/byte custody; [registry synthetic rehearsal](DGC_REFERENCE_REGISTRATION_20261022.md) đã kiểm hai documents × hai Invoice, replay/rollback và guard runtime. Snapshot thật chưa có whole-document candidate: 46 documents có refs bị 46 Invoice held chặn; 31 package no-ref giữ riêng. Ưu tiên hàng chờ theo số documents bị ảnh hưởng; chưa ghi registry nguồn thật hoặc mở hủy/activation.
-   [Đã characterize rounding nguồn](DGC_DONOR_ROUNDING_20261022.md): 21/46 Invoice blockers có chênh lệch USD truyền từ components độc lập được giải thích. [Đã ghi/đọc thử exception revenue](DGC_ROUNDING_EXCEPTION_REHEARSAL_20261022.md) cho 66 groups/105 rows snapshot thật, 73 metadata, runtime đọc/replay/rollback đạt; strict readiness vẫn giữ. Tiếp theo mapping ngoại lệ Invoice header/detail/AR, đồng thời giữ source/PDF/lifecycle gates, không sửa số tiền để ép identity.
+   [Đã characterize rounding nguồn](DGC_DONOR_ROUNDING_20261022.md): 21/46 Invoice blockers có chênh lệch USD truyền từ components độc lập được giải thích. [Đã ghi/đọc thử exception revenue](DGC_ROUNDING_EXCEPTION_REHEARSAL_20261022.md) cho 66 groups/105 rows snapshot thật, 73 metadata; [Invoice header/detail/AR trial](DGC_INVOICE_ROUNDING_REHEARSAL_20261022.md) lượt đầu đạt tám Invoice/AR và 46 groups/70 revenue, replay/rollback sạch. Bản cuối build đạt nhưng PostgreSQL/hồi quy còn gián đoạn kết nối/timeout: kiểm lại trước mở rộng. Strict readiness vẫn giữ. Sau đó whole-document exception dependency profile và lifecycle, không sửa số tiền để ép identity.
 2. Hoàn tất adapter vận hành lịch sử: actor/date riêng, current/revision, trạng thái và receipts không phát sinh tiền; tăng tập rehearsal chỉ khi gate nguồn đáp ứng. Không sửa số tiền cũ hoặc tái sinh PDF để vượt gate.
 3. Đối chiếu tổng doanh thu, Invoice/AR/AP, receipts theo kỳ/đối tác/tiền tệ và kiểm toàn chuỗi qua UI/quyền trên staging. Import tài chính cần quy trình commit/replay/rollback được kiểm chứng, không đổi rehearsal thành lệnh ghi thật.
 4. Hoàn tất SOA/reporting/roles và UAT; sau đó chuẩn bị môi trường DGC và cutover ở chặng 6. Projects tiếp tục sau nền nghiệp vụ DGC theo baseline, không thay thế luồng tài chính dịch vụ.

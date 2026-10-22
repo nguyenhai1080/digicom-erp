@@ -29,6 +29,8 @@ import {referenceRegistrationPlan,verifyReferenceRegistrationPlan,rehearseRefere
 import {donorRoundingReview,verifyDonorRoundingReview,donorRoundingImpact} from './dgc-migration/donor-rounding.mjs';
 import {roundingExceptionPlan,verifyRoundingExceptionPlan} from './dgc-migration/rounding-exception.mjs';
 import {rehearseRoundingExceptions} from './dgc-migration/revenue-rehearsal.mjs';
+import {invoiceRoundingPlan,verifyInvoiceRoundingPlan} from './dgc-migration/invoice-rounding.mjs';
+import {rehearseInvoiceRounding} from './dgc-migration/invoice-rehearsal.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -62,6 +64,22 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
+}else if(['prepare-invoice-rounding','verify-invoice-rounding','rehearse-invoice-rounding'].includes(command)){
+ const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
+ const input=async name=>json(await privateArchivePath(option(name))),invoiceOptions={snapshot,targetPlan:await input('plan'),combined:await input('review'),reviewPin:option('review-hash'),manifest:await input('manifest'),manifestPin:option('manifest-hash'),restorePlan:await input('restore-plan'),decisions:resolutions};
+ const inputs={invoiceOptions,rounding:await input('rounding-review'),roundingPin:option('rounding-review-hash'),exceptionPlan:await input('exception-plan')};let report;
+ if(command==='prepare-invoice-rounding')report=invoiceRoundingPlan(inputs);
+ else{
+  const p=verifyInvoiceRoundingPlan(await input('invoice-rounding-plan'),inputs);
+  if(command==='verify-invoice-rounding')console.log(JSON.stringify({command,verified:true,planHash:p.planHash,counts:p.counts,commitAllowed:false}));
+  else{
+   requireStaging(process.env.DATABASE_URL??'');invoiceOptions.root=await privateArchivePath(option('root'));const sourceRows=option('source-rows')==='all-candidates'?p.entries.filter(e=>e.state==='INVOICE_ROUNDING_SHAPE_CANDIDATE').map(e=>e.source.sourceRow):option('source-rows').split(',').map(Number);
+   if(!sourceRows.length||new Set(sourceRows).size!==sourceRows.length||sourceRows.some(n=>p.entries.find(e=>e.source.sourceRow===n)?.state!=='INVOICE_ROUNDING_SHAPE_CANDIDATE'))throw Error('Select unique whole candidate Invoices');
+   const reconManifest=await input('recon-manifest'),reconManifestPin=option('recon-manifest-hash'),reconRoot=await privateArchivePath(option('recon-root'));
+   const {PrismaClient}=createRequire(new URL('../packages/db/package.json',import.meta.url))('@prisma/client'),db=new PrismaClient();try{invoiceOptions.companyId=(await db.company.findUniqueOrThrow({where:{companyCode:'DGC'}})).id;report=await rehearseInvoiceRounding(db,{...inputs,invoiceExceptionPlan:p,sourceRows,reconManifest,reconManifestPin,reconRoot});}finally{await db.$disconnect();}
+  }
+ }
+ if(report){const out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});console.log(JSON.stringify({command,planHash:report.planHash??report.restorePlanHash,counts:report.counts,first:report.first,replay:report.replay,rolledBack:report.rolledBack,originalGatesUnchanged:true,commitAllowed:false}));}
 }else if(['prepare-rounding-exceptions','verify-rounding-exceptions','rehearse-rounding-exceptions'].includes(command)){
  const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  const targetPlan=await json(await privateArchivePath(option('plan'))),combined=await json(await privateArchivePath(option('review'))),rounding=await json(await privateArchivePath(option('rounding-review'))),combinedPin=option('review-hash'),roundingPin=option('rounding-review-hash'),inputs=[snapshot,targetPlan,combined,combinedPin,rounding,roundingPin,resolutions];let report;

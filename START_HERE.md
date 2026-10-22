@@ -1,10 +1,12 @@
 # Bắt đầu làm việc với DGC Finance
 
-Cập nhật ngày 22/10/2026, giờ Việt Nam.
+Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–22/10
 
 **[Roadmap hiện hành và mốc tiếp theo](docs/handover/DGC_ROADMAP_STATUS_20261022.md): đang diễn tập migration tài chính địa phương, chưa nhập chính thức hoặc go-live.** Đọc bảng này để xem toàn cảnh; các mục dưới là lịch sử từng đợt, không phải các chặng đã nghiệm thu.
+
+[Ngoại lệ Invoice/AR — ghi và đọc thử](docs/handover/DGC_INVOICE_ROUNDING_REHEARSAL_20261022.md): lượt đầu tám Invoice/AR cùng 46 nhóm/70 revenue đã trial/replay/rollback, giữ components và khoản đã thu nguồn. Bản cuối build đạt nhưng rerun PostgreSQL/hồi quy bị mất kết nối/timeout; cần kiểm lại trước khi mở rộng whole-document dependencies. Không đổi original gates, chưa import tài chính hoặc activation.
 
 [Lưu/đọc ngoại lệ và trial snapshot thật](docs/handover/DGC_ROUNDING_EXCEPTION_REHEARSAL_20261022.md): 66 nhóm/105 revenue ghi thử, 73 metadata ±0,01 USD giữ nguyên components; runtime đọc 105/105, replay 0 trùng, 23 nhóm bảng rollback khớp. API build, 26 suite/21 shape + 30 reader + 83 PostgreSQL mới và hồi quy đạt. Strict gates/Invoice/registry cũ giữ nguyên; chưa import hoặc activation.
 

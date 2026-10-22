@@ -3,9 +3,11 @@ import {resolve} from 'node:path';
 import {canonical,digest,SOURCE_ID} from './core.mjs';
 import {requireStaging} from './staging.mjs';
 import {verifyInvoiceFiles} from './invoice-files.mjs';
+import {verifyReconFiles} from './recon-files.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
-import {rehearseRevenue} from './revenue-rehearsal.mjs';
-const models=['user','userRole','authSession','reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','invoiceDocumentLink','dgcImportLink','auditLog'];
+import {rehearseRevenue,rehearseInvoiceRoundingSources} from './revenue-rehearsal.mjs';
+import {verifyInvoiceRoundingPlan} from './invoice-rounding.mjs';
+const models=['user','userRole','authSession','approvalRequest','reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','invoiceDocumentLink','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
 const normalized=v=>v instanceof Date?v.toISOString():typeof v==='bigint'?v.toString():v?.toFixed?v.toFixed():v;
 const hash=(row,data)=>digest(Object.fromEntries(Object.keys(data).map(k=>[k,normalized(row[k])])));
@@ -37,6 +39,7 @@ async function materialize(tx,companyId,selected,plan,root,actorId){
   await record('document',{id:documentId,companyId,documentCode:'DGC-TRIAL-'+id,documentType:'DGC_REHEARSAL_EVIDENCE',entityType:'DGC_INVOICE_REHEARSAL',entityId:id,documentNumber:s.invoiceNumber,versionNo:s.sourceRevisionNo,documentDate:new Date(s.invoiceDate+'T00:00:00Z'),attachmentId,status:'DRAFT',createdById:actorId},adopt);
   const rows=await Promise.all(e.scopes.flatMap(scope=>scope.items.map(async item=>{const revenueId=await linked(item.source,'revenue'),revenue=await tx.revenue.findFirst({where:{companyId,id:revenueId}});if(!revenue||revenue.isCurrent||revenue.status!=='BLOCKED'||revenue.partnerId!==partnerId||revenue.contractId!==await linked(scope.contractSource,'contract'))throw Error('Invoice trial requires blocked rehearsal revenue');return {source:item.source,revenue};})));
   const snapshot={sourceKind:'DGC_INVOICE_REHEARSAL_ONLY',snapshotHash:plan.snapshotHash,restorePlanHash:plan.planHash,source:e.source,sourceStatus:e.sourceStatus,capturedHeaderJson:e.capturedHeaderJson,capturedDetailsJson:e.capturedDetailsJson,capturedReceivablesJson:e.capturedReceivablesJson,capturedPaymentsJson:e.capturedPaymentsJson,sourceRevenueIds:rows.map(r=>r.revenue.id),pdfEvidence:{sha256:e.pdf.sha256,size:e.pdf.size,fileId:e.pdf.fileId},noApprovalOrPosting:true,historicalCashPosting:false,paymentRestorePolicy:e.paymentRestorePolicy};
+  if(e.invoiceRounding)snapshot.roundingException=e.invoiceRounding;
   const data={id,companyId,invoiceNumber:s.invoiceNumber,businessKey:'DGC-TRIAL|'+plan.snapshotHash+'|'+e.source.sourceRow,revisionNo:s.sourceRevisionNo,isCurrent:false,status:s.safeTrialStatus,partnerId,period:s.period,invoiceMode:s.invoiceMode,serviceId:s.invoiceMode==='PER_SERVICE'?rows[0].revenue.serviceId:null,invoiceDate:new Date(s.invoiceDate+'T00:00:00Z'),dueDate:new Date(s.dueDate+'T00:00:00Z'),currency:s.currency,revenueAmount:s.revenueAmount,whtAmount:s.whtAmount,payableAmount:s.payableAmount,paidAmount:s.paidAmount,issuedAt:null,issuedById:null,snapshot,documentId,createdById:actorId};
   await record('invoice',data,adopt);await provenance(e.source,'invoice',data,adopt);
   for(const scope of e.scopes){const scopeId=uuid(companyId,'scope',scope.proposalScopeKey),contractId=await linked(scope.contractSource,'contract');
@@ -55,6 +58,17 @@ export async function rehearseInvoiceRestore(db,{snapshot,targetPlan,combined,re
  requireStaging(process.env.DATABASE_URL??'');verifyInvoiceRestorePlan(restorePlan,snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions);
  if(!Array.isArray(sourceRows)||!sourceRows.length||new Set(sourceRows).size!==sourceRows.length)throw Error('Select unique complete Invoice source rows');
  const selected=sourceRows.map(row=>restorePlan.entries.find(e=>e.source.sourceRow===row));if(selected.some(e=>!e||e.state!=='CANDIDATE_FOR_VERIFIED_ROLLBACK_TRIAL'))throw Error('Invoice selection is held, draft, archived or missing');
+ return runInvoiceTrial(db,{snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions,restorePlan,sourceRows,root,companyId},selected);
+}
+
+export async function rehearseInvoiceRounding(db,options){
+ requireStaging(process.env.DATABASE_URL??'');const {invoiceOptions:i,invoiceExceptionPlan:p,sourceRows}=options;verifyInvoiceRoundingPlan(p,options);
+ if(!Array.isArray(sourceRows)||!sourceRows.length||new Set(sourceRows).size!==sourceRows.length)throw Error('Select unique whole rounding Invoices');
+ const selected=sourceRows.map(n=>p.entries.find(e=>e.source.sourceRow===n));if(selected.some(e=>!e||e.state!=='INVOICE_ROUNDING_SHAPE_CANDIDATE'))throw Error('Other Invoice/source/scope gates remain held');
+ const result=await runInvoiceTrial(db,{...i,restorePlan:p,sourceRows},selected,options);return {...result,shapeProfile:'CAPTURED_INVOICE_ROUNDING_ONLY',originalGatesUnchanged:true,commitAllowed:false};
+}
+
+async function runInvoiceTrial(db,{snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions,restorePlan,sourceRows,root,companyId},selected,roundingOptions){
  await verifiedFiles(snapshot,manifest,root,manifestPin);const before=await counts(db),groups=[...new Set(selected.flatMap(e=>e.revenueGroupKeys))];let result,failure;
  const proxy=new Proxy(db,{get(target,prop){if(prop==='$transaction')return async(fn,options)=>target.$transaction(async tx=>{
   try{await fn(tx);throw Error('Revenue rehearsal unexpectedly returned');}catch(e){
@@ -62,13 +76,15 @@ export async function rehearseInvoiceRestore(db,{snapshot,targetPlan,combined,re
    const actorId=uuid(companyId,'technical-actor',restorePlan.planHash);if(await tx.user.findFirst({where:{OR:[{id:actorId},{email:'dgc-trial-'+actorId+'@example.invalid'}]}}))throw Error('Technical trial actor already exists');
    await tx.user.create({data:{id:actorId,companyId,email:'dgc-trial-'+actorId+'@example.invalid',fullName:'Disabled migration trial creator',passwordHash:'NO_LOGIN_REHEARSAL_ONLY',status:'INACTIVE'}});
    const first=await materialize(tx,companyId,selected,restorePlan,root,actorId),replay=await materialize(tx,companyId,selected,restorePlan,root,actorId);if(replay.created||replay.unchanged!==selected.length)throw Error('Invoice rehearsal replay differs');
-   await verifiedFiles(snapshot,manifest,root,manifestPin);const inside=await counts(tx);
-   for(const model of ['invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','invoiceDocumentLink','userRole','authSession'])if(inside[model]!==before[model])throw Error('Unexpected Invoice rehearsal downstream effect');
+   await verifiedFiles(snapshot,manifest,root,manifestPin);
+   if(roundingOptions)await verifyReconFiles(snapshot,roundingOptions.reconManifest,roundingOptions.reconRoot,roundingOptions.reconManifestPin);
+   const inside=await counts(tx);
+   for(const model of ['approvalRequest','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','invoiceDocumentLink','userRole','authSession'])if(inside[model]!==before[model])throw Error('Unexpected Invoice rehearsal downstream effect');
    const invoices=await tx.invoice.findMany({where:{companyId,id:{in:selected.map(e=>uuid(companyId,'invoice',e.source))}},include:{receivable:true,scopes:{include:{items:true}}}});
    const proof=invoices.map(i=>{const e=selected.find(e=>e.source.sourceRow===i.snapshot.source.sourceRow),raw=JSON.parse(i.snapshot.capturedHeaderJson);if(digest({values:raw.values,cells:raw.cells})!==e.source.rowHash||i.isCurrent||i.status!=='CANCELLED'||i.issuedAt||i.issuedById||i.scopes.some(s=>s.isCurrent||s.status!=='BLOCKED'||s.items.some(x=>x.isCurrent)))throw Error('Trial lifecycle or captured Invoice evidence changed');return {source:e.source,status:i.status,isCurrent:i.isCurrent,payable:i.payableAmount.toFixed(),paid:i.paidAmount.toFixed(),receivable:{original:i.receivable.originalAmount.toFixed(),paid:i.receivable.paidAmount.toFixed(),outstanding:i.receivable.outstandingAmount.toFixed(),status:i.receivable.status},scopes:i.scopes.length,scopeItems:i.scopes.reduce((n,s)=>n+s.items.length,0),capturedHeaderHashVerified:true};});
-   throw new InvoiceRollback({mode:'ROLLBACK_ONLY',restorePlanHash:restorePlan.planHash,invoiceManifestHash:manifestPin,sourceRows,revenueRehearsal:{first:e.result.first,replay:e.result.replay},first,replay,before,inside,proof,postingAllowed:false,acceptance:false,historicalCashPosting:false,paymentRowsRestored:false,technicalActorPolicy:'EPHEMERAL_INACTIVE_NO_ROLES_OR_SESSION',filesVerified:true,fileVerificationScope:'ORIGINAL_INVOICE_PDFS_ONLY',reconFilesReverified:false});
+   throw new InvoiceRollback({mode:'ROLLBACK_ONLY',restorePlanHash:restorePlan.planHash,invoiceManifestHash:manifestPin,sourceRows,revenueRehearsal:{first:e.result.first,replay:e.result.replay},first,replay,before,inside,proof,postingAllowed:false,acceptance:false,historicalCashPosting:false,paymentRowsRestored:false,technicalActorPolicy:'EPHEMERAL_INACTIVE_NO_ROLES_OR_SESSION',filesVerified:true,fileVerificationScope:roundingOptions?'ORIGINAL_INVOICE_AND_RECON_PDFS':'ORIGINAL_INVOICE_PDFS_ONLY',reconFilesReverified:Boolean(roundingOptions)});
   }
  },options);const member=target[prop];return typeof member==='function'?member.bind(target):member;}});
- try{await rehearseRevenue(proxy,snapshot,companyId,targetPlan,groups,targetPlan.planHash,decisions);throw Error('Invoice rehearsal unexpectedly completed');}catch(e){if(e instanceof InvoiceRollback)result=e.result;else failure=e;}
+ try{if(roundingOptions)await rehearseInvoiceRoundingSources(proxy,{snapshot,companyId,targetPlan,combined,combinedPin:reviewPin,rounding:roundingOptions.rounding,roundingPin:roundingOptions.roundingPin,exceptionPlan:roundingOptions.exceptionPlan,groupKeys:groups,decisions,manifest:roundingOptions.reconManifest,manifestPin:roundingOptions.reconManifestPin,root:roundingOptions.reconRoot});else await rehearseRevenue(proxy,snapshot,companyId,targetPlan,groups,targetPlan.planHash,decisions);throw Error('Invoice rehearsal unexpectedly completed');}catch(e){if(e instanceof InvoiceRollback)result=e.result;else failure=e;}
  const after=await counts(db);if(canonical(after)!==canonical(before))throw Error('Invoice rehearsal rollback footprint differs');if(failure)throw failure;return {...result,after,rolledBack:true};
 }
