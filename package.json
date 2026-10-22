@@ -24,7 +24,7 @@
     "migration:create-invoice-archive": "node scripts/dgc-migration.mjs create-invoice-archive",
     "migration:verify-invoice-archive": "node scripts/dgc-migration.mjs verify-invoice-archive",
     "migration:list-invoice-archive": "node scripts/dgc-migration.mjs list-invoice-archive",
-    "test:migration": "node scripts/dgc-migration/core.test.mjs && node scripts/dgc-migration/graph.test.mjs && node scripts/dgc-migration/finance-review.test.mjs && node scripts/dgc-migration/invoice-history.test.mjs && node scripts/dgc-migration/invoice-files.test.mjs && node scripts/dgc-migration/invoice-archive.test.mjs && node scripts/dgc-migration/input-finance-review.test.mjs && node scripts/dgc-migration/input-files.test.mjs && node scripts/dgc-migration/revenue-review.test.mjs && node scripts/dgc-migration/revenue-target.test.mjs && node scripts/dgc-migration/recon-files.test.mjs && node scripts/dgc-migration/recon-semantics.test.mjs && node scripts/dgc-migration/recon-lines.test.mjs && node scripts/dgc-migration/recon-ocr.test.mjs && node scripts/dgc-migration/recon-lifecycle.test.mjs && node scripts/dgc-migration/recon-gates.test.mjs && node scripts/dgc-migration/recon-audit.test.mjs && node scripts/dgc-migration/revenue-lifecycle.test.mjs && node scripts/dgc-migration/revenue-billing.test.mjs && node scripts/dgc-migration/revenue-scopes.test.mjs && node scripts/dgc-migration/invoice-restore.test.mjs && node scripts/dgc-migration/invoice-references.test.mjs && node scripts/dgc-migration/reference-files.test.mjs",
+    "test:migration": "node scripts/dgc-migration/core.test.mjs && node scripts/dgc-migration/graph.test.mjs && node scripts/dgc-migration/finance-review.test.mjs && node scripts/dgc-migration/invoice-history.test.mjs && node scripts/dgc-migration/invoice-files.test.mjs && node scripts/dgc-migration/invoice-archive.test.mjs && node scripts/dgc-migration/input-finance-review.test.mjs && node scripts/dgc-migration/input-files.test.mjs && node scripts/dgc-migration/revenue-review.test.mjs && node scripts/dgc-migration/revenue-target.test.mjs && node scripts/dgc-migration/recon-files.test.mjs && node scripts/dgc-migration/recon-semantics.test.mjs && node scripts/dgc-migration/recon-lines.test.mjs && node scripts/dgc-migration/recon-ocr.test.mjs && node scripts/dgc-migration/recon-lifecycle.test.mjs && node scripts/dgc-migration/recon-gates.test.mjs && node scripts/dgc-migration/recon-audit.test.mjs && node scripts/dgc-migration/revenue-lifecycle.test.mjs && node scripts/dgc-migration/revenue-billing.test.mjs && node scripts/dgc-migration/revenue-scopes.test.mjs && node scripts/dgc-migration/invoice-restore.test.mjs && node scripts/dgc-migration/invoice-references.test.mjs && node scripts/dgc-migration/reference-files.test.mjs && node scripts/dgc-migration/reference-registration.test.mjs",
     "test:migration:staging": "node scripts/dgc-migration/staging.integration.mjs",
     "test:migration:revenue-staging": "node scripts/dgc-migration/revenue-rehearsal.integration.mjs",
     "dev": "pnpm -r --parallel dev",
@@ -52,6 +52,10 @@
     "migration:verify-invoice-references": "node scripts/dgc-migration.mjs verify-invoice-references",
     "migration:prepare-reference-files": "node scripts/dgc-migration.mjs prepare-reference-files",
     "migration:verify-reference-files": "node scripts/dgc-migration.mjs verify-reference-files",
-    "migration:review-reference-custody": "node scripts/dgc-migration.mjs review-reference-custody"
+    "migration:review-reference-custody": "node scripts/dgc-migration.mjs review-reference-custody",
+    "migration:prepare-reference-registration": "node scripts/dgc-migration.mjs prepare-reference-registration",
+    "migration:verify-reference-registration": "node scripts/dgc-migration.mjs verify-reference-registration",
+    "migration:rehearse-reference-registration": "node scripts/dgc-migration.mjs rehearse-reference-registration",
+    "test:migration:reference-staging": "node scripts/dgc-migration/reference-registration.integration.mjs"
   }
 }

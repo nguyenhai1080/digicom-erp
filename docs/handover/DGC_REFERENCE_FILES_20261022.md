@@ -43,4 +43,6 @@ pnpm migration:review-reference-custody --snapshot <snapshot.json> --snapshot-ha
 
 ## Bước kế tiếp
 
+Cập nhật sau đợt custody: [registration planner và PostgreSQL synthetic rehearsal](DGC_REFERENCE_REGISTRATION_20261022.md) đã kiểm whole document set/replay/rollback/guard. Snapshot thật chưa có document candidate vì còn 46 unique Invoice blockers; production lifecycle/registry vẫn pending như phần dưới.
+
 Chuẩn bị historical document lifecycle và rehearsal đăng ký nguyên tử toàn bộ tập Invoice của mỗi tài liệu trên DB riêng. Giữ SOA nguồn Draft là evidence có tác dụng chặn hủy, không tự đổi thành ACTIVE/đã phát hành để vượt `linkInvoiceDocuments`. Phải kiểm cả dependencies ngoài bốn candidate trước khi cho phép registration; không tạo partial package chỉ để trial một Invoice. Chưa promote file, tạo target Document/Attachment/InvoiceDocumentLink, chọn cutoff SOA, fake source approver hoặc mở financial import. Ba proposal tài chính, timezone/cutoff và môi trường DGC từ xa vẫn giữ nguyên pending.

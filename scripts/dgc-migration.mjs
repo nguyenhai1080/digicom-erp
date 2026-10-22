@@ -1,7 +1,7 @@
 import {readFile,readdir,mkdir,writeFile,realpath} from 'node:fs/promises';
 import {resolve,relative,isAbsolute} from 'node:path';
 import {createRequire} from 'node:module';
-import {normalizeCapture,preflight,masterPlan,verifySnapshot} from './dgc-migration/core.mjs';
+import {normalizeCapture,preflight,masterPlan,verifySnapshot,canonical} from './dgc-migration/core.mjs';
 import {requireStaging,stageSnapshot,applyMasters} from './dgc-migration/staging.mjs';
 import {referenceGraph} from './dgc-migration/graph.mjs';
 import {financeReview} from './dgc-migration/finance-review.mjs';
@@ -25,6 +25,7 @@ import {invoiceRestorePlan,verifyInvoiceRestorePlan} from './dgc-migration/invoi
 import {rehearseInvoiceRestore} from './dgc-migration/invoice-rehearsal.mjs';
 import {invoiceReferenceReview,verifyInvoiceReferenceReview} from './dgc-migration/invoice-references.mjs';
 import {referenceFilePlan,verifyReferenceFiles,reviewReferenceCustody} from './dgc-migration/reference-files.mjs';
+import {referenceRegistrationPlan,verifyReferenceRegistrationPlan,rehearseReferenceRegistration} from './dgc-migration/reference-registration.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -58,6 +59,25 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
+}else if(['prepare-reference-registration','verify-reference-registration','rehearse-reference-registration'].includes(command)){
+ const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
+ const invoiceOptions={snapshot,targetPlan:await json(await privateArchivePath(option('plan'))),combined:await json(await privateArchivePath(option('review'))),reviewPin:option('review-hash'),manifest:await json(await privateArchivePath(option('manifest'))),manifestPin:option('manifest-hash'),decisions:resolutions,restorePlan:await json(await privateArchivePath(option('restore-plan'))),root:args.includes('--root')?await privateArchivePath(option('root')):undefined};
+ const inputs={invoiceOptions,references:await json(await privateArchivePath(option('reference-review'))),referencePin:option('reference-review-hash'),referenceManifest:await json(await privateArchivePath(option('reference-manifest'))),referenceManifestPin:option('reference-manifest-hash'),referenceRoot:await privateArchivePath(option('reference-root'))};
+ if(command==='verify-reference-registration'){
+  const p=await verifyReferenceRegistrationPlan(await json(await privateArchivePath(option('registration-plan'))),inputs);console.log(JSON.stringify({command,verified:true,planHash:p.planHash,counts:p.counts,registryCommitAllowed:false}));
+ }else{
+  let report;
+  if(command==='prepare-reference-registration')report=await referenceRegistrationPlan(inputs);
+  else{
+   requireStaging(process.env.DATABASE_URL??'');if(!invoiceOptions.root)throw Error('Missing original Invoice --root');
+   const p=await verifyReferenceRegistrationPlan(await json(await privateArchivePath(option('registration-plan'))),inputs),selected=option('documents').split(',').map(v=>{const d=p.documents.find(d=>d.source.sheet+':'+d.source.sourceRow===v);if(!d)throw Error('Unknown source document address');return d.source;});
+   // Reject held selections before connecting to any database.
+   if(selected.some(s=>p.documents.find(d=>canonical(d.source)===canonical(s)).state!=='WHOLE_DOCUMENT_CANDIDATE_FOR_ROLLBACK_TRIAL'))throw Error('Whole source document dependencies are held');
+   const {PrismaClient}=createRequire(new URL('../packages/db/package.json',import.meta.url))('@prisma/client'),db=new PrismaClient();
+   try{invoiceOptions.companyId=(await db.company.findUniqueOrThrow({where:{companyCode:'DGC'}})).id;report=await rehearseReferenceRegistration(db,{...inputs,registrationPlan:p,documentSources:selected});}finally{await db.$disconnect();}
+  }
+  const out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});console.log(JSON.stringify({command,planHash:report.planHash??report.registrationPlanHash,counts:report.counts,first:report.first,replay:report.replay,rolledBack:report.rolledBack,registryCommitAllowed:false}));
+ }
 }else if(command==='review-reference-custody'){
  const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  const report=await reviewReferenceCustody(snapshot,await json(await privateArchivePath(option('review'))),option('review-hash'),await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')),option('manifest-hash'));
