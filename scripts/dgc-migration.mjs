@@ -27,6 +27,8 @@ import {invoiceReferenceReview,verifyInvoiceReferenceReview} from './dgc-migrati
 import {referenceFilePlan,verifyReferenceFiles,reviewReferenceCustody} from './dgc-migration/reference-files.mjs';
 import {referenceRegistrationPlan,verifyReferenceRegistrationPlan,rehearseReferenceRegistration} from './dgc-migration/reference-registration.mjs';
 import {donorRoundingReview,verifyDonorRoundingReview,donorRoundingImpact} from './dgc-migration/donor-rounding.mjs';
+import {roundingExceptionPlan,verifyRoundingExceptionPlan} from './dgc-migration/rounding-exception.mjs';
+import {rehearseRoundingExceptions} from './dgc-migration/revenue-rehearsal.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -60,6 +62,19 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
+}else if(['prepare-rounding-exceptions','verify-rounding-exceptions','rehearse-rounding-exceptions'].includes(command)){
+ const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
+ const targetPlan=await json(await privateArchivePath(option('plan'))),combined=await json(await privateArchivePath(option('review'))),rounding=await json(await privateArchivePath(option('rounding-review'))),combinedPin=option('review-hash'),roundingPin=option('rounding-review-hash'),inputs=[snapshot,targetPlan,combined,combinedPin,rounding,roundingPin,resolutions];let report;
+ if(command==='prepare-rounding-exceptions')report=roundingExceptionPlan(...inputs);
+ else{
+  const p=verifyRoundingExceptionPlan(await json(await privateArchivePath(option('exception-plan'))),...inputs);
+  if(command==='verify-rounding-exceptions'){console.log(JSON.stringify({command,verified:true,planHash:p.planHash,counts:p.counts,originalGatesUnchanged:true,commitAllowed:false}));}
+  else{
+   requireStaging(process.env.DATABASE_URL??'');const keys=option('group-keys')==='all-candidates'?p.groups.filter(g=>g.state==='CAPTURED_ROUNDING_SHAPE_TRIAL_CANDIDATE').map(g=>g.groupKey):option('group-keys').split(',');
+   const {PrismaClient}=createRequire(new URL('../packages/db/package.json',import.meta.url))('@prisma/client'),db=new PrismaClient();try{report=await rehearseRoundingExceptions(db,{snapshot,companyId:(await db.company.findUniqueOrThrow({where:{companyCode:'DGC'}})).id,targetPlan,combined,combinedPin,rounding,roundingPin,exceptionPlan:p,groupKeys:keys,decisions:resolutions,manifest:await json(await privateArchivePath(option('manifest'))),manifestPin:option('manifest-hash'),root:await privateArchivePath(option('root'))});}finally{await db.$disconnect();}
+  }
+ }
+ if(report){const out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});console.log(JSON.stringify({command,planHash:report.planHash??report.exceptionPlanHash,counts:report.counts,first:report.first,replay:report.replay,rolledBack:report.rolledBack,originalGatesUnchanged:true,commitAllowed:false}));}
 }else if(['review-donor-rounding','verify-donor-rounding','review-rounding-impact'].includes(command)){
  const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  let report;

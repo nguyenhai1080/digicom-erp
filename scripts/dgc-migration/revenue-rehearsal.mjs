@@ -2,6 +2,8 @@ import {createRequire} from 'node:module';
 import {SOURCE_ID,canonical,digest,masterPlan} from './core.mjs';
 import {requireStaging} from './staging.mjs';
 import {verifyRevenueTargetPlan} from './revenue-target.mjs';
+import {verifyRoundingExceptionPlan} from './rounding-exception.mjs';
+import {verifyReconFiles} from './recon-files.mjs';
 const {Prisma}=createRequire(new URL('../../packages/db/package.json',import.meta.url))('@prisma/client');
 const models=['reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
@@ -37,7 +39,7 @@ async function masterResolver(tx,snapshot,companyId,decisions){
  return resolve;
 }
 
-async function materialize(tx,snapshot,companyId,plan,selected,resolve){
+async function materialize(tx,snapshot,companyId,plan,selected,resolve,exceptions){
  let created=0,unchanged=0,groupsCreated=0;
  async function record(model,data,adopt){const old=await tx[model].findFirst({where:{companyId,id:data.id}});if(old){if(!adopt||hash(old,data)!==hash(data,data)){const fields=Object.keys(data).flatMap(k=>diffPaths(value(old[k]),value(data[k]),k));throw Error('Rehearsal target drift or unlinked existing record: '+model+' ['+fields.join(',')+']');}return old;}return tx[model].create({data});}
  for(const g of selected){
@@ -49,11 +51,14 @@ async function materialize(tx,snapshot,companyId,plan,selected,resolve){
   // Canonical strings protect raw spreadsheet serials/float representations
   // from Prisma JSON numeric serialization. Hash validation remains exact.
   const meta={sourceKind:'DGC_REHEARSAL_ONLY',snapshotHash:snapshot.snapshotHash,planHash:plan.planHash,groupKey:g.groupKey,filesVerified:false,sourceFileId:g.sourceFileId,documentJson:canonical(g.documentEvidence),sourceLifecycles:g.entries.map(e=>({source:e.source,status:e.sourceStatus,legacyReconciliationsJson:canonical(e.legacyReconciliations)})),noApprovalOrPosting:true};
+  if(exceptions)meta.roundingReviewHash=exceptions.roundingReviewHash;
   await record('reconciliation',{id:recId,companyId,reconCode:'DGC-TRIAL-'+g.groupKey.slice(0,24),logicalGroupId:uuid(companyId,'recon-group',g.groupKey),revisionNo:1,isCurrent:false,supersedesId:null,partnerId,contractId,periodType:'MONTHLY',periodStart:start,periodEnd:end,currency:g.currency,sourceType:'SYSTEM_IMPORT',sourceAttachmentId:null,sourceChecksum:null,sourceReportedTotal:null,ocrRawJson:meta,...g.managementHeader,totalWht:'0',status:'BLOCKED',createdById:null,approvedById:null,approvedAt:null,validatedById:null,validatedAt:null},allLinked);
   if(!allLinked)groupsCreated++;
   for(const [index,e] of g.entries.entries()){
    const s=e.source,serviceId=await resolve(e.bindings.Service_ID),parentServiceId=e.bindings.Parent_Service_ID?await resolve(e.bindings.Parent_Service_ID):null,itemId=uuid(companyId,'item',identity(s)),id=uuid(companyId,'revenue',identity(s)),scope=[partnerId,serviceId,g.period].join('|');
    const calc={dgc:true,sourceKind:'DGC_REHEARSAL_ONLY',filesVerified:false,snapshotHash:snapshot.snapshotHash,source:s,sourceStatus:e.sourceStatus,capturedRevenueJson:canonical(e.capturedRevenue),capturedManagement:e.capturedManagement,legacyReconciliationsJson:canonical(e.legacyReconciliations),legacyReconBases:e.legacyReconBases,rowType:e.aggregationMapping.rowType,includeInMonthlyTotal:e.aggregationMapping.includeInMonthlyTotal,parentServiceId,invoiceRevenueUsd:e.capturedInvoiceUsd.Invoice_Revenue_USD,invoiceWhtUsd:e.capturedInvoiceUsd.Invoice_WHT_USD,invoicePayableUsd:e.capturedInvoiceUsd.Invoice_Payable_USD,noApprovalOrPosting:true};
+   const capturedException=exceptions?.groups.find(x=>x.groupKey===g.groupKey)?.entries.find(x=>canonical(x.source)===canonical(s))?.exceptionEvidence;
+   if(capturedException)calc.roundingException=capturedException;
    const m=e.capturedManagement;
    await record('reconciliationItem',{id:itemId,companyId,reconciliationId:recId,serviceId,lineNo:index+1,businessScopeKey:scope,periodStart:start,periodEnd:end,isCurrent:false,grossRevenue:m.Gross_Revenue,partnerShareAmount:m.Partner_Share,companyShareAmount:m.Company_Share,taxAmount:m.Tax_Amount,whtAmount:'0',netRevenue:m.Company_Share,sourceRowReference:canonical(s),calculationJson:calc},allLinked);
    const data={id,companyId,revenueCode:s.legacyId,logicalGroupId:uuid(companyId,'revenue-group',identity(s)),revisionNo:1,isCurrent:false,supersedesId:null,reconciliationId:recId,reconciliationItemId:itemId,partnerId,contractId,serviceId,businessScopeKey:scope,periodType:'MONTHLY',periodStart:start,periodEnd:end,currency:g.currency,grossAmount:m.Gross_Revenue,partnerShareAmount:m.Partner_Share,companyShareAmount:m.Company_Share,taxAmount:m.Tax_Amount,whtAmount:'0',adjustmentAmount:'0',netAmount:m.Company_Share,calculationJson:calc,status:'BLOCKED'};
@@ -77,6 +82,26 @@ export async function rehearseRevenue(prisma,snapshot,companyId,plan,groupKeys,e
  if(!Array.isArray(groupKeys)||!groupKeys.length||new Set(groupKeys).size!==groupKeys.length)throw Error('Select complete, unique rehearsal groups');
  const selected=groupKeys.map(k=>plan.groups.find(g=>g.groupKey===k));
  if(selected.some(g=>!g||g.state!=='REHEARSABLE'))throw Error('Selected group is held or missing; no partial group import');
+ return runRevenueTrial(prisma,snapshot,companyId,plan,selected,groupKeys,decisions);
+}
+
+// A separate, rollback-only shape profile. It preserves every original HELD
+// gate; no regular rehearsal/import caller can opt out of its strict selection.
+export async function rehearseRoundingExceptions(prisma,{snapshot,companyId,targetPlan,combined,combinedPin,rounding,roundingPin,exceptionPlan,groupKeys,decisions,manifest,root,manifestPin}){
+ requireStaging(process.env.DATABASE_URL??'');verifyRoundingExceptionPlan(exceptionPlan,snapshot,targetPlan,combined,combinedPin,rounding,roundingPin,decisions);
+ if(!Array.isArray(groupKeys)||!groupKeys.length||new Set(groupKeys).size!==groupKeys.length)throw Error('Select unique whole rounding groups');
+ const selected=groupKeys.map(k=>exceptionPlan.groups.find(g=>g.groupKey===k));if(selected.some(g=>!g||g.state!=='CAPTURED_ROUNDING_SHAPE_TRIAL_CANDIDATE'))throw Error('Other source/PDF/lifecycle gates remain held');
+ const custody=await verifyReconFiles(snapshot,manifest,root,manifestPin);
+ if(combined.manifestHash!==manifestPin)throw Error('Rounding source PDF manifest differs');
+ const groups=groupKeys.map(k=>targetPlan.groups.find(g=>g.groupKey===k));
+ if(groups.some(g=>custody.missingFiles.includes(g.sourceFileId)))throw Error('Missing rounding source PDF bytes');
+ const footprint=async()=>Object.fromEntries(await Promise.all([...models,'user','userRole','authSession','approvalRequest','invoiceDocumentLink'].map(async m=>[m,await prisma[m].count()]))),before=await footprint();let result,failure;
+ try{result=await runRevenueTrial(prisma,snapshot,companyId,targetPlan,groups,groupKeys,decisions,exceptionPlan,async()=>verifyReconFiles(snapshot,manifest,root,manifestPin));}catch(e){failure=e;}
+ const after=await footprint();if(canonical(before)!==canonical(after))throw Error('Rounding shape trial rollback footprint differs');if(failure)throw failure;
+ return {...result,shapeProfile:'CAPTURED_ROUNDING_EXCEPTION_ONLY',exceptionPlanHash:exceptionPlan.planHash,originalGatesUnchanged:true,commitAllowed:false,originalPdfBytesReverified:true,pdfSemanticsVerified:false,footprintBefore:before,footprintAfter:after};
+}
+
+async function runRevenueTrial(prisma,snapshot,companyId,plan,selected,groupKeys,decisions,exceptions,reverify){
  let result;
  try {await prisma.$transaction(async tx=>{
   const actual=await tx.$queryRaw`SELECT current_database() AS name`;
@@ -84,15 +109,16 @@ export async function rehearseRevenue(prisma,snapshot,companyId,plan,groupKeys,e
   await tx.$queryRaw`SELECT id FROM companies WHERE id=${companyId}::uuid FOR UPDATE`;
   const c=await tx.company.findUnique({where:{id:companyId}});if(!c||c.companyCode!=='DGC'||await tx.company.count()!==1)throw Error('Rehearsal requires exactly one DGC tenant');
   await staged(tx,snapshot,companyId);const before=await counts(tx);
-  const first=await materialize(tx,snapshot,companyId,plan,selected,await masterResolver(tx,snapshot,companyId,decisions));
+  const first=await materialize(tx,snapshot,companyId,plan,selected,await masterResolver(tx,snapshot,companyId,decisions),exceptions);
   await staged(tx,snapshot,companyId);
-  const replay=await materialize(tx,snapshot,companyId,plan,selected,await masterResolver(tx,snapshot,companyId,decisions)),inside=await counts(tx);
+  const replay=await materialize(tx,snapshot,companyId,plan,selected,await masterResolver(tx,snapshot,companyId,decisions),exceptions),inside=await counts(tx);
+  if(reverify)await reverify();
   if(replay.created||replay.groupsCreated||replay.unchanged!==selected.reduce((n,g)=>n+g.entries.length,0))throw Error('Rehearsal replay did not converge');
   for(const m of ['invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document'])if(inside[m]!==before[m])throw Error('Unexpected downstream effect during revenue rehearsal');
   const trialRows=await tx.revenue.findMany({where:{companyId,id:{in:selected.flatMap(g=>g.entries.map(e=>uuid(companyId,'revenue',identity(e.source))))}},orderBy:{revenueCode:'asc'}});
   const trialHeaders=await tx.reconciliation.findMany({where:{companyId,id:{in:selected.map(g=>uuid(companyId,'reconciliation',g.groupKey))}}});
   for(const row of trialRows){const captured=JSON.parse(row.calculationJson.capturedRevenueJson);if(captured.rowHash!==row.calculationJson.source.rowHash||digest({values:captured.values,cells:captured.cells})!==captured.rowHash)throw Error('Captured revenue evidence changed during database round trip');}
-  const financialProof={revenues:trialRows.map(r=>({source:r.calculationJson.source,sourceStatus:r.calculationJson.sourceStatus,status:r.status,isCurrent:r.isCurrent,currency:r.currency,management:{gross:r.grossAmount.toFixed(),company:r.companyShareAmount.toFixed(),net:r.netAmount.toFixed()},invoiceUsd:{revenue:r.calculationJson.invoiceRevenueUsd,wht:r.calculationJson.invoiceWhtUsd,payable:r.calculationJson.invoicePayableUsd},rowType:r.calculationJson.rowType,includeInMonthlyTotal:r.calculationJson.includeInMonthlyTotal,parentServiceId:r.calculationJson.parentServiceId})),headers:trialHeaders.map(r=>({status:r.status,isCurrent:r.isCurrent,approvedById:r.approvedById,approvedAt:r.approvedAt,gross:r.totalGrossRevenue.toFixed(),company:r.totalCompanyShare.toFixed(),net:r.totalNetRevenue.toFixed()}))};
+  const financialProof={revenues:trialRows.map(r=>({source:r.calculationJson.source,sourceStatus:r.calculationJson.sourceStatus,status:r.status,isCurrent:r.isCurrent,currency:r.currency,management:{gross:r.grossAmount.toFixed(),company:r.companyShareAmount.toFixed(),net:r.netAmount.toFixed()},invoiceUsd:{revenue:r.calculationJson.invoiceRevenueUsd,wht:r.calculationJson.invoiceWhtUsd,payable:r.calculationJson.invoicePayableUsd},...(r.calculationJson.roundingException?{roundingException:r.calculationJson.roundingException}:{}),rowType:r.calculationJson.rowType,includeInMonthlyTotal:r.calculationJson.includeInMonthlyTotal,parentServiceId:r.calculationJson.parentServiceId})),headers:trialHeaders.map(r=>({status:r.status,isCurrent:r.isCurrent,approvedById:r.approvedById,approvedAt:r.approvedAt,gross:r.totalGrossRevenue.toFixed(),company:r.totalCompanyShare.toFixed(),net:r.totalNetRevenue.toFixed()}))};
   throw new RollbackOnly({mode:'ROLLBACK_ONLY',postingAllowed:false,acceptance:false,filesVerified:false,sourceCaptureVerified:true,snapshotHash:snapshot.snapshotHash,planHash:plan.planHash,groups:groupKeys,first,replay,before,inside,financialProof});
  },{isolationLevel:'Serializable',timeout:120000});throw Error('Rehearsal unexpectedly committed');
  }catch(e){if(!(e instanceof RollbackOnly))throw e;result=e.result;}

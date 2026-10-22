@@ -28,7 +28,8 @@
     "test:input-recon": "node tests/input-recon.characterization.mjs && node tests/input-recon-pdf.characterization.mjs && node tests/input-recon.integration.mjs",
     "test:historical-revenue-source": "node tests/historical-revenue-source.characterization.mjs",
     "test:historical-revenue-source:integration": "node tests/historical-revenue-source.integration.mjs",
-    "test:historical-recon-files": "node tests/historical-recon-files.characterization.mjs"
+    "test:historical-recon-files": "node tests/historical-recon-files.characterization.mjs",
+    "test:historical-rounding": "node tests/historical-rounding.characterization.mjs"
   },
   "dependencies": {
     "@erp/db": "workspace:*",

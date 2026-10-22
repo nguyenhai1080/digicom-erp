@@ -59,4 +59,6 @@ pnpm migration:review-rounding-impact --snapshot <snapshot.json> --snapshot-hash
 
 ## Tiếp theo
 
+Cập nhật sau characterization: [đã kiểm persistence/runtime cho exception shape](DGC_ROUNDING_EXCEPTION_REHEARSAL_20261022.md), 66 groups/105 revenue thật, 73 metadata ±0,01, runtime read/replay/rollback đạt. Original target/Invoice/registry gates vẫn giữ; Invoice exception/AR mapping tiếp theo chưa thực hiện ở đợt này.
+
 Chuẩn bị cách ánh xạ ngoại lệ lịch sử giữ ba captured components độc lập và source provenance; không bắt kế toán sửa Payable để ép khớp Revenue − WHT. Trước khi đưa ngoại lệ vào rehearsal/import phải giữ riêng acceptance của source PDF/lifecycle/scope và kiểm header/detail/current AR/receipts toàn chuỗi. Với 17 native differences và hai source-check exceptions, tiếp tục truy nguyên từng hồ sơ; không áp dung sai đại trà. Scan chỉ có Payable USD vẫn không chứng minh Revenue/WHT USD; không suy hai số thiếu từ native/rate để đổi PDF gate thành đạt. Owner proposals/cutoff/timezone/roles vẫn pending như roadmap.
