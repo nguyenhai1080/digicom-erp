@@ -52,4 +52,6 @@ Các input chung: `--snapshot/--snapshot-hash`, `--plan` revenue target, `--revi
 
 ## Tiếp tục
 
+Cập nhật tiếp theo: [characterization rounding donor](DGC_DONOR_ROUNDING_20261022.md) đã giải thích exact component-to-header propagation cho 21/46 Invoice blockers; không sửa số tiền hoặc gỡ gate. 17 revenue native identity differences và hai source-check exceptions giữ riêng; report impact tiếp tục giữ đầy đủ original restore reasons.
+
 Ưu tiên kiểm từng Invoice blocker cùng nhóm revenue/đối soát nguồn, bắt đầu những Invoice ảnh hưởng nhiều documents và các lỗi có thể làm rõ từ evidence. Giữ các chênh lệch/tham chiếu đang chờ owner; không nâng gate vì có đủ PDF hoặc vì chạy test đạt. Sau khi một whole document set đủ điều kiện mới rehearsal snapshot thật, rồi hoàn tất operational historical adapter/activation, receipts và kiểm tổng tiền toàn chuỗi. SOA cutoff, timezone, full user provisioning và môi trường DGC riêng vẫn pending; không cần tự chọn để làm công việc evidence độc lập.

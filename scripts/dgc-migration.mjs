@@ -26,6 +26,7 @@ import {rehearseInvoiceRestore} from './dgc-migration/invoice-rehearsal.mjs';
 import {invoiceReferenceReview,verifyInvoiceReferenceReview} from './dgc-migration/invoice-references.mjs';
 import {referenceFilePlan,verifyReferenceFiles,reviewReferenceCustody} from './dgc-migration/reference-files.mjs';
 import {referenceRegistrationPlan,verifyReferenceRegistrationPlan,rehearseReferenceRegistration} from './dgc-migration/reference-registration.mjs';
+import {donorRoundingReview,verifyDonorRoundingReview,donorRoundingImpact} from './dgc-migration/donor-rounding.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -59,6 +60,16 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
+}else if(['review-donor-rounding','verify-donor-rounding','review-rounding-impact'].includes(command)){
+ const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
+ let report;
+ if(command==='verify-donor-rounding'){
+  report=verifyDonorRoundingReview(await json(await privateArchivePath(option('review'))),snapshot,resolutions);if(report.reviewHash!==option('review-hash'))throw Error('Rounding review pin differs');
+ }else{
+  report=command==='review-donor-rounding'?donorRoundingReview(snapshot,resolutions):donorRoundingImpact(snapshot,await json(await privateArchivePath(option('review'))),option('review-hash'),await json(await privateArchivePath(option('registration-plan'))),option('registration-plan-hash'),resolutions);
+  const out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});
+ }
+ console.log(JSON.stringify({command,reviewHash:report.reviewHash,revenueStates:report.revenueStates,invoiceStates:report.invoiceStates,counts:report.counts,gateOverrideAllowed:false,postingAllowed:false}));
 }else if(['prepare-reference-registration','verify-reference-registration','rehearse-reference-registration'].includes(command)){
  const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  const invoiceOptions={snapshot,targetPlan:await json(await privateArchivePath(option('plan'))),combined:await json(await privateArchivePath(option('review'))),reviewPin:option('review-hash'),manifest:await json(await privateArchivePath(option('manifest'))),manifestPin:option('manifest-hash'),decisions:resolutions,restorePlan:await json(await privateArchivePath(option('restore-plan'))),root:args.includes('--root')?await privateArchivePath(option('root')):undefined};

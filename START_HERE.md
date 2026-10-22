@@ -6,6 +6,8 @@ Cập nhật ngày 22/10/2026, giờ Việt Nam.
 
 **[Roadmap hiện hành và mốc tiếp theo](docs/handover/DGC_ROADMAP_STATUS_20261022.md): đang diễn tập migration tài chính địa phương, chưa nhập chính thức hoặc go-live.** Đọc bảng này để xem toàn cảnh; các mục dưới là lịch sử từng đợt, không phải các chặng đã nghiệm thu.
 
+[Characterization làm tròn donor](docs/handover/DGC_DONOR_ROUNDING_20261022.md): cả 111 revenue lệch ±0,01 USD tái hiện đúng recipe Number nguồn; 92 đủ source checks, 17 có native identity khác, hai còn check khác. Đã giải thích component propagation ở 21/46 Invoice blocker, không đổi gate hoặc số lịch sử. 25 suite/57 assertions mới đạt; chưa nhập thêm tài chính.
+
 [Diễn tập registry tài liệu–Invoice](docs/handover/DGC_REFERENCE_REGISTRATION_20261022.md): hai tài liệu × hai Invoice giả lập, bốn links, replay 0 trùng và rollback sạch; guard runtime chặn cả SOA Draft riêng. 24 suite/19 planner + 76 PostgreSQL assertions đạt. Snapshot thật có 46 Invoice blocker, chưa có whole-document candidate; 31 package không có refs giữ riêng. Migration document provenance chỉ áp DB synthetic mới; chưa đăng ký/kích hoạt tài liệu thật.
 
 [PDF gốc SOA/gói phê duyệt](docs/handover/DGC_REFERENCE_FILES_20261022.md): đã lấy/kiểm đủ 77 file, 145.848.978 byte; backup/restore 160 entries đạt. 46 tài liệu có refs + bytes, 31 package không có Invoice refs giữ riêng. 23 suite/52 assertions mới đạt; chưa ghi registry, promote file hoặc kích hoạt/hủy Invoice.
