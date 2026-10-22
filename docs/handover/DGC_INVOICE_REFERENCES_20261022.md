@@ -41,4 +41,6 @@ pnpm migration:verify-invoice-references --snapshot <snapshot.json> --snapshot-h
 
 ## Phần còn lại
 
+Cập nhật sau đợt này: [custody SOA/package](DGC_REFERENCE_FILES_20261022.md) đã lấy và kiểm bytes 77/77 PDF, backup/restore đạt. Nhận định chưa kiểm bytes bên dưới là thời điểm reference review ban đầu; target document lifecycle/registry vẫn chưa triển khai.
+
 Chưa kiểm bytes PDF SOA/package, tạo target Document, promote file hoặc ghi InvoiceDocumentLink. `linkInvoiceDocuments` hiện yêu cầu target Document ACTIVE và Invoice current/operational; không dùng nó trực tiếp với SOA nguồn Draft hay các trial Invoice CANCELLED/non-current. Cần lớp historical document lifecycle và transactional mapping giữ nguyên guard nguồn, không tự coi Draft thành phát hành/approved. Sau đó mới rehearsal đăng ký đầy đủ tập Invoice/tài liệu và rollback, rồi tích hợp activation. Không mở cancellation của bản imported trước bước này; không cần chọn payment cutoff để giữ reference evidence.

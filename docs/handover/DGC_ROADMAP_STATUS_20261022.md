@@ -15,7 +15,7 @@ Cập nhật 22/10/2026. Đây là bảng trạng thái hiện hành, đọc cù
 
 ## Việc tiếp theo, theo thứ tự
 
-1. Hoàn tất lớp tài liệu lịch sử SOA/package: custody file, mapping tài liệu và reference registry nguyên tử; giữ guard của SOA Draft và Invoice cũ. [Đợt kiểm tham chiếu](DGC_INVOICE_REFERENCES_20261022.md) đã xác định đủ hàng nguồn nhưng chưa ghi registry. Cả bốn Invoice trial đều có tham chiếu; chưa được mở hủy khi phục hồi vận hành.
+1. Hoàn tất lớp tài liệu lịch sử SOA/package: mapping target lifecycle và reference registry nguyên tử; giữ guard của SOA Draft và Invoice cũ. [Đợt kiểm tham chiếu](DGC_INVOICE_REFERENCES_20261022.md) đã xác định đủ hàng nguồn; [custody PDF](DGC_REFERENCE_FILES_20261022.md) đã lấy/kiểm 77/77 originals, backup/restore đạt. Chưa ghi registry. Cả bốn Invoice trial đều có tham chiếu; chưa được mở hủy khi phục hồi vận hành.
 2. Hoàn tất adapter vận hành lịch sử: actor/date riêng, current/revision, trạng thái và receipts không phát sinh tiền; tăng tập rehearsal chỉ khi gate nguồn đáp ứng. Không sửa số tiền cũ hoặc tái sinh PDF để vượt gate.
 3. Đối chiếu tổng doanh thu, Invoice/AR/AP, receipts theo kỳ/đối tác/tiền tệ và kiểm toàn chuỗi qua UI/quyền trên staging. Import tài chính cần quy trình commit/replay/rollback được kiểm chứng, không đổi rehearsal thành lệnh ghi thật.
 4. Hoàn tất SOA/reporting/roles và UAT; sau đó chuẩn bị môi trường DGC và cutover ở chặng 6. Projects tiếp tục sau nền nghiệp vụ DGC theo baseline, không thay thế luồng tài chính dịch vụ.
