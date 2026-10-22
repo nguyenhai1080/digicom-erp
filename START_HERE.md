@@ -4,6 +4,8 @@ Cập nhật ngày 22/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–22/10
 
+[Nối revenue với Invoice/payment/AR lịch sử](docs/handover/DGC_REVENUE_BILLING_20261022.md): rà đủ 409 revenue/91 Invoice; đề xuất 34 PAID, tám INVOICED, năm SUPERSEDED; 362 hàng tiếp tục review. Giữ draft/business-scope reservations, TOTAL/CHILD và archive riêng; chưa gán Invoice Ready, phân bổ receipt hoặc mở import. 19 suite/115 assertions mới đạt; target scope/adapter lịch sử vẫn pending.
+
 [Proposal lifecycle/revision doanh thu lịch sử](docs/handover/DGC_REVENUE_LIFECYCLE_20261022.md): đã giữ đủ 265 nhóm/409 rows, đề xuất hai Recon edges/năm Revenue edges từ audit, không đoán Invoice Ready cho Approved nguồn. Actor/date/status gốc giữ canonical JSON; không tạo local approval hoặc current records. 18 suite/52 assertions mới đạt; còn adapter lịch sử và mapping Invoice/payment/AR.
 
 [Gate evidence và source lifecycle](docs/handover/DGC_RECON_GATES_20261022.md): đã hợp nhất 265 nhóm/409 revenue; 145 nhóm/151 hàng sang rà soát kế tiếp, 120 nhóm giữ lại, không mở import. Hai chuỗi Cancelled/Approved/N khớp mẫu donor; audit bổ sung chỉ đọc đã xác lập hai quan hệ thay thế nguồn, tách khỏi snapshot. 17 suite/104 assertions mới đạt; target revision/actor-date/Invoice-payment-AR vẫn pending.

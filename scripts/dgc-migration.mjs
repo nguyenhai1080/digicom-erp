@@ -19,6 +19,7 @@ import {reviewReconLines} from './dgc-migration/recon-lines.mjs';
 import {reviewReconOcr} from './dgc-migration/recon-ocr.mjs';
 import {reviewReconGates} from './dgc-migration/recon-gates.mjs';
 import {revenueLifecyclePlan} from './dgc-migration/revenue-lifecycle.mjs';
+import {revenueBillingPlan,verifyRevenueBillingPlan} from './dgc-migration/revenue-billing.mjs';
 
 const [command,...args]=process.argv.slice(2);
 function option(name){const i=args.indexOf('--'+name);if(i<0||!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing --'+name);return args[i+1];}
@@ -52,6 +53,18 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
+}else if(['prepare-revenue-billing','verify-revenue-billing'].includes(command)){
+ const snapshot=verifySnapshot(await json(option('snapshot')));
+ if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
+ const inputs=[snapshot,await json(await privateArchivePath(option('plan'))),await json(await privateArchivePath(option('review'))),option('review-hash'),resolutions];
+ if(command==='verify-revenue-billing'){
+  const report=verifyRevenueBillingPlan(await json(await privateArchivePath(option('proposal'))),...inputs);
+  console.log(JSON.stringify({command,verified:true,planHash:report.planHash,rows:report.rows.length,counts:report.counts,postingAllowed:false}));
+ }else{
+  const report=revenueBillingPlan(...inputs),out=await privateArchivePath(option('out'));
+  await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});
+  console.log(JSON.stringify({command,planHash:report.planHash,counts:report.counts,reasonCounts:report.reasonCounts,rows:report.rows.length,invoices:report.invoices.length,postingAllowed:false,privateReport:out}));
+ }
 }else if(command==='prepare-revenue-lifecycle'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
