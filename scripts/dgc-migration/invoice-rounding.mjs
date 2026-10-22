@@ -1,11 +1,13 @@
 import {canonical,digest} from './core.mjs';
+import {memoSourcePlan} from './planning-context.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
 import {verifyRoundingExceptionPlan} from './rounding-exception.mjs';
 import {revenueScopePlan} from './revenue-scopes.mjs';
 import {revenueBillingPlan} from './revenue-billing.mjs';
 import {invoiceHistoryPlan} from './invoice-history.mjs';
 
-export function invoiceRoundingPlan({invoiceOptions:i,rounding,roundingPin,exceptionPlan}){
+export function invoiceRoundingPlan(options){const {invoiceOptions:i,rounding,roundingPin,exceptionPlan}=options;return memoSourcePlan(i.snapshot,'invoice-rounding',[i.snapshot,i.targetPlan,i.combined,i.reviewPin,i.manifest,i.manifestPin,i.restorePlan,i.decisions,rounding,roundingPin,exceptionPlan],()=>buildInvoiceRoundingPlan(options));}
+function buildInvoiceRoundingPlan({invoiceOptions:i,rounding,roundingPin,exceptionPlan}){
  verifyInvoiceRestorePlan(i.restorePlan,i.snapshot,i.targetPlan,i.combined,i.reviewPin,i.manifest,i.manifestPin,i.decisions);
  verifyRoundingExceptionPlan(exceptionPlan,i.snapshot,i.targetPlan,i.combined,i.reviewPin,rounding,roundingPin,i.decisions);
  const scopes=revenueScopePlan(i.snapshot,i.targetPlan,i.combined,i.reviewPin,i.decisions),billing=revenueBillingPlan(i.snapshot,i.targetPlan,i.combined,i.reviewPin,i.decisions),history=invoiceHistoryPlan(i.snapshot,i.decisions),allowed=new Set(['CAPTURED_FINANCE_REQUIRES_REVIEW','REVENUE_BUSINESS_OR_PDF_EVIDENCE_HELD','REVENUE_FINANCIAL_STATE_REQUIRES_REVIEW']);

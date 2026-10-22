@@ -1,6 +1,7 @@
 import {digest,canonical} from './core.mjs';
 import {referenceGraph} from './graph.mjs';
 import {financeReview} from './finance-review.mjs';
+import {memoSourcePlan} from './planning-context.mjs';
 const text=v=>v==null?'':String(v).trim();
 const key=a=>`${a.sheet}|${a.sourceRow}`;
 const current=v=>v===true||text(v).toUpperCase()==='TRUE';
@@ -11,6 +12,9 @@ const openStatuses=new Set(['DRAFT','ISSUED','OVERDUE','PARTIALLY PAID','PAID'])
 // Historical revisions retain their captured header/detail payloads. They must
 // never be passed to the new-invoice generator, which would recompute history.
 export function invoiceHistoryPlan(snapshot,decisions){
+ return memoSourcePlan(snapshot,'invoice-history',[snapshot,decisions],()=>buildInvoiceHistoryPlan(snapshot,decisions));
+}
+function buildInvoiceHistoryPlan(snapshot,decisions){
  const graph=referenceGraph(snapshot,decisions),finance=financeReview(snapshot,decisions),nodes=new Map();
  for(const [sheet,t] of Object.entries(snapshot.tables))for(const row of t.rows)nodes.set(key({sheet,...row}),{sheet,sheetId:t.sheetId,...row});
  const addr=r=>({sheet:r.sheet,sheetId:r.sheetId,sourceRow:r.sourceRow,legacyId:r.legacyId,rowHash:r.rowHash});

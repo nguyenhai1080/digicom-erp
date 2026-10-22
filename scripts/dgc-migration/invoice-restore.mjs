@@ -1,4 +1,5 @@
 import {canonical,digest,sourceDate} from './core.mjs';
+import {memoSourcePlan} from './planning-context.mjs';
 import {invoiceHistoryPlan} from './invoice-history.mjs';
 import {revenueScopePlan} from './revenue-scopes.mjs';
 import {createRequire} from 'node:module';
@@ -9,6 +10,9 @@ const hex=/^[a-f0-9]{64}$/;
 // Blueprint for rollback-only trials. Never issue/regenerate an Invoice, create
 // local approvals, or turn historical receipts into runtime cash/payment rows.
 export function invoiceRestorePlan(snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions){
+ return memoSourcePlan(snapshot,'invoice-restore',[snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions],()=>buildInvoiceRestorePlan(snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions));
+}
+function buildInvoiceRestorePlan(snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions){
  const scopes=revenueScopePlan(snapshot,targetPlan,combined,reviewPin,decisions),history=invoiceHistoryPlan(snapshot,decisions),{manifestHash,...body}=manifest??{};
  if(!hex.test(manifestPin??'')||manifestHash!==manifestPin||manifest?.format!=='dgc-source-invoice-files-v1'||manifest.snapshotHash!==snapshot.snapshotHash||manifest.acceptance!==false||digest(body)!==manifestPin||!Array.isArray(manifest.files))throw Error('Pinned Invoice PDF manifest differs');
  const pdfs=new Map();for(const f of manifest.files){const h=history.entries.find(e=>e.source.sourceRow===f.sourceRow);if(!h||pdfs.has(f.sourceRow)||f.rowHash!==h.source.rowHash||f.legacyId!==h.source.legacyId||f.fileId!==String(h.capturedHeader.values.Pdf_File_ID??'').trim()||!/^[A-Za-z0-9_-]{20,200}$/.test(f.fileId)||f.relativePath!==f.fileId+'.pdf'||f.mimeType!=='application/pdf'||!Number.isSafeInteger(f.size)||f.size<=0||f.size>64*1024*1024||!hex.test(f.sha256??''))throw Error('Invoice PDF row coverage or metadata differs');pdfs.set(f.sourceRow,f);}

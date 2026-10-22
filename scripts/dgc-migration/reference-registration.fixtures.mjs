@@ -6,8 +6,8 @@ import {digest} from './core.mjs';
 import {cell} from './fixtures.mjs';
 import {createHash} from 'node:crypto';
 export const trialPdf=Buffer.from('%PDF-test');
-export function referenceRegistrationInputs(mutate=()=>{}){
- const inputs=invoiceRestoreInputs('Issued',(captures,change)=>{
+export function referenceRegistrationInputs(mutate=()=>{},sourceInputs=invoiceRestoreInputs){
+ const inputs=sourceInputs('Issued',(captures,change)=>{
   function set(name,headers,rows){const e=captures.find(e=>e.data.sheets[0].properties.title===name),s=e.data.sheets[0];s.properties.gridProperties={rowCount:rows.length+1,columnCount:headers.length};e.requestedRange=`'${name}'!A1:${String.fromCharCode(64+headers.length)}${rows.length+1}`;s.data[0].rowData=[{values:headers.map(cell)},...rows.map(r=>({values:r.map(cell)}))];}
   // Two independent monthly Invoice chains: a complete document must register
   // both, and failure after its first link must roll back the entire set.

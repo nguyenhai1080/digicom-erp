@@ -1,4 +1,5 @@
 import {canonical,digest} from './core.mjs';
+import {memoSourcePlan} from './planning-context.mjs';
 import {referenceGraph} from './graph.mjs';
 import {invoiceHistoryPlan} from './invoice-history.mjs';
 import {revenueLifecyclePlan} from './revenue-lifecycle.mjs';
@@ -21,6 +22,9 @@ const archives=new Set(['CANCELLED','CANCELED','SUPERSEDED']);
 // invoice-level receipt to a child, add TOTAL + CHILD, or infer Invoice Ready
 // from absence of a resolved line. Unresolved links still reserve their scope.
 export function revenueBillingPlan(snapshot,targetPlan,combined,pin,decisions){
+ return memoSourcePlan(snapshot,'revenue-billing',[snapshot,targetPlan,combined,pin,decisions],()=>buildRevenueBillingPlan(snapshot,targetPlan,combined,pin,decisions));
+}
+function buildRevenueBillingPlan(snapshot,targetPlan,combined,pin,decisions){
  const lifecycle=revenueLifecyclePlan(snapshot,targetPlan,combined,pin,decisions),graph=referenceGraph(snapshot,decisions),history=invoiceHistoryPlan(snapshot,decisions);
  const raw=new Map(),addresses=new Map();
  for(const [sheet,t] of Object.entries(snapshot.tables))for(const r of t.rows){const a={sheet,sheetId:t.sheetId,sourceRow:r.sourceRow,legacyId:r.legacyId,rowHash:r.rowHash};raw.set(key(a),r);addresses.set(key(a),a);}

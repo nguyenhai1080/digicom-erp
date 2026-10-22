@@ -62,10 +62,16 @@ export async function rehearseInvoiceRestore(db,{snapshot,targetPlan,combined,re
 }
 
 export async function rehearseInvoiceRounding(db,options){
+ return invoiceEvidenceSet(db,options,false);
+}
+// Whole-document trials may need strict and characterized-rounding Invoices
+// together. Both profiles are rederived; this never opens the regular importer.
+export async function rehearseInvoiceEvidenceSet(db,options){return invoiceEvidenceSet(db,options,true);}
+async function invoiceEvidenceSet(db,options,allowStrict){
  requireStaging(process.env.DATABASE_URL??'');const {invoiceOptions:i,invoiceExceptionPlan:p,sourceRows}=options;verifyInvoiceRoundingPlan(p,options);
  if(!Array.isArray(sourceRows)||!sourceRows.length||new Set(sourceRows).size!==sourceRows.length)throw Error('Select unique whole rounding Invoices');
- const selected=sourceRows.map(n=>p.entries.find(e=>e.source.sourceRow===n));if(selected.some(e=>!e||e.state!=='INVOICE_ROUNDING_SHAPE_CANDIDATE'))throw Error('Other Invoice/source/scope gates remain held');
- const result=await runInvoiceTrial(db,{...i,restorePlan:p,sourceRows},selected,options);return {...result,shapeProfile:'CAPTURED_INVOICE_ROUNDING_ONLY',originalGatesUnchanged:true,commitAllowed:false};
+ const selected=sourceRows.map(n=>{const e=p.entries.find(e=>e.source.sourceRow===n);if(e?.state==='INVOICE_ROUNDING_SHAPE_CANDIDATE')return e;const strict=i.restorePlan.entries.find(e=>e.source.sourceRow===n);return allowStrict&&strict?.state==='CANDIDATE_FOR_VERIFIED_ROLLBACK_TRIAL'?strict:null;});if(selected.some(e=>!e))throw Error('Other Invoice/source/scope gates remain held');
+ const result=await runInvoiceTrial(db,{...i,restorePlan:p,sourceRows},selected,options);return {...result,shapeProfile:allowStrict?'STRICT_AND_CAPTURED_INVOICE_SHAPES':'CAPTURED_INVOICE_ROUNDING_ONLY',originalGatesUnchanged:true,commitAllowed:false};
 }
 
 async function runInvoiceTrial(db,{snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions,restorePlan,sourceRows,root,companyId},selected,roundingOptions){

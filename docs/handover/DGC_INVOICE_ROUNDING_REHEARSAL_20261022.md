@@ -1,6 +1,6 @@
 # Invoice/AR giữ components lịch sử — diễn tập 22/10/2026
 
-**Cập nhật sang 23/10: bản sửa cuối build đạt, nhưng vòng kiểm PostgreSQL/hồi quy cuối chưa hoàn tất do mất kết nối rồi hết timeout transaction. Không coi lượt trial ban đầu là kiểm chứng toàn bộ các guard bổ sung cuối phiên. Ưu tiên chạy lại kiểm tra trước khi mở rộng profile.**
+**Đã hoàn tất lượt kiểm cuối ngày 23/10: 96 PostgreSQL/runtime assertions, 27 migration suites và hồi quy 56/83/217 đều đạt. Snapshot thật đã đọc đủ tám Invoice và 70 revenue, replay không trùng và 23 model counts rollback khớp. Các timeout phiên trước đã được kiểm lại, không tăng timeout runtime.**
 
 ## Phạm vi và kết quả
 
@@ -8,7 +8,7 @@ Tiếp sau `DGC_ROUNDING_EXCEPTION_REHEARSAL_20261022.md`, bổ sung profile ri�
 
 Snapshot thật có **tám Invoice** đáp ứng profile (physical header rows 3, 9, 20, 28, 29, 31, 34, 35), phụ thuộc **46 nhóm/70 revenue**. Đã ghi thử đủ tám Invoice/AR, scopes chỉ dùng TOTAL, giữ CHILD làm presentation/evidence; chạy lại không tạo trùng và rollback toàn bộ. Invoice `CANCELLED/non-current`, scopes `BLOCKED/non-current`, AR `CANCELLED`; source status và captured amounts giữ riêng. Receipt chỉ canonical evidence, không tạo InvoicePayment/cash/approval.
 
-Lượt đầu reader đọc tám Invoice và 46 source revenue được tham chiếu khi kiểm Invoice; 70 là số revenue materialize, chưa phải 70 runtime-reader proofs trong lượt này. Footprint lượt đầu 22 models rollback khớp. Bản cuối thêm approvalRequest thành model thứ 23 và kiểm full captured detail/AR/payment set, nhưng lượt xác minh cuối bị gián đoạn; chưa có `verification.json` hoàn tất cho bản cuối.
+Lượt đầu reader đọc tám Invoice và 46 source revenue được tham chiếu khi kiểm Invoice; footprint 22 models. Lượt chốt 23/10 đọc thêm độc lập đủ **70/70 revenue**, kiểm full captured detail/AR/payment set, thêm approvalRequest thành model thứ 23 và rollback khớp. `verification.json` xác nhận cả ba DB nguồn/copy/synthetic; các bảng chưa tồn tại trong schema staging gốc được ghi rõ, không nâng schema gốc để phục vụ phép kiểm.
 
 Profile 91 entries có tám candidate, 83 ngoài profile. **83 không phải 83 current Invoice blockers**: chứa bốn strict candidates cũ, 33 archive, năm draft và 41 held còn lại. Original restore vẫn bốn candidate/49 held/33 archive/năm draft; original revenue target vẫn 169 REHEARSABLE/96 HELD; reference registry vẫn 77 held. Đây là shape trial, không đổi readiness/acceptance và không có commit path.
 
@@ -22,11 +22,14 @@ Profile 91 entries có tám candidate, 83 ngoài profile. **83 không phải 83 
 
 ## Private evidence và DB
 
-`artifacts/dgc-migration/20261022/invoice-rounding/` chứa plan, rehearsal và runtime-proof private. Không đưa raw records/PDF vào Git.
+`artifacts/dgc-migration/20261022/invoice-rounding/` giữ nguyên lượt đầu. `artifacts/dgc-migration/20261023/invoice-rounding/` chứa plan, rehearsal, runtime-proof và verification lượt chốt. Không đưa raw records/PDF vào Git.
 
 - Snapshot: `47b65e21d2d00359a3db5a46f882aa0dca0c35ee9eb1052892eca38fd4aeb87d`.
 - Original restore plan: `7ee9be18858a3f89d5f402ff45ebb1086f03bb0c944f448eca6787dc90534904`.
 - Invoice rounding profile **lượt đầu**: `14c4146cd4d02e6dcb123d6e139015c2f4098714a273de85f7464d8aae4519ec`. Bản cuối bổ sung kiểm history issues; phải rederive và ghi pin mới khi chạy lại, không đổi pin trong proof cũ.
+- Profile lượt chốt: `3f281c7dfc924acad051cc1cfe26846ea03e10a8f16d8762a0156b0ab47176c8`.
+- Rehearsal digest: `b71dd7206ea96d26f662cf4f4b8ea2809af3dc3a8d1c6bb5a851dd958f6b8a09`.
+- Runtime proof digest: `a1b906225dc05c0fae683eafb817320ce697c1b4c4f09dddfeb8a55cb5fbb01d`.
 - Revenue exception plan: `5829891b8bb3a960c29387c2bcb55c0b19596b19808d2ce0b649332f17607473`.
 - Characterization review: `2c299435c89fd73f256a15eb7ac6144b980e8469abae51315d9fe6bdc8c069fa`.
 - Invoice manifest: `dc7739817c07f064d2a5bc00d48a36e80eb94f3b18cdc02912bac796a1ab3f68`.
@@ -39,10 +42,10 @@ Kiểm SQL trực tiếp sau khởi động lại container: DB invoice rounding
 ## Kiểm thử và phần còn lại
 
 - Đã đạt: API TypeScript build bản cuối; 94 source-reader, 30 revenue-rounding-reader và 60 PDF custody assertions.
-- Lượt triển khai ban đầu đạt 25 planner assertions và 88 PostgreSQL/runtime assertions (paid evidence, replay, failure/drift, metadata rehash, PDF tamper và outer rollback).
-- Sau đó thêm guard full captured detail/AR/payment sets, amount tamper và approval footprint. PostgreSQL rerun đầu mất kết nối loopback; sau restart tiếp tục timeout outer transaction 120 giây. Chưa có kết quả đạt cho các guard mới, không tăng timeout runtime để che lỗi môi trường.
-- Bộ 27 migration suites đã khởi chạy nhưng chưa hoàn tất; 56 strict Invoice/83 revenue exception/217 revenue PostgreSQL regression chưa chạy xong trong đợt này. Không dùng kết quả phiên trước làm kết quả phiên này.
-- Cần chạy lại trên DB fixture trống khi môi trường ổn định: API build đã đạt; `test:migration`, `test:migration:invoice-rounding-staging`, rồi strict Invoice, rounding và revenue staging regressions. Sau đó chạy snapshot thật với reader đủ 8 Invoice/70 revenue và private verification; cập nhật pins/proofs, không ghi đè proof ban đầu bằng report dở dang.
+- Lượt triển khai ban đầu đạt 25 planner và 88 PostgreSQL/runtime assertions. Lượt chốt đạt **25 planner/96 PostgreSQL/runtime**, gồm full captured detail/AR/payment sets, amount tamper, target rehash, approval footprint, paid evidence, replay, failure/drift và PDF tamper.
+- Lượt trước từng mất kết nối loopback và timeout outer transaction 120 giây. Ngày 23/10 đã chạy lại thành công trên cùng fixture trống; không đổi timeout hoặc nới constraint.
+- **27 migration suites đạt**; **56 strict Invoice/83 revenue exception/217 revenue PostgreSQL regression đạt** trong phiên 23/10.
+- Private verification kiểm source components/AR chính xác, original restore/reference gates giữ nguyên, ba DB không có financial records committed; snapshot gốc vẫn 3.154 raw/37 master links. Không coi kết quả này là operational acceptance hoặc whole-document registry đã hoàn tất.
 
 ## Lệnh sử dụng và tiếp tục
 
@@ -50,4 +53,4 @@ Kiểm SQL trực tiếp sau khởi động lại container: DB invoice rounding
 
 `migration:rehearse-invoice-rounding` dùng các input/pins trên, thêm `--invoice-rounding-plan --source-rows all-candidates --root --recon-manifest --recon-manifest-hash --recon-root --out` và DATABASE_URL riêng được staging guard chấp nhận. Chỉ rollback; CLI report không tự khẳng định runtime-reader đã kiểm. Private runtime trial gọi reader trong transaction trước deliberate rollback để có evidence riêng.
 
-Tiếp theo: hoàn tất lượt kiểm cuối trên, rồi whole-document exception dependency profile cho SOA/package, không mở strict registry bằng cách đổi gate cũ; sau đó actor/date/current revision và receipt lifecycle. Chưa nhập tài chính chính thức, promotion file hoặc activation, chưa push/deploy. Ba financial links, cutoff SOA, reporting timezone và môi trường DGC đúng tài khoản vẫn pending.
+Tiếp theo: whole-document exception dependency profile cho SOA/package, không mở strict registry bằng cách đổi gate cũ; sau đó actor/date/current revision và receipt lifecycle. Chưa nhập tài chính chính thức, promotion file hoặc activation, chưa push/deploy. Ba financial links, cutoff SOA, reporting timezone và môi trường DGC đúng tài khoản vẫn pending.

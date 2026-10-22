@@ -25,7 +25,8 @@ import {invoiceRestorePlan,verifyInvoiceRestorePlan} from './dgc-migration/invoi
 import {rehearseInvoiceRestore} from './dgc-migration/invoice-rehearsal.mjs';
 import {invoiceReferenceReview,verifyInvoiceReferenceReview} from './dgc-migration/invoice-references.mjs';
 import {referenceFilePlan,verifyReferenceFiles,reviewReferenceCustody} from './dgc-migration/reference-files.mjs';
-import {referenceRegistrationPlan,verifyReferenceRegistrationPlan,rehearseReferenceRegistration} from './dgc-migration/reference-registration.mjs';
+import {referenceRegistrationPlan,verifyReferenceRegistrationPlan,rehearseReferenceRegistration,rehearseReferenceRounding} from './dgc-migration/reference-registration.mjs';
+import {referenceRoundingPlan,verifyReferenceRoundingPlan} from './dgc-migration/reference-rounding.mjs';
 import {donorRoundingReview,verifyDonorRoundingReview,donorRoundingImpact} from './dgc-migration/donor-rounding.mjs';
 import {roundingExceptionPlan,verifyRoundingExceptionPlan} from './dgc-migration/rounding-exception.mjs';
 import {rehearseRoundingExceptions} from './dgc-migration/revenue-rehearsal.mjs';
@@ -103,22 +104,26 @@ if(command==='prepare'){
   const out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});
  }
  console.log(JSON.stringify({command,reviewHash:report.reviewHash,revenueStates:report.revenueStates,invoiceStates:report.invoiceStates,counts:report.counts,gateOverrideAllowed:false,postingAllowed:false}));
-}else if(['prepare-reference-registration','verify-reference-registration','rehearse-reference-registration'].includes(command)){
+}else if(['prepare-reference-registration','verify-reference-registration','rehearse-reference-registration','prepare-reference-rounding','verify-reference-rounding','rehearse-reference-rounding'].includes(command)){
+ const rounding=command.endsWith('reference-rounding'),prepare=rounding?referenceRoundingPlan:referenceRegistrationPlan,verify=rounding?verifyReferenceRoundingPlan:verifyReferenceRegistrationPlan;
  const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  const invoiceOptions={snapshot,targetPlan:await json(await privateArchivePath(option('plan'))),combined:await json(await privateArchivePath(option('review'))),reviewPin:option('review-hash'),manifest:await json(await privateArchivePath(option('manifest'))),manifestPin:option('manifest-hash'),decisions:resolutions,restorePlan:await json(await privateArchivePath(option('restore-plan'))),root:args.includes('--root')?await privateArchivePath(option('root')):undefined};
  const inputs={invoiceOptions,references:await json(await privateArchivePath(option('reference-review'))),referencePin:option('reference-review-hash'),referenceManifest:await json(await privateArchivePath(option('reference-manifest'))),referenceManifestPin:option('reference-manifest-hash'),referenceRoot:await privateArchivePath(option('reference-root'))};
- if(command==='verify-reference-registration'){
-  const p=await verifyReferenceRegistrationPlan(await json(await privateArchivePath(option('registration-plan'))),inputs);console.log(JSON.stringify({command,verified:true,planHash:p.planHash,counts:p.counts,registryCommitAllowed:false}));
+ if(rounding)Object.assign(inputs,{registrationPlan:await json(await privateArchivePath(option('registration-plan'))),invoiceExceptionPlan:await json(await privateArchivePath(option('invoice-rounding-plan'))),rounding:await json(await privateArchivePath(option('rounding-review'))),roundingPin:option('rounding-review-hash'),exceptionPlan:await json(await privateArchivePath(option('exception-plan')))});
+ if(command.startsWith('verify-')){
+  const p=await verify(await json(await privateArchivePath(option(rounding?'rounding-registration-plan':'registration-plan'))),inputs);console.log(JSON.stringify({command,verified:true,planHash:p.planHash,counts:p.counts,registryCommitAllowed:false}));
  }else{
   let report;
-  if(command==='prepare-reference-registration')report=await referenceRegistrationPlan(inputs);
+  if(command.startsWith('prepare-'))report=await prepare(inputs);
   else{
    requireStaging(process.env.DATABASE_URL??'');if(!invoiceOptions.root)throw Error('Missing original Invoice --root');
-   const p=await verifyReferenceRegistrationPlan(await json(await privateArchivePath(option('registration-plan'))),inputs),selected=option('documents').split(',').map(v=>{const d=p.documents.find(d=>d.source.sheet+':'+d.source.sourceRow===v);if(!d)throw Error('Unknown source document address');return d.source;});
+   const p=await verify(await json(await privateArchivePath(option(rounding?'rounding-registration-plan':'registration-plan'))),inputs),selected=option('documents').split(',').map(v=>{const d=p.documents.find(d=>d.source.sheet+':'+d.source.sourceRow===v);if(!d)throw Error('Unknown source document address');return d.source;});
    // Reject held selections before connecting to any database.
-   if(selected.some(s=>p.documents.find(d=>canonical(d.source)===canonical(s)).state!=='WHOLE_DOCUMENT_CANDIDATE_FOR_ROLLBACK_TRIAL'))throw Error('Whole source document dependencies are held');
+   if(selected.some(s=>p.documents.find(d=>canonical(d.source)===canonical(s)).state!==(rounding?'WHOLE_DOCUMENT_ROUNDING_SHAPE_CANDIDATE':'WHOLE_DOCUMENT_CANDIDATE_FOR_ROLLBACK_TRIAL')))throw Error('Whole source document dependencies are held');
+   if(new Set(selected.map(s=>s.sheet+'|'+s.sourceRow)).size!==selected.length)throw Error('Select unique whole source documents');
+   if(rounding)Object.assign(inputs,{reconManifest:await json(await privateArchivePath(option('recon-manifest'))),reconManifestPin:option('recon-manifest-hash'),reconRoot:await privateArchivePath(option('recon-root'))});
    const {PrismaClient}=createRequire(new URL('../packages/db/package.json',import.meta.url))('@prisma/client'),db=new PrismaClient();
-   try{invoiceOptions.companyId=(await db.company.findUniqueOrThrow({where:{companyCode:'DGC'}})).id;report=await rehearseReferenceRegistration(db,{...inputs,registrationPlan:p,documentSources:selected});}finally{await db.$disconnect();}
+   try{invoiceOptions.companyId=(await db.company.findUniqueOrThrow({where:{companyCode:'DGC'}})).id;report=await (rounding?rehearseReferenceRounding:rehearseReferenceRegistration)(db,{...inputs,[rounding?'referenceRoundingPlan':'registrationPlan']:p,documentSources:selected});}finally{await db.$disconnect();}
   }
   const out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});console.log(JSON.stringify({command,planHash:report.planHash??report.registrationPlanHash,counts:report.counts,first:report.first,replay:report.replay,rolledBack:report.rolledBack,registryCommitAllowed:false}));
  }

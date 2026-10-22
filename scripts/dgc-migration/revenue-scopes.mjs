@@ -1,4 +1,5 @@
 import {canonical,digest} from './core.mjs';
+import {memoSourcePlan} from './planning-context.mjs';
 import {referenceGraph} from './graph.mjs';
 import {revenueBillingPlan} from './revenue-billing.mjs';
 import {capturedMonth} from './recon-semantics.mjs';
@@ -14,6 +15,9 @@ const fields=[['revenue','Invoice_Revenue_USD','Revenue_USD','Total_Revenue_USD'
 // Invoice snapshots retain the ACTUAL donor lines. Never call a generator to
 // recreate old child expansion, rounding adjustments, or a cancelled revision.
 export function revenueScopePlan(snapshot,targetPlan,combined,pin,decisions){
+ return memoSourcePlan(snapshot,'revenue-scopes',[snapshot,targetPlan,combined,pin,decisions],()=>buildRevenueScopePlan(snapshot,targetPlan,combined,pin,decisions));
+}
+function buildRevenueScopePlan(snapshot,targetPlan,combined,pin,decisions){
  const billing=revenueBillingPlan(snapshot,targetPlan,combined,pin,decisions),graph=referenceGraph(snapshot,decisions),links=new Map(graph.links.map(l=>[`${key(l.source)}|${l.field}`,l]));
  const entries=new Map(targetPlan.groups.flatMap(g=>g.entries.map(e=>[key(e.source),{entry:e,group:g}]))),billed=new Map(billing.rows.map(r=>[key(r.source),r]));
  const active=billing.invoices.filter(i=>i.disposition!=='PRESERVE_HISTORY_ONLY'),invoices=[];
