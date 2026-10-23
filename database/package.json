@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./dgc-master-transfer": "./prisma/dgc-master-transfer.mjs",
     ".": {
       "development": "./src/index.ts",
       "types": "./dist/index.d.ts",

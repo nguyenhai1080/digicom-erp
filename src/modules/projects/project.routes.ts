@@ -3,6 +3,7 @@ import {cashTransferRoutes} from './cash-transfers.js';
 import {expenseRoutes} from './expenses.js';
 import {cashHistoryRoutes} from './cash-history.js';
 import type { FastifyInstance } from 'fastify';
+import {masterTransferRoutes} from './master-transfer.js';
 import { z } from 'zod';
 import { prisma, Prisma } from '@erp/db';
 import { projectAccessWhere, requirePermission, type AuthConfig } from '../auth/access.js';
@@ -43,6 +44,7 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
     const status = typeof error === 'object' && error && 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500;
     return reply.code(status >= 400 && status < 500 ? status : 500).send({ message: 'Không thể xử lý yêu cầu.' });
   });
+  await app.register(masterTransferRoutes, config);
   await app.register(partnerRoutes, config);
   await app.register(serviceContractRoutes, config);
   await app.register(outputReconRoutes, config);
