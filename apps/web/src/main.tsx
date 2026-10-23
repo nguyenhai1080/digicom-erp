@@ -18,6 +18,7 @@ import { FinanceLedger } from './FinanceLedger';
 import { Dashboard } from './Dashboard';
 import { Users } from './Users';
 import {CompanyBrandProvider,useBranding} from './CompanyBranding';
+import {AdminSetup} from './AdminSetup';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
@@ -72,6 +73,7 @@ function App() {
     finally { setBusy(false); }
   }
   if (loading) return <main className="auth-screen"><p role="status">Đang kiểm tra phiên đăng nhập…</p></main>;
+  if(!session&&branding.companyCode==='DGC'&&window.location.pathname==='/setup')return <AdminSetup companyCode={branding.companyCode} appName={branding.appName}/>;
   if (!session) return <main className="auth-screen"><section className="auth-card">
     <div className="brand">{branding.appName}</div><p className="muted">Không gian quản lý công việc và tài chính</p>
     <h1>Đăng nhập</h1>
