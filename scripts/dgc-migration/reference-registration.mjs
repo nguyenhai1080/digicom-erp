@@ -1,7 +1,8 @@
 import {canonical,digest,SOURCE_ID} from './core.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
 import {reviewReferenceCustody,verifyReferenceFiles} from './reference-files.mjs';
-import {rehearseInvoiceRestore,rehearseInvoiceEvidenceSet} from './invoice-rehearsal.mjs';
+import {rehearseInvoiceRestore,rehearseInvoiceEvidenceSet,rehearseInvoiceUnifiedSet} from './invoice-rehearsal.mjs';
+import {verifyReferenceUnifiedPlan} from './reference-unified.mjs';
 import {verifyReferenceRoundingPlan,verifyReferenceOffsettingPlan} from './reference-rounding.mjs';
 import {withSourcePlanningCache} from './planning-context.mjs';
 import {requireStaging} from './staging.mjs';
@@ -80,6 +81,9 @@ export async function rehearseReferenceOffsetting(db,options){
  requireStaging(process.env.DATABASE_URL??'');
  return withSourcePlanningCache(async()=>{await verifyReferenceOffsettingPlan(options.referenceOffsettingPlan,options);return runReferenceTrial(db,options,options.referenceOffsettingPlan,'OFFSET');});
 }
+export async function rehearseReferenceUnified(db,options){
+ requireStaging(process.env.DATABASE_URL??'');return withSourcePlanningCache(async()=>{await verifyReferenceUnifiedPlan(options.unifiedReferencePlan,options);return runReferenceTrial(db,options,options.unifiedReferencePlan,'UNIFIED');});
+}
 async function runReferenceTrial(db,options,plan,rounding){
  const {documentSources,invoiceOptions:i}=options;
  // The rounding profile has already rederived all required plans and whole
@@ -89,11 +93,13 @@ async function runReferenceTrial(db,options,plan,rounding){
  const validatedInputsHash=rounding?digest(options):null;
  if(!Array.isArray(documentSources)||!documentSources.length||documentSources.some(s=>!s||typeof s.sheet!=='string'||!Number.isInteger(s.sourceRow))||new Set(documentSources.map(key)).size!==documentSources.length)throw Error('Select unique whole source documents');
  const selected=documentSources.map(s=>plan.documents.find(d=>canonical(d.source)===canonical(s)));
- if(selected.some(d=>!d||d.state!==(rounding==='OFFSET'?'WHOLE_DOCUMENT_OFFSETTING_SHAPE_CANDIDATE':rounding?'WHOLE_DOCUMENT_ROUNDING_SHAPE_CANDIDATE':'WHOLE_DOCUMENT_CANDIDATE_FOR_ROLLBACK_TRIAL')))throw Error('Document has held or incomplete Invoice dependencies');
- const sourceRows=[...new Set(selected.flatMap(d=>d.dependencies.map(i=>i.source.sourceRow)))],before=await counts(db);let result,failure;
+ if(selected.some(d=>!d||d.state!==(rounding==='UNIFIED'?'WHOLE_DOCUMENT_UNIFIED_SHAPE_CANDIDATE':rounding==='OFFSET'?'WHOLE_DOCUMENT_OFFSETTING_SHAPE_CANDIDATE':rounding?'WHOLE_DOCUMENT_ROUNDING_SHAPE_CANDIDATE':'WHOLE_DOCUMENT_CANDIDATE_FOR_ROLLBACK_TRIAL')))throw Error('Document has held or incomplete Invoice dependencies');
+ if(rounding!=='UNIFIED'&&options.additionalInvoiceSourceRows?.length)throw Error('Additional Invoice selection requires the unified profile');
+ const extra=rounding==='UNIFIED'?(options.additionalInvoiceSourceRows??[]):[];if(!Array.isArray(extra)||new Set(extra).size!==extra.length||extra.some(n=>!Number.isInteger(n)||options.unifiedInvoicePlan.entries.find(e=>e.source.sourceRow===n)?.state!=='UNIFIED_INVOICE_SHAPE_CANDIDATE'))throw Error('Additional unified Invoice selection remains held');
+ const sourceRows=[...new Set([...selected.flatMap(d=>d.dependencies.map(i=>i.source.sourceRow)),...extra])],before=await counts(db);let result,failure;
  const proxy=new Proxy(db,{get(target,prop){if(prop==='$transaction')return async(fn,settings)=>target.$transaction(async tx=>{
   try{await fn(tx);throw Error('Invoice rehearsal unexpectedly returned');}catch(e){
-   if(e.message!=='DGC Invoice trial rollback'||e.result?.restorePlanHash!==(rounding==='OFFSET'?options.offsettingPlan.planHash:rounding?options.invoiceExceptionPlan.planHash:i.restorePlan.planHash))throw e;
+   if(e.message!=='DGC Invoice trial rollback'||e.result?.restorePlanHash!==(rounding==='UNIFIED'?options.unifiedInvoicePlan.planHash:rounding==='OFFSET'?options.offsettingPlan.planHash:rounding?options.invoiceExceptionPlan.planHash:i.restorePlan.planHash))throw e;
    const first=await materialize(tx,i.companyId,selected,plan,options),replay=await materialize(tx,i.companyId,selected,plan,options);
    if(replay.created||replay.linksCreated||replay.unchanged!==selected.length)throw Error('Reference registry replay differs');
    if(rounding){await verifyReferenceFiles(i.snapshot,options.referenceManifest,options.referenceRoot,options.referenceManifestPin);if(digest(options)!==validatedInputsHash)throw Error('Reference trial input drift');}else await verifyReferenceRegistrationPlan(plan,options);const inside=await counts(tx);
@@ -103,6 +109,6 @@ async function runReferenceTrial(db,options,plan,rounding){
    throw new ReferenceRollback({mode:'ROLLBACK_ONLY',registrationPlanHash:plan.planHash,invoiceSourceRows:sourceRows,invoiceTrial:e.result,first,replay,before,inside,proof,filesVerified:true,fileVerificationScope:rounding?'ORIGINAL_INVOICE_RECON_AND_REFERENCE_PDFS':'ORIGINAL_INVOICE_AND_REFERENCE_PDFS_ONLY',reconFilesReverified:Boolean(rounding),originalGatesUnchanged:true,postingAllowed:false,acceptance:false,registryCommitAllowed:false,historicalCashPosting:false});
   }
  },settings);const x=target[prop];return typeof x==='function'?x.bind(target):x;}});
- try{if(rounding)await rehearseInvoiceEvidenceSet(proxy,{...options,offsettingPlan:rounding==='OFFSET'?options.offsettingPlan:undefined,sourceRows});else await rehearseInvoiceRestore(proxy,{...i,sourceRows});throw Error('Reference trial unexpectedly committed');}catch(e){if(e instanceof ReferenceRollback)result=e.result;else failure=e;}
+ try{if(rounding==='UNIFIED')await rehearseInvoiceUnifiedSet(proxy,{...options,sourceRows});else if(rounding)await rehearseInvoiceEvidenceSet(proxy,{...options,offsettingPlan:rounding==='OFFSET'?options.offsettingPlan:undefined,sourceRows});else await rehearseInvoiceRestore(proxy,{...i,sourceRows});throw Error('Reference trial unexpectedly committed');}catch(e){if(e instanceof ReferenceRollback)result=e.result;else failure=e;}
  const after=await counts(db);if(canonical(before)!==canonical(after))throw Error('Reference trial rollback footprint differs');if(failure)throw failure;return {...result,after,rolledBack:true};
 }

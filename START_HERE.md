@@ -2,6 +2,8 @@
 
 Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
+**Đã chạy một transaction tài chính chung:** [unified staging](docs/handover/DGC_UNIFIED_FINANCIAL_STAGING_20261023.md) ghi/đọc thử 17 Invoice–AR, 113 revenue, 12 documents/12 links và 13 receipts trên parent đầy đủ (không shells). Replay/rollback sạch, 37 master links không đổi; 310 source/173 synthetic + 35 suites đạt. Còn 38 receipts ngoài set, 34 Invoice dependencies/34 referenced documents và ba Issued held; đã phát hiện Invoice 85 multi-period trên PDF và ba scan CRBT có source FX=0, không tự sửa/đổi tiền. Host vẫn v12, chưa financial commit/cutover.
+
 **Invoice dòng con cuối đã tái hiện donor:** [group balancing V4](docs/handover/DGC_INVOICE_GROUP_BALANCING_20261023.md) giải thích đúng −0,01 USD ở chi tiết cuối Invoice hàng 79; một Invoice–AR/bốn revenue đã ghi/đọc thử/replay/rollback trên clone host, 37 master links không đổi. Bốn Issued strict + một V4 đã trial riêng; còn ba Issued held, chưa full import/registry/UAT. Không thay số nguồn hoặc mở gate cũ; website vẫn v12.
 
 **V12 đã online — adapter thu lịch sử giữ nguyên nguồn:** [source receipts](docs/handover/DGC_SOURCE_RECEIPTS_20261023.md) kiểm đủ 51 khoản/45 Invoice trên clone host: VND phần lẻ và FX tới 12 chữ số giữ nguyên, raw actor/date tách khỏi local approver, replay 0 trùng/rollback sạch, không cash. DB/API/UI guards đã triển khai từ deploy `28270590`; backup DB trước đổi thành công, host đủ 25 migrations/no pending, health 200 và storage marker preserved. Chưa nhập tài chính hoặc cutover; không bỏ các Invoice/revenue/scope holds từ kết quả receipt-only trial.

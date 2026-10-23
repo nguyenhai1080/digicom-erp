@@ -2,6 +2,8 @@
 
 Cập nhật 23/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
 
+Mốc tổng hợp hiện hành: [unified staging](DGC_UNIFIED_FINANCIAL_STAGING_20261023.md) đã trial cùng transaction 17 Invoice–AR, 113 revenue, 12 documents/12 links, 13 receipts vào parent đầy đủ; replay/rollback sạch, 37 master links giữ nguyên. Còn 34 dependencies/34 referenced documents, 38 receipts ngoài candidate parent set và ba Issued held. Source PDF cho thấy historical multi-period và CRBT FX=0 cần xử lý có evidence; không đổi raw/source amounts. 310 source/173 synthetic và 35 suites đạt; chưa operational import/cutover, host vẫn v12.
+
 Invoice mới: [donor group balancing V4](DGC_INVOICE_GROUP_BALANCING_20261023.md) đã trial riêng một Invoice–AR/bốn revenue nguồn thật (hàng 79), replay/rollback và reader guards đạt. Có bốn Issued strict + một V4 đã trial riêng, còn ba Issued held; không đổi strict/V1/V2/V3 hoặc số tiền nguồn. Full financial importer/registry V3/V4/files/UAT vẫn pending; tài chính thực tế chưa nhập, website vẫn v12.
 
 Receipt adapter mới: [51 source receipts](DGC_SOURCE_RECEIPTS_20261023.md) đã lưu/đọc thử đủ trên clone host, giữ raw VND/FX/actor/date, không local approval/cash, replay/rollback sạch. V12/deploy `28270590` đã online sau backup DB thành công: schema25/no pending, health 200, storage marker preserved; DB/API/UI guards đã triển khai. Đây chưa phải full Invoice/revenue/AR restoration hoặc source financial acceptance; bốn Issued Invoice held, operational importer/files/registry/UAT vẫn đường găng.
