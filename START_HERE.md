@@ -1,6 +1,8 @@
 # Bắt đầu làm việc với DGC Finance
 
-Cập nhật ngày 23/10/2026, giờ Việt Nam.
+Cập nhật ngày 24/10/2026, giờ Việt Nam.
+
+**Kho nguồn đã chuyển lên DGC thật:** [host transfer 24/10](docs/handover/DGC_EVIDENCE_HOST_TRANSFER_20261024.md) đã preview/rollback rồi apply 3.154 hàng / 25 bảng; đọc đủ 91 Invoice trên 10 trang và tìm kiếm. Backup trước/sau thành công; dump host restore local đạt 34 assertions, full payload replay khớp, 37 master links và 0 financial records. V14 đã online, runtime transferEnabled=false; preview bị chặn và reader vẫn đọc đủ. Chưa đạt cutover 23/10; tiếp tục operational financial import, files/registry và UAT.
 
 **Đã chuẩn bị chuyển kho nguồn:** [evidence transfer](docs/handover/DGC_EVIDENCE_TRANSFER_20261023.md) có preview/rollback, apply/replay và màn đọc Invoice nguồn phân trang 10. 49 source/63 HTTP/17 unit + 36 suites đạt, browser local đạt. Gói private 3.154 hàng/25 bảng, kiểm 37 master links, không tạo financial records. Chưa apply host; tiếp tục triển khai/backup/chuyển rồi tắt importer. Không coi đây là cutover.
 

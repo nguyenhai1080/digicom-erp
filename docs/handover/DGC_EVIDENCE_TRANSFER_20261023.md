@@ -1,5 +1,7 @@
 # Chuyển kho nguồn DGC — 23/10/2026
 
+Cập nhật 24/10: đã apply trên host thật và đóng importer qua v14; xem [kết quả và backup/restore](DGC_EVIDENCE_HOST_TRANSFER_20261024.md). Phần dưới ghi bước chuẩn bị trước triển khai.
+
 ## Phạm vi và trạng thái
 
 Đã chuẩn bị runtime chuyển nguyên snapshot nguồn vào kho evidence của DB DGC riêng. Đây là raw evidence để đối chiếu; không tạo revenue, Invoice/AR, receipts, tài khoản tiền, phê duyệt hoặc bút toán. Chưa apply trên host tại thời điểm ghi tài liệu này; host vẫn v12 và tài chính chưa nhập/cutover.
