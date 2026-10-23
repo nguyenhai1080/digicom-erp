@@ -2,7 +2,7 @@
 
 Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
-**Danh mục đã nhập lên DGC thật:** [master transfer](docs/handover/DGC_MASTER_TRANSFER_20261023.md) đã preview/rollback rồi apply 10 dịch vụ, 4 đối tác, 9 hợp đồng, 14 liên kết qua admin; UI đọc đủ, Movitel Active và hai alias đúng. Website/DB backup trước nhập và DB backup sau nhập thành công. V9 online/health connected; importer đã tắt và kiểm từ UI bị chặn. Tài chính chưa nhập; local migration guards không đổi.
+**Danh mục đã nhập lên DGC thật:** [master transfer](docs/handover/DGC_MASTER_TRANSFER_20261023.md) đã preview/rollback rồi apply 10 dịch vụ, 4 đối tác, 9 hợp đồng, 14 liên kết qua admin; UI đọc đủ, Movitel Active và hai alias đúng. Website/DB backup trước nhập và DB backup sau nhập thành công; backup DB thật đã restore local/18 kiểm đạt, đủ 37 links/38 audit và 0 financial rows. V9 online/health connected; importer đã tắt và kiểm từ UI bị chặn. Tài chính chưa nhập; local migration guards không đổi. Hai câu hỏi financial links/SOA cutoff đang chờ owner trả lời.
 
 **Môi trường DGC đã online:** [kích hoạt host DGC](docs/handover/DGC_HOST_ACTIVATION_20261023.md) ghi Digicom-Erp v7/DB riêng, health connected, persistent path /app/storage và seed kỹ thuật DGC (103 permissions/16 sequences). Owner đã tạo admin; Dashboard vẫn đăng nhập đúng DGC sau reload v7. AUTH_BOOTSTRAP_ENABLED đã tắt và redeploy; seed vẫn false. Không dùng connector GST; browser owner hiện đã ở đúng tài khoản DGC. Chưa financial import hoặc cutover.
 
