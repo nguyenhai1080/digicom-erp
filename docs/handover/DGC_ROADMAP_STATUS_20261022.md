@@ -2,13 +2,13 @@
 
 Cập nhật 23/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
 
-**Ưu tiên mới của owner: cắt chuyển trong ngày 23/10; đang chuẩn bị môi trường một website DGC và chốt đường nhập/đối chiếu/UAT. Chưa nhập chính thức tài chính hoặc go-live.** Không dùng số test hoặc schema coverage làm tỷ lệ nghiệm thu nghiệp vụ.
+**Ưu tiên mới của owner: cắt chuyển trong ngày 23/10; một website DGC đã online, DB kết nối, seed kỹ thuật hoàn tất và owner đã tạo/đăng nhập admin. Đang đóng bootstrap và chốt đường nhập/đối chiếu/UAT. Chưa nhập chính thức tài chính hoặc go-live.** Không dùng số test hoặc schema coverage làm tỷ lệ nghiệm thu nghiệp vụ. Trạng thái host chi tiết tại [hồ sơ kích hoạt](DGC_HOST_ACTIVATION_20261023.md).
 
 Mốc Invoice trước đó 23/10: [Invoice có line delta trái dấu bù nhau](DGC_INVOICE_OFFSETTING_REHEARSAL_20261023.md) đã diễn tập riêng ba Invoice–AR/17 nhóm/26 revenue; reader đủ, replay 0 trùng và rollback 23 model counts khớp. 30 suites/104 PostgreSQL mới cùng hồi quy đạt. Đã tiếp tục ghép profile V2 vào whole-document package trial ở mốc mới bên dưới; số 39 là worklist trước đợt registry này. Mọi số tiền/gates strict và V1 giữ nguyên.
 
 | Chặng | Kết quả hiện có | Điều kiện còn lại |
 | --- | --- | --- |
-| 1. Tách DGC và chốt nguồn | Repository/branch DGC riêng; donor v61, snapshot 25 bảng/3.154 hàng ghim hash; USD/VND, mặc định USD | Repo DGC riêng đã được owner cấp; cần website/DB/storage/secrets và connector đúng tài khoản host DGC. Timezone đã chốt Asia/Ho_Chi_Minh |
+| 1. Tách DGC và chốt nguồn | Repository/branch DGC riêng; donor v61, snapshot 25 bảng/3.154 hàng ghim hash; USD/VND, mặc định USD; Digicom-Erp một website/DB riêng online, volume /app/storage, admin đã đăng nhập; Asia/Ho_Chi_Minh | Connector vẫn GST nên chỉ dùng browser đúng tài khoản DGC; còn kiểm remote storage/backup/restore và snapshot cuối |
 | 2. Danh mục/hợp đồng | Đã nhập staging địa phương 10 dịch vụ, 4 đối tác, 9 hợp đồng, 14 liên kết; 37 provenance; đã áp dụng đúng quyết định owner về Movitel/thuế/alias | Nghiệm thu màn hình/quyền/dữ liệu đích toàn bộ trước vận hành |
 | 3. Nghiệp vụ mới | Có runtime đối soát đầu ra → doanh thu → Invoice/AR/thu; DGC Invoice/PDF và ảnh ký ghép; đầu vào → duyệt → AP/PDF; kế toán nhập FX/chuẩn bị nháp | Nghiệm thu toàn chuỗi và full role parity; cấp quyền người dùng thật; không suy đã nghiệm thu từ build/test |
 | 4. Migration tài chính — hiện tại | Đã ghi thử 169 nhóm/205 revenue; bốn strict và tám rounding Invoice/AR đã trial/replay/rollback riêng; registry V1 đã trial bảy package/bảy links với 40 nhóm/61 revenue; registry offsetting thêm bốn package/bốn links/ba Invoice với 17 nhóm/26 revenue, guard 3/3 đạt; giữ đủ original PDF và provenance | Original strict gates vẫn giữ: revenue 120/265 nhóm review; Invoice 49 held/33 archive/năm draft. Union hai profile còn 36 Invoice dependencies chặn 35 documents có refs; 31 package no-ref riêng. Chưa nhận tài chính chính thức; còn actor/date, file promotion, historical lifecycle/registry vận hành và nghiệm thu tổng tiền toàn chuỗi |
@@ -32,6 +32,6 @@ Mốc registry mới 23/10: [whole-document offsetting trial](DGC_REFERENCE_OFFS
 - Ba proposal liên kết tài chính đang chờ owner; chưa áp dụng. Các thiếu file, chênh lệch child/Total và nguồn revision vẫn giữ review theo từng nhóm, không tự coi là owner đã chấp nhận.
 - Chính sách payment cutoff SOA còn mở. Timezone đã được owner xác nhận Asia/Ho_Chi_Minh ngày 23/10; giữ nguyên metadata/serial ngày nguồn làm evidence.
 - Chưa cấp/gán đầy đủ Staff/Accountant/Manager/BOD thật. Quyền kế toán nhập FX đã được owner xác nhận, không hỏi lại.
-- Connector host hiện là GST Vietnam; cần tài khoản/môi trường DGC riêng trước staging từ xa. Chưa push/deploy, không dùng dịch vụ GST thay thế.
+- Connector host hiện là GST Vietnam; môi trường DGC đã push/deploy qua browser đúng tài khoản owner. Không dùng connector hoặc dịch vụ GST thay thế. Staging tài chính từ xa vẫn chờ importer/đối chiếu, không nới guard localhost của tools hiện tại.
 
 Các phần độc lập vẫn tiếp tục được; không cần đợi các quyết định này để kiểm custody, mapping, rollback và tính đầy đủ của evidence. Thu lịch sử chỉ cập nhật Invoice/revenue/AR; không cộng số dư cash/bank. Chuyển động tiền mới chỉ vận hành sau historical imports và lập sổ tiền hiện tại.

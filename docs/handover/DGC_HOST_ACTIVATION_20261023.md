@@ -22,6 +22,8 @@ Không chạy financial importer từ xa. Các migration tools vẫn chỉ cho l
 
 Owner báo đã lưu token/flag bootstrap. Đã triển khai v6 qua browser đúng website; host xác nhận 100%, trực tuyến. HTTPS `/api/v1/health` sau v6 trả `status=ok`, `release=0.6.79`, `database=connected`. Không đọc/reveal token hoặc nhập credential. Form `/setup` đang trống và đã giữ tab để owner tự nhập/gửi; chưa tạo admin hoặc thử bootstrap. Proof private: `artifacts/dgc-deploy/20261023/dgc-v6-online.png`. Sau owner tạo xong cần tắt bootstrap và redeploy.
 
+Owner tiếp tục báo đã tạo xong admin; browser xác nhận Dashboard đăng nhập tenant DGC, số liệu tài chính hiện 0 và chưa khai báo tài khoản tiền. Agent lưu AUTH_BOOTSTRAP_ENABLED=false (ERP_SEED_ON_START vẫn false) rồi triển khai v7; host xác nhận 100%, trực tuyến. Health HTTPS sau v7 trả status ok/database connected/release 0.6.79. Không tạo thêm user, gán role thật ngoài admin do owner tự tạo hoặc nhập tài chính. Proof private `artifacts/dgc-deploy/20261023/dgc-v7-bootstrap-disabled.png`. Còn remote file persistence/backup/restore, UAT và importer tài chính vận hành.
+
 ## Khởi tạo admin: bước owner cần tự nhập
 
 UI mới tại `https://digicom-erp.n1.tinhgon.xyz/setup` chỉ gọi API bootstrap sẵn có, không tạo endpoint/quyền server mới. Có tên/email, password/confirm và setup token; xóa password/token khỏi form sau gửi, không ghi localStorage, dùng POST kể cả native fallback, không đưa secrets vào URL. Backend vẫn yêu cầu flag enabled + token >=32 ký tự và đóng vĩnh viễn khi công ty đã có user; guard đồng thời/role/origin không đổi.
