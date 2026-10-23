@@ -4,6 +4,8 @@
   "private": true,
   "packageManager": "pnpm@10.18.3",
   "scripts": {
+    "migration:review-source-delta": "node scripts/dgc-source-delta.mjs",
+    "test:migration:source-delta": "node scripts/dgc-migration/source-delta.test.mjs",
     "migration:prepare": "node scripts/dgc-migration.mjs prepare",
     "migration:review-references": "node scripts/dgc-migration.mjs review-references",
     "migration:review-finance": "node scripts/dgc-migration.mjs review-finance",

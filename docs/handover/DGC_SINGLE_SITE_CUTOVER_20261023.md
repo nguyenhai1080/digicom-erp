@@ -65,4 +65,4 @@ Gom ngoại lệ theo ảnh hưởng để xử lý và báo go/no-go; không t�
 
 ## Thứ tự công việc tiếp theo
 
-Owner chuẩn bị website/DB/volume và kết nối tài khoản trong khi Codex chốt build, đẩy code lên repo DGC và chuẩn bị kiểm từ xa. Sau đó schema/khởi tạo → nhập/đối chiếu staging → UAT → snapshot cuối/backup/restore → go/no-go → chuyển vận hành. Dừng mở rộng các đợt thử ngoại lệ nhỏ nếu chúng không giải quyết đường găng. Ba liên kết tài chính, SOA cutoff và roles còn mở phải được xử lý trong checklist này; timezone đã chốt, không hỏi lại.
+Môi trường/schema/admin/danh mục đã có trên host DGC; v10 hiển thị policy SOA. [Owner đã chốt ba liên kết và cutoff](DGC_FINANCIAL_OWNER_DECISIONS_20261023.md), không hỏi lại; [nguồn 25 bảng/3.154 hàng đọc lại khớp baseline](DGC_SOURCE_DELTA_AND_V10_20261023.md), chưa frozen. Tiếp tục importer tài chính/đối chiếu staging → UAT/roles → snapshot cuối/backup DB/files và restore → go/no-go → chuyển vận hành. Dừng mở rộng các đợt thử ngoại lệ nhỏ nếu chúng không giải quyết đường găng. Timezone đã chốt Asia/Ho_Chi_Minh; storage qua redeploy/restore vẫn cần kiểm trên host thật.
