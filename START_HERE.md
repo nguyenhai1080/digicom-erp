@@ -2,7 +2,7 @@
 
 Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
-**Thu lịch sử đã có adapter giữ nguyên nguồn:** [source receipts](docs/handover/DGC_SOURCE_RECEIPTS_20261023.md) kiểm đủ 51 khoản/45 Invoice trên clone host: VND phần lẻ và FX tới 12 chữ số giữ nguyên, raw actor/date tách khỏi local approver, replay 0 trùng/rollback sạch, không cash. Có DB/API/UI guards cho source receipts; migration 25 hiện mới local, đang chuẩn bị release sau backup DGC. Chưa nhập tài chính hoặc cutover; không bỏ các Invoice/revenue/scope holds từ kết quả receipt-only trial.
+**V12 đã online — adapter thu lịch sử giữ nguyên nguồn:** [source receipts](docs/handover/DGC_SOURCE_RECEIPTS_20261023.md) kiểm đủ 51 khoản/45 Invoice trên clone host: VND phần lẻ và FX tới 12 chữ số giữ nguyên, raw actor/date tách khỏi local approver, replay 0 trùng/rollback sạch, không cash. DB/API/UI guards đã triển khai từ deploy `28270590`; backup DB trước đổi thành công, host đủ 25 migrations/no pending, health 200 và storage marker preserved. Chưa nhập tài chính hoặc cutover; không bỏ các Invoice/revenue/scope holds từ kết quả receipt-only trial.
 
 **Mốc mới — v11/storage và nối staging tài chính:** [host finance bridge](docs/handover/DGC_HOST_FINANCE_BRIDGE_20261023.md): marker storage preserved qua redeploy v10→v11, backup website thành công và restore marker local khớp bytes/hash. Đã sửa Invoice resolver để nhận đúng 37 master links dùng hash gói riêng; trên clone backup host, stage đủ 3.154 raw rows rồi thử bốn Invoice–AR/revenue, replay 0 trùng/rollback sạch, 48 assertions và 56/217 PostgreSQL hồi quy + 32 suites đạt. Browser đã phục hồi. Chưa financial commit; còn bốn Issued Invoice held và adapter 51 receipts (bốn VND phần lẻ), files/registry/UAT.
 
