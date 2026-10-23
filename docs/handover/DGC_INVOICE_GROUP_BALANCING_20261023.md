@@ -27,6 +27,8 @@ CLI `migration:prepare-invoice-balance`, `migration:verify-invoice-balance`, `mi
 
 ## Trạng thái và bước tiếp
 
-Bốn Issued Invoice strict đã trial trước đó và một Issued Invoice V4 đã trial riêng; ba Issued khác (84/85/86) vẫn held bởi source/PDF/scope. Chưa phải một transaction gộp hoặc operational acceptance. Registry V1/V2 vẫn 36 dependencies/35 documents vì V3/V4 chưa ghép. Website đang v12; chưa triển khai V4 lên host. Bundle một website cần tái tạo/test/publish sau source commit; không redeploy chỉ vì tài liệu audit.
+Bốn Issued Invoice strict đã trial trước đó và một Issued Invoice V4 đã trial riêng; ba Issued khác (84/85/86) vẫn held bởi source/PDF/scope. Chưa phải một transaction gộp hoặc operational acceptance. Registry V1/V2 vẫn 36 dependencies/35 documents vì V3/V4 chưa ghép. Website đang v12; chưa triển khai V4 lên host.
+
+Source `22685c6743f0a52061169f38456e4d9cd5cebd13` và generated release `01338c43f0304613b53bc69a4232637bb599c90b` đã push đúng hai nhánh DGC. Bundle root một app/121 files được tái tạo, Linux Docker build và Node 22 smoke kiểm shared arithmetic/internal reader import đạt; không donor records/secrets. Không redeploy host vì profile mới chỉ là internal trial reader, chưa có operational importer/route cần mở; không redeploy chỉ vì tài liệu audit. Proof release private ở `artifacts/dgc-deploy/20261023/invoice-balancing-release.json`.
 
 Tiếp theo: hợp nhất các profile đã kiểm vào whole-document/full financial staging, giữ ba Invoice held trong danh sách đối chiếu, hoàn thiện operational importer/files/lifecycle và UAT trước cutover. Không promote các trial rows hoặc source Approved thành local approval.
