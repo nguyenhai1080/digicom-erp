@@ -2,6 +2,10 @@
 
 Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
+**Ưu tiên mới của owner:** cắt chuyển trong ngày, triển khai **một website ERP DGC** (web/API chung Node process). Repo riêng `https://github.com/nguyenhai1080/digicom-erp.git`, nhánh `dgc/main`; timezone đã chốt `Asia/Ho_Chi_Minh`. Owner xác nhận chưa có môi trường đích; connector hiện vẫn là GST. Làm theo [chuẩn bị một website và checklist cutover](docs/handover/DGC_SINGLE_SITE_CUTOVER_20261023.md), không tiếp tục chia nhỏ các đợt ngoại lệ trước đường găng môi trường → nhập/đối chiếu staging → UAT → snapshot cuối/backup/chuyển vận hành.
+
+[Đã chốt phần Invoice source rounding đang làm](docs/handover/DGC_INVOICE_SOURCE_ROUNDING_20261023.md): một Invoice–AR/sáu nhóm/chín revenue đọc đủ, 23 model counts rollback khớp; 32 suites/118 PostgreSQL mới và hồi quy đạt. Registry worklist vẫn 36/35 do chưa ghép profile này; chưa nhập tài chính.
+
 ## Trạng thái sau tiếp nhận 19–22/10
 
 [Registry với Invoice có delta trái dấu](docs/handover/DGC_REFERENCE_OFFSETTING_REHEARSAL_20261023.md): thêm bốn package/bốn links/ba Invoice–AR với 17 nhóm/26 revenue đã ghi/đọc thử, guard 3/3 và replay/rollback 23 model counts đạt. 31 suite/135 PostgreSQL mới và hồi quy đạt. Worklist còn 36 Invoice dependencies chặn 35 documents có refs; 31 package no-ref riêng. Chưa nhập tài chính hoặc promote source Approved.

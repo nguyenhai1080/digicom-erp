@@ -9,8 +9,10 @@ import { PasswordBusyError } from './modules/auth/password.js';
 import { projectRoutes } from './modules/projects/project.routes.js';
 import { serviceRoutes } from './modules/services/service.routes.js';
 import { companyAssetRoutes } from './modules/company-assets/company-assets.js';
-export async function buildApp(options: { auth?: AuthConfig; logger?: boolean } = {}) {
+import { registerWeb } from './web.js';
+export async function buildApp(options: { auth?: AuthConfig; logger?: boolean; webRoot?: string } = {}) {
   const auth = options.auth ?? loadAuthConfig();
+  const webRoot=options.webRoot??process.env.ERP_WEB_ROOT;
   const app = Fastify({ bodyLimit: 32768, logger: options.logger === false ? false : {
     redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers["x-csrf-token"]', 'req.body.password', 'req.body.setupToken']
   } });
@@ -29,11 +31,12 @@ export async function buildApp(options: { auth?: AuthConfig; logger?: boolean } 
   const appTitle=process.env.APP_TITLE?.trim()||(auth.defaultCompanyCode==='GST'?'ERP Core - GST':appName);
   if(appName.length>80||appTitle.length>120)throw new Error('Application branding is too long');
   app.get('/api/v1/public-config',async (_req,reply)=>reply.header('Cache-Control','no-store').send({companyCode:auth.defaultCompanyCode,appName,appTitle}));
-  await app.register(healthRoutes);
+  await app.register(healthRoutes,{rootHealth:!webRoot});
   await app.register(authRoutes, auth);
   await app.register(userRoutes, auth);
   await app.register(projectRoutes, auth);
   await app.register(serviceRoutes, auth);
   await app.register(companyAssetRoutes, auth);
+  if(webRoot)await registerWeb(app,webRoot);
   return app;
 }

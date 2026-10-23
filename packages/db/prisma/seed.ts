@@ -21,7 +21,7 @@ async function main() {
   if(companyCode!=='DGC')throw new Error('This repository seeds DGC only; check the dedicated DGC database and configuration');
   const companyName=process.env.DEFAULT_COMPANY_NAME?.trim()||'';
   const defaultCurrency=process.env.DEFAULT_COMPANY_CURRENCY??'USD';
-  const timezone=process.env.DEFAULT_COMPANY_TIMEZONE??'Africa/Maputo';
+  const timezone=process.env.DEFAULT_COMPANY_TIMEZONE??'Asia/Ho_Chi_Minh';
   if(!/^[A-Za-z0-9_-]{1,50}$/.test(companyCode)||!companyName||companyName.length>250||!['USD','VND'].includes(defaultCurrency))throw new Error('Provide a valid company code, legal company name and currency before seeding');
   new Intl.DateTimeFormat('en',{timeZone:timezone}).format();
   if(await prisma.company.findFirst({where:{companyCode:{not:'DGC'}}}))throw new Error('DGC seed requires a database without other company tenants');

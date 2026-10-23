@@ -2,6 +2,8 @@
 
 Ngày 19/10/2026, Asia/Saigon. Đây là kế hoạch chuẩn bị, chưa phải biên bản nghiệm thu hay lệnh triển khai.
 
+Cập nhật owner 23/10: [một website DGC và cắt chuyển](DGC_SINGLE_SITE_CUTOVER_20261023.md) thay phương án hai service web/API bên dưới. Repo riêng `nguyenhai1080/digicom-erp`, nhánh dgc/main; timezone chốt Asia/Ho_Chi_Minh. Owner xác nhận chưa có môi trường đích. Phần còn lại giữ lịch sử kế hoạch ban đầu; không dùng trạng thái timezone-pending hoặc hai website để cấu hình mới.
+
 Trạng thái cập nhật 22/10: đọc [roadmap hiện hành](DGC_ROADMAP_STATUS_20261022.md). Đã có snapshot trong checkout DGC, master importer, review/planner và rehearsal rollback-only revenue/Invoice/AR; các nhận định chưa có snapshot/importer/DB thử ở phần kế hoạch ban đầu bên dưới là lịch sử. Chưa có financial import commit hoặc môi trường DGC từ xa.
 
 Đã bắt đầu staging địa phương và triển khai Invoice DGC riêng; xem [kết quả và phạm vi đã kiểm tra](DGC_MIGRATION_AND_INVOICE_20261019.md). Phần dưới giữ kế hoạch đích; trạng thái importer/chưa có DB thử trong bản đầu không còn mô tả toàn bộ hiện trạng.
