@@ -7,7 +7,7 @@ import {verifyReconFiles} from './recon-files.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
 import {rehearseRevenue,rehearseInvoiceRoundingSources} from './revenue-rehearsal.mjs';
 import {verifyInvoiceRoundingPlan} from './invoice-rounding.mjs';
-import {verifyInvoiceOffsettingPlan} from './invoice-offsetting.mjs';
+import {verifyInvoiceOffsettingPlan,verifyInvoiceSourceRoundingPlan} from './invoice-offsetting.mjs';
 import {withSourcePlanningCache} from './planning-context.mjs';
 const models=['user','userRole','authSession','approvalRequest','reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','invoiceDocumentLink','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
@@ -67,11 +67,17 @@ export async function rehearseInvoiceRounding(db,options){
  return invoiceEvidenceSet(db,options,false);
 }
 export async function rehearseInvoiceOffsetting(db,options){
+ return exactHeaderTrial(db,options,false);
+}
+export async function rehearseInvoiceSourceRounding(db,options){
+ return exactHeaderTrial(db,options,true);
+}
+async function exactHeaderTrial(db,options,sourceOnly){
  requireStaging(process.env.DATABASE_URL??'');
- return withSourcePlanningCache(async()=>{const {invoiceOptions:i,offsettingPlan:p,sourceRows}=options;verifyInvoiceOffsettingPlan(p,options);
+ return withSourcePlanningCache(async()=>{const {invoiceOptions:i,sourceRows}=options,p=sourceOnly?options.sourceRoundingPlan:options.offsettingPlan;(sourceOnly?verifyInvoiceSourceRoundingPlan:verifyInvoiceOffsettingPlan)(p,options);
   if(!Array.isArray(sourceRows)||!sourceRows.length||new Set(sourceRows).size!==sourceRows.length)throw Error('Select unique whole offsetting Invoices');
-  const selected=sourceRows.map(n=>p.entries.find(e=>e.source.sourceRow===n));if(selected.some(e=>!e||e.state!=='INVOICE_OFFSETTING_SHAPE_CANDIDATE'))throw Error('Other Invoice/source/scope gates remain held');
-  const r=await runInvoiceTrial(db,{...i,restorePlan:p,sourceRows},selected,options);return {...r,shapeProfile:'OFFSETTING_CHARACTERIZED_LINE_DELTAS',originalGatesUnchanged:true,commitAllowed:false};
+  const selected=sourceRows.map(n=>p.entries.find(e=>e.source.sourceRow===n));if(selected.some(e=>!e||e.state!==(sourceOnly?'INVOICE_SOURCE_ROUNDING_SHAPE_CANDIDATE':'INVOICE_OFFSETTING_SHAPE_CANDIDATE')))throw Error('Other Invoice/source/scope gates remain held');
+  const r=await runInvoiceTrial(db,{...i,restorePlan:p,sourceRows},selected,options);return {...r,shapeProfile:sourceOnly?'EXACT_PRESENTED_LINES_WITH_SOURCE_ROUNDING':'OFFSETTING_CHARACTERIZED_LINE_DELTAS',originalGatesUnchanged:true,commitAllowed:false};
  });
 }
 // Whole-document trials may combine strict, nonzero-header and offsetting-line

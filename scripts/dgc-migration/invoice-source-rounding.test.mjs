@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {canonical,digest} from './core.mjs';
+import {invoiceSourceRoundingInputs} from './invoice-source-rounding.fixtures.mjs';
+import {invoiceOffsettingInputs} from './invoice-offsetting.fixtures.mjs';
+import {referenceRoundingInputs} from './reference-rounding.fixtures.mjs';
+import {invoiceSourceRoundingPlan,verifyInvoiceSourceRoundingPlan,invoiceOffsettingPlan} from './invoice-offsetting.mjs';
+import {rehearseInvoiceSourceRounding,rehearseInvoiceOffsetting} from './invoice-rehearsal.mjs';
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;},reject=async(f,re)=>{await assert.rejects(f,re);n++;};
+const o=invoiceSourceRoundingInputs(),before=canonical(o),p=invoiceSourceRoundingPlan(o),e=p.entries[0];
+eq(p.counts,{INVOICE_SOURCE_ROUNDING_SHAPE_CANDIDATE:1});eq(e.invoiceRounding.components,{revenue:'100',wht:'10',payable:'90'});eq(e.invoiceRounding.lines.map(l=>l.identityDelta),['0']);eq(e.invoiceRounding.sourceRevenueSet.map(s=>s.sourceRow),[2,3,4,5]);eq(e.invoiceRounding.format,'DGC_CAPTURED_INVOICE_ROUNDING_V3');eq(e.invoiceRounding.headerArithmetic,'EXACT_PRESENTED_LINES_WITH_SOURCE_ROUNDING');eq(e.originalRoundingReasons,['HEADER_LINE_ROUNDING_NOT_CHARACTERIZED']);eq(o.invoiceOptions.restorePlan.entries[0].state,'RESTORE_HELD');eq(p.originalGatesUnchanged,true);eq(p.commitAllowed,false);eq(verifyInvoiceSourceRoundingPlan(p,o),p);eq(canonical(o),before);eq(invoiceOffsettingPlan(o).entries[0].state,'INVOICE_OFFSETTING_SHAPE_HELD');
+for(const mutate of [(c,ch)=>ch('50_AR_AP','Original_Amount',91),(c,ch)=>ch('49_INVOICE_DETAIL','Payable_USD',90.01),(c,ch)=>ch('40_MONTHLY_REVENUE','Status','Draft',2),(c,ch)=>ch('44_RECON_PDF_DETAIL','Partner_Revenue_MZN',88,2)])eq(invoiceSourceRoundingPlan(invoiceSourceRoundingInputs(mutate)).entries[0].state,'INVOICE_SOURCE_ROUNDING_SHAPE_HELD');
+eq(invoiceSourceRoundingPlan(invoiceOffsettingInputs()).entries[0].state,'INVOICE_SOURCE_ROUNDING_SHAPE_HELD');eq(invoiceSourceRoundingPlan(referenceRoundingInputs()).entries[1].state,'INVOICE_SOURCE_ROUNDING_SHAPE_HELD');
+const forged=structuredClone(p);forged.entries[0].invoiceRounding.sourceRevenueSet.pop();const {planHash,...b}=forged;forged.planHash=digest(b);assert.throws(()=>verifyInvoiceSourceRoundingPlan(forged,o),/pinned source/);n++;
+const saved=process.env.DATABASE_URL;try{process.env.DATABASE_URL='postgresql://unused@127.0.0.1:55555/dgc_migration_staging_no_connection';await reject(()=>rehearseInvoiceSourceRounding({}, {...o,sourceRoundingPlan:p,sourceRows:[2,2]}),/unique whole/);await reject(()=>rehearseInvoiceOffsetting({}, {...o,offsettingPlan:invoiceOffsettingPlan(o),sourceRows:[2]}),/gates remain held/);process.env.DATABASE_URL='postgresql://unused@remote.invalid/dgc_migration_staging_bad';await reject(()=>rehearseInvoiceSourceRounding({},o),/dedicated local/);}finally{if(saved===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=saved;}
+console.log(`Exact Invoice with source rounding profile: ${n} assertions passed`);
