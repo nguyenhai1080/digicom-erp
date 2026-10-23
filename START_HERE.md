@@ -2,6 +2,8 @@
 
 Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
+**Môi trường DGC đã online:** [kích hoạt host DGC](docs/handover/DGC_HOST_ACTIVATION_20261023.md) ghi website Digicom-Erp/DB riêng, health connected, persistent path /app/storage và seed kỹ thuật DGC (103 permissions/16 sequences). Bootstrap vẫn tắt; owner cần tự tạo credential admin qua /setup theo hồ sơ, sau bước bật token/flag có kiểm soát. Không dùng connector GST; browser owner hiện đã ở đúng tài khoản DGC. Chưa financial import hoặc cutover.
+
 **Lưu ý nhập GitHub trên host:** chọn nhánh triển khai **`codex/dgc-deploy`**, không chọn nhánh mã nguồn `dgc/main` trong bộ quét tự động nhiều dự án. Release được đóng gói thành một Fastify app tại gốc, UI build trong `public`, `ERP_WEB_ROOT=/app/public`; giữ cổng 3000 và volume `/app/storage`. Xem [hướng dẫn một website](docs/handover/DGC_SINGLE_SITE_CUTOVER_20261023.md).
 
 **Ưu tiên mới của owner:** cắt chuyển trong ngày, triển khai **một website ERP DGC** (web/API chung Node process). Repo riêng `https://github.com/nguyenhai1080/digicom-erp.git`, nhánh `dgc/main`; timezone đã chốt `Asia/Ho_Chi_Minh`. Owner xác nhận chưa có môi trường đích; connector hiện vẫn là GST. Làm theo [chuẩn bị một website và checklist cutover](docs/handover/DGC_SINGLE_SITE_CUTOVER_20261023.md), không tiếp tục chia nhỏ các đợt ngoại lệ trước đường găng môi trường → nhập/đối chiếu staging → UAT → snapshot cuối/backup/chuyển vận hành.
