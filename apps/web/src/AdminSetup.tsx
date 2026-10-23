@@ -17,7 +17,7 @@ export function AdminSetup({companyCode,appName}:{companyCode:string;appName:str
   <div className="brand">{appName}</div><h1>Khởi tạo quản trị DGC</h1>
   {done?<><p role="status">Đã tạo tài khoản quản trị. Anh có thể đăng nhập bằng tài khoản vừa tạo.</p><a href="/">Đến màn hình đăng nhập</a></>:<>
    <p className="muted">Chỉ dùng cho quản trị đầu tiên, sau khi công ty DGC đã khởi tạo và thiết lập một lần được bật trên host.</p>
-   <form onSubmit={submit} autoComplete="off"><fieldset disabled={busy}>
+   <form method="post" onSubmit={submit} autoComplete="off"><fieldset disabled={busy}>
     <label>Họ và tên<input name="fullName" required minLength={2} maxLength={150} autoComplete="name" /></label>
     <label>Email quản trị<input name="email" type="email" required maxLength={254} autoComplete="username" /></label>
     <label>Mật khẩu mới<input name="password" type="password" required minLength={8} maxLength={128} autoComplete="new-password" /></label>
