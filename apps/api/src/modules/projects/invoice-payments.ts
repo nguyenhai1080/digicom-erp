@@ -9,6 +9,7 @@ import {checkedFile,persistPdf,persistPaymentImage,rollbackFiles,sha} from './fi
 import {financialPeriodLock} from './recon-finalize.js';
 import {historicalPaymentSchema,historicalPaymentAmounts,historicalPaymentDate} from './historical-payment.js';
 import {invoicePaymentReadPermission,canPostInvoicePayment} from './invoice-payment-access.js';
+import {isSourceReceipt,sourceReceiptView} from './source-receipt.js';
 
 const amount=z.string().regex(/^(0|[1-9]\d{0,13})(\.\d{1,2})?$/);
 const bodySchema=z.object({requestId:z.uuid(),expectedUpdatedAt:timestamp,paymentDate:date,paidUsd:amount,paidVnd:z.string().regex(/^[1-9]\d{0,15}$/),fxRate:z.string().regex(/^(0|[1-9]\d{0,11})(\.\d{1,4})?$/).optional(),swiftNo:z.string().trim().max(200),cashAccountId:z.uuid(),bankAccount:z.string().trim().max(200).default(''),paymentMethod:z.enum(['Bank Transfer','Cash','Other']),note:z.string().trim().max(2000),confirmed:z.literal(true),swiftFile:z.object({filename:z.string().trim().min(1).max(200),base64:z.string().max(7*1024*1024)}).strict().optional()}).strict();
@@ -34,7 +35,7 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
   const items=await prisma.invoicePayment.findMany({where:{companyId:invoice.companyId,invoiceId:invoice.id},orderBy:[{paymentDate:'desc'},{createdAt:'desc'}]});
   const canPost=canPostInvoicePayment(request.auth!);
   const accounts=request.auth!.companyCode==='DGC'&&!canPost?[]:await prisma.cashAccount.findMany({where:{companyId:invoice.companyId,status:'ACTIVE',currency:'VND'},select:{id:true,accountCode:true,name:true,kind:true,currency:true,bankName:true,accountNumber:true},orderBy:{accountCode:'asc'},take:1000});
-  return {canPost,accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items};
+  return {canPost,accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items:items.map(p=>({...p,historicalSource:sourceReceiptView(p.historicalSource)}))};
  });
  app.post('/api/v1/invoices/:id/payments',{bodyLimit:8*1024*1024,onRequest:writeGuard('PAYMENT_POST',config)},async request=>{
   const user=request.auth!,invoiceId=id(request.params),body=parse(z.union([bodySchema,historicalPaymentSchema]),request.body),historical='mode' in body,digest=sha(JSON.stringify({invoiceId,...body}));
@@ -98,6 +99,7 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
   return prisma.$transaction(async tx=>{
    const initial=await tx.invoicePayment.findFirst({where:{companyId:user.companyId,id:paymentId},include:{invoice:true}});
    if(!initial)throw new CommandError(404,'Không tìm thấy thanh toán.');
+   if(isSourceReceipt(initial.historicalSource))fail('Khoản thu nhập từ nguồn chỉ cập nhật lịch sử Invoice/công nợ; không được ghi vào tài khoản tiền.');
    await financialPeriodLock(tx,user.companyId,initial.invoice.partnerId,initial.invoice.period);
    await tx.$queryRaw`SELECT id FROM invoices WHERE id=${initial.invoiceId}::uuid AND company_id=${user.companyId}::uuid FOR UPDATE`;
    await tx.$queryRaw`SELECT id FROM invoice_payments WHERE id=${paymentId}::uuid AND company_id=${user.companyId}::uuid FOR UPDATE`;

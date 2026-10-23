@@ -2009,7 +2009,7 @@ model InvoiceScopeItem {
   @@map("invoice_scope_items")
 }
 
-// Each immutable approved receipt is both a USD invoice allocation and a VND cash movement.
+// Live receipts have a local approver. Imported source receipts preserve donor evidence without cash posting or a fabricated local approval.
 model InvoicePayment {
   cashAccountId String? @map("cash_account_id") @db.Uuid
   cashAccount CashAccount? @relation(fields:[companyId,cashAccountId],references:[companyId,id],onDelete:Restrict)
@@ -2022,22 +2022,22 @@ model InvoicePayment {
   requestDigest String @map("request_digest")
   paymentDate DateTime @map("payment_date") @db.Date
   paidUsd Decimal @map("paid_usd") @db.Decimal(20,2)
-  paidVnd Decimal? @map("paid_vnd") @db.Decimal(20,0)
-  fxRate Decimal? @map("fx_rate") @db.Decimal(20,4)
+  paidVnd Decimal? @map("paid_vnd") @db.Decimal(30,12)
+  fxRate Decimal? @map("fx_rate") @db.Decimal(30,12)
   allocationAmount Decimal @map("allocation_amount") @db.Decimal(20,2)
   cashCurrency String @default("VND") @map("cash_currency") @db.VarChar(3)
-  cashAmount Decimal @map("cash_amount") @db.Decimal(20,2)
+  cashAmount Decimal @map("cash_amount") @db.Decimal(30,12)
   historicalSource Json? @map("historical_source")
   swiftNo String @map("swift_no")
   bankAccount String @map("bank_account")
   paymentMethod String @map("payment_method")
   note String
   documentId String? @map("document_id") @db.Uuid
-  approvedById String @map("approved_by_id") @db.Uuid
+  approvedById String? @map("approved_by_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
   invoice Invoice @relation(fields:[companyId,invoiceId],references:[companyId,id])
   document Document? @relation(fields:[documentId],references:[id],onDelete:Restrict)
-  approvedBy User @relation("PaymentApprovedBy",fields:[approvedById],references:[id])
+  approvedBy User? @relation("PaymentApprovedBy",fields:[approvedById],references:[id])
   @@unique([companyId,requestId])
   @@unique([companyId,paymentCode])
   @@index([companyId,invoiceId,paymentDate])

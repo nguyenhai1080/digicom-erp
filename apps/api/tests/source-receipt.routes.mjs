@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import Fastify from 'fastify';
+import cookie from '@fastify/cookie';
+import {prisma,Prisma} from '@erp/db';
+import {invoicePaymentRoutes} from '../dist/modules/projects/invoice-payments.js';
+import {sourceReceiptView,isSourceReceipt} from '../dist/modules/projects/source-receipt.js';
+import {csrfToken} from '../dist/modules/auth/access.js';
+const app=Fastify(),companyId=randomUUID(),invoiceId=randomUUID(),paymentId=randomUUID(),userId=randomUUID(),token='a'.repeat(64),origin='https://source-receipt.example.test';
+const config={secret:'synthetic-source-receipt-test-secret',appOrigin:origin,defaultCompanyCode:'DGC',secureCookies:false,bootstrapEnabled:false,bootstrapToken:'disabled'};
+let permissions=['INVOICE_PAYMENT_VIEW'],reads=0,writes=0;
+await app.register(cookie);app.addHook('onRequest',async request=>{request.auth={companyId,userId,email:'synthetic@example.invalid',companyCode:'DGC',permissions};});app.setErrorHandler((e,_req,reply)=>reply.code(e.statusCode??500).send({message:e.message}));
+const raw={sourceKind:'DGC_SOURCE_RECEIPT_V1',reference:'DGC source receipt synthetic',capturedRowJson:'PRIVATE_RAW_FIXTURE',sourceActorJson:'PRIVATE_ACTOR_FIXTURE',historicalCashPosting:false};
+const old={invoice:prisma.invoice.findFirst,rows:prisma.invoicePayment.findMany,accounts:prisma.cashAccount.findMany,transaction:prisma.$transaction,session:prisma.authSession.findUnique};
+prisma.authSession.findUnique=async()=>({expiresAt:new Date(Date.now()+60000),user:{id:userId,companyId,email:'synthetic@example.invalid',fullName:'Synthetic source reader',status:'ACTIVE',company:{companyCode:'DGC',status:'ACTIVE'},roles:[{role:{companyId,status:'ACTIVE',permissions:permissions.map(code=>({permission:{code}}))}}]}});
+prisma.invoice.findFirst=async()=>({id:invoiceId,companyId,invoiceNumber:'SYN',period:'2026-01',currency:'USD',status:'PAID',updatedAt:new Date(),payableAmount:new Prisma.Decimal(100),paidAmount:new Prisma.Decimal(100),receivable:{outstandingAmount:new Prisma.Decimal(0)}});
+prisma.invoicePayment.findMany=async()=>[{id:paymentId,allocationAmount:'100',cashAmount:'12345.12345678',fxRate:'123.451234567891',historicalSource:raw,approvedById:null}];
+prisma.cashAccount.findMany=async()=>{throw Error('Read-only source receipt must not query cash catalog');};
+prisma.$transaction=async run=>run({invoicePayment:{findFirst:async()=>{reads++;return {id:paymentId,historicalSource:raw};}},cashAccount:{update:async()=>{writes++;throw Error('Unexpected cash write');}}});
+let checks=0;const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};
+try{
+ await invoicePaymentRoutes(app,config);
+ eq(isSourceReceipt(raw),true);eq(isSourceReceipt(null),false);eq(isSourceReceipt([]),false);const legacy={reference:'Existing manual history'};eq(sourceReceiptView(legacy),legacy);
+ let r=await app.inject({method:'GET',url:'/api/v1/invoices/'+invoiceId+'/payments',headers:{cookie:'erp_session='+token}});eq(r.statusCode,200);const data=r.json();eq(data.canPost,false);eq(data.accounts,[]);eq(data.items[0].cashAmount,'12345.12345678');eq(data.items[0].fxRate,'123.451234567891');eq(data.items[0].historicalSource.rateKind,'SOURCE_INFORMATIONAL');eq(r.body.includes('PRIVATE_RAW_FIXTURE'),false);eq(r.body.includes('PRIVATE_ACTOR_FIXTURE'),false);
+ permissions=[];r=await app.inject({method:'GET',url:'/api/v1/invoices/'+invoiceId+'/payments',headers:{cookie:'erp_session='+token}});eq(r.statusCode,403);
+ permissions=['PAYMENT_POST','PAYMENT_CREATE','PAYMENT_APPROVE'];const headers={cookie:'erp_session='+token,origin,'x-csrf-token':csrfToken(token,config.secret)},payload={cashAccountId:randomUUID(),reason:'Synthetic source must never post cash',confirmed:true};
+ r=await app.inject({method:'POST',url:'/api/v1/invoice-payments/'+paymentId+'/post-cash',headers,payload});eq(r.statusCode,409);eq(r.json().message.includes('không được ghi'),true);eq(reads,1);eq(writes,0);
+ r=await app.inject({method:'POST',url:'/api/v1/invoice-payments/'+paymentId+'/post-cash',headers:{...headers,'x-csrf-token':'wrong'},payload});eq(r.statusCode,403);eq(reads,1);
+ console.log(`Source receipt HTTP: ${checks} assertions passed; read precision, no raw actor/row disclosure, no cash catalog and immutable cash policy`);
+}finally{prisma.invoice.findFirst=old.invoice;prisma.invoicePayment.findMany=old.rows;prisma.cashAccount.findMany=old.accounts;prisma.$transaction=old.transaction;prisma.authSession.findUnique=old.session;await app.close();await prisma.$disconnect();}

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import ts from '../node_modules/typescript/lib/typescript.js';
+const compile=s=>ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const numbers='data:text/javascript;base64,'+Buffer.from(compile(await readFile(new URL('../src/numbers.ts',import.meta.url),'utf8'))).toString('base64');
+let source=await readFile(new URL('../src/sourceReceipt.ts',import.meta.url),'utf8');source=source.replace("'./numbers'",JSON.stringify(numbers));
+const {receiptCash,importedReceipt}=await import('data:text/javascript;base64,'+Buffer.from(compile(source)).toString('base64'));
+const p={cashAmount:'12345.12345678',cashCurrency:'VND',historicalSource:{sourceKind:'DGC_SOURCE_RECEIPT_V1'}};
+assert.equal(importedReceipt(p),true);assert.equal(receiptCash(p),'12.345,12345678');assert.equal(receiptCash({...p,cashAmount:'9007199254740993.123456789012'}),'9.007.199.254.740.993,123456789012');assert.equal(receiptCash({...p,historicalSource:undefined}),'12.345');assert.equal(importedReceipt({}),false);
+const component=await readFile(new URL('../src/InvoicePayments.tsx',import.meta.url),'utf8');assert.match(component,/canPost&&p.historicalSource&&!importedReceipt\(p\)/);assert.match(component,/importedReceipt\(p\)\?12:8/);console.log('Source receipt display: 7 assertions passed; original VND precision and no cash conversion action');
