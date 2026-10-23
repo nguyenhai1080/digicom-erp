@@ -25,7 +25,7 @@ try{
  for(const suffix of ['?asOf=2026-01-31','?partnerId='+own.partner.id,'?partnerId='+own.partner.id+'&asOf=2026-02-30','?partnerId='+own.partner.id+'&asOf=2026-01-31&companyId='+companies[1].id])await get(reader,path+suffix,400);
  const before=await Promise.all([prisma.invoice.count(),prisma.accountReceivable.count(),prisma.invoicePayment.count(),prisma.cashEntry.count(),prisma.document.count(),prisma.auditLog.count()]);
  const refs=await get(reader,path+'/partners');eq(refs.items.length,1);eq(refs.items[0].partnerKey,'SOA_SYN');
- const r=await get(reader,url);eq(r.reviewOnly,true);eq(r.cutoffPolicy,'AWAITING_OWNER');eq(r.total,12);eq(r.pageSize,10);eq(r.pages,2);eq(r.items.length,10);eq(r.affectedInvoices,2);
+ const r=await get(reader,url);eq(r.reviewOnly,true);eq(r.cutoffPolicy,'THROUGH_AS_OF_INCLUSIVE');eq(r.total,12);eq(r.pageSize,10);eq(r.pages,2);eq(r.items.length,10);eq(r.affectedInvoices,2);
  const first=r.items[0];for(const [k,v] of Object.entries({amount:'100.00',paidThrough:'20.00',paidAfter:'40.00',paidAll:'60.00',remainingThrough:'80.00',remainingAll:'40.00'}))eq(first[k],v);
  eq(r.items.some(i=>i.invoiceNumber==='SOA-02'),true);const usd=r.totals.find(t=>t.currency==='USD');eq(usd.amount,'1100.00');eq(usd.paidThrough,'120.00');eq(usd.paidAfter,'40.00');eq(usd.remainingThrough,'980.00');eq(usd.remainingAll,'940.00');
  const page2=await get(reader,url+'&page=2');eq(page2.items.length,2);eq(page2.totals,r.totals);const vnd=page2.items.find(i=>i.currency==='VND');eq(vnd.remainingThrough,'1000000.00');eq(vnd.remainingAll,'900000.00');
@@ -38,7 +38,9 @@ try{
  await prisma.invoice.update({where:{id:own.crossing.id},data:{paidAmount:'60'}});
  await prisma.accountReceivable.delete({where:{companyId_invoiceId:{companyId:companies[0].id,invoiceId:own.crossing.id}}});await get(reader,url,409);
  const D=v=>new Prisma.Decimal(v),p=(date,amount)=>({paymentDate:new Date(date),allocationAmount:D(amount),allocationCurrency:'USD'});
- const boundary=cutoffAmounts(D('100'),'USD','2026-01-31',[p('2026-02-05','60')]);eq(boundary.remainingThrough,'100.00');eq(boundary.remainingAll,'40.00');
+ const boundary=cutoffAmounts(D('100'),'USD','2026-01-31',[p('2026-02-05','60')]);eq(boundary.remainingThrough,'100.00');eq(boundary.remainingAll,'40.00');eq(boundary.paidAtCutoff,'0.00');eq(boundary.outstandingAtCutoff,'100.00');
+ eq(first.paidAtCutoff,'20.00');eq(first.outstandingAtCutoff,'80.00');eq(usd.outstandingAtCutoff,'980.00');eq(vnd.outstandingAtCutoff,'1000000.00');
+ const inclusive=cutoffAmounts(D('100'),'USD','2026-01-31',[p('2026-01-31','20'),p('2026-02-01','30')]);eq(inclusive.paidAtCutoff,'20.00');eq(inclusive.outstandingAtCutoff,'80.00');
  assert.throws(()=>cutoffAmounts(D('100'),'USD','2026-01-31',[{...p('2026-01-10','10'),allocationCurrency:'VND'}]));checks++;
  const rounding=cutoffAmounts(D('1.005'),'USD','2026-01-31',[]);eq(rounding.amount,'1.01');eq(rounding.remainingAll,'1.01');
  console.log('SOA cutoff review: '+checks+' assertions passed.');

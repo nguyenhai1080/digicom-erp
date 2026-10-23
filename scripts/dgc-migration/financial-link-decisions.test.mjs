@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {fixture,cell} from './fixtures.mjs';
+import {normalizeCapture,masterPlan,digest} from './core.mjs';
+import {approveFinancialLinkProposal,financialLinkOverrides} from './financial-link-decisions.mjs';
+import {referenceGraph} from './graph.mjs';
+const captures=fixture();
+function table(name,headers,rows){const e=captures.find(e=>e.data.sheets[0].properties.title===name),s=e.data.sheets[0];s.properties.gridProperties={rowCount:rows.length+1,columnCount:headers.length};e.requestedRange=`'${name}'!A1:${String.fromCharCode(64+headers.length)}${rows.length+1}`;s.data[0].rowData=[{values:headers.map(cell)},...rows.map(r=>({values:r.map(cell)}))];}
+table('40_MONTHLY_REVENUE',['Revenue_ID','Partner_ID','Contract_ID','Service_ID','Revenue_Month'],[['WRONG','SYNTH_PARTNER','SYNTH_CONTRACT','SYNTH_SERVICE','2026-02'],['RIGHT','SYNTH_PARTNER','SYNTH_CONTRACT','SYNTH_SERVICE','2026-01']]);
+table('48_INVOICE_HEADER',['Invoice_ID','Partner_ID'],[['INV1','SYNTH_PARTNER']]);
+table('49_INVOICE_DETAIL',['Invoice_Detail_ID','Invoice_ID','Revenue_ID','Service_ID','Revenue_Month'],[['LINE1','INV1','WRONG','SYNTH_SERVICE','2026-01']]);
+table('50_AR_AP',['ARAP_ID','Invoice_ID','Revenue_ID','Partner_ID','Contract_ID','Revenue_Month'],[['AR1','INV1','WRONG','SYNTH_PARTNER','SYNTH_CONTRACT','2026-01']]);
+const snapshot=normalizeCapture(captures),before=JSON.stringify(snapshot),target=snapshot.tables['40_MONTHLY_REVENUE'].rows[1];
+const proposals=['49_INVOICE_DETAIL','50_AR_AP'].map(sheet=>{const t=snapshot.tables[sheet],r=t.rows[0];return {source:{sheet,sheetId:t.sheetId,sourceRow:r.sourceRow,legacyId:r.legacyId,expectedRowHash:r.rowHash,field:'Revenue_ID',expectedValue:'WRONG'},target:{sheet:'40_MONTHLY_REVENUE',sheetId:snapshot.tables['40_MONTHLY_REVENUE'].sheetId,sourceRow:target.sourceRow,legacyId:target.legacyId,expectedRowHash:target.rowHash},evidence:{invoiceId:'INV1',fileId:'SYNTHETIC_FILE_1234567890',sha256:'a'.repeat(64)},state:'PROPOSED_AWAITING_OWNER',changeSource:false,changeMoney:false};});
+const seal=p=>({...p,proposalHash:digest(p)}),proposal=seal({format:'dgc-financial-link-proposals-v1',snapshotHash:snapshot.snapshotHash,approved:false,postingAllowed:false,proposals});
+const approve=p=>approveFinancialLinkProposal(snapshot,p,{expectedProposalHash:p.proposalHash,approvedBy:'OWNER',approvedAt:'2026-10-23T08:10:37Z',decision:'APPROVE_ALL'});
+const approved=approve(proposal),resolutions={format:'dgc-master-decisions-v1',snapshotHash:snapshot.snapshotHash,decisions:[],financialLinkDecisions:approved};
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;},reject=fn=>{assert.throws(fn);n++;};
+eq(financialLinkOverrides(snapshot,undefined).size,0);eq(financialLinkOverrides(snapshot,approved).size,2);
+const prior=referenceGraph(snapshot),after=referenceGraph(snapshot,resolutions);eq(after.counts.OWNER_APPROVED_LINK,2);eq(after.unresolved,prior.unresolved-2);
+for(const sheet of ['49_INVOICE_DETAIL','50_AR_AP']){const l=after.links.find(l=>l.source.sheet===sheet&&l.field==='Revenue_ID');eq(l.legacyId,'WRONG');eq(l.target.sourceRow,3);eq(l.target.legacyId,'RIGHT');eq(l.ownerDecision.approvalHash,approved.approvalHash);}
+eq(JSON.stringify(snapshot),before);eq(masterPlan(snapshot).planHash,masterPlan(snapshot,resolutions).planHash);eq(after.postingAllowed,false);eq(after.acceptance,false);
+reject(()=>approveFinancialLinkProposal(snapshot,proposal,{expectedProposalHash:'stale',approvedBy:'OWNER',approvedAt:'2026-10-23',decision:'APPROVE_ALL'}));
+const bad=structuredClone(approved);bad.proposal.proposals[0].target.sourceRow=2;reject(()=>financialLinkOverrides(snapshot,bad));
+const reseal=e=>{const {approvalHash,...b}=e;return {...b,approvalHash:digest(b)};};
+const staff=structuredClone(approved);staff.approval.approvedBy='STAFF';reject(()=>financialLinkOverrides(snapshot,reseal(staff)));
+const changed=structuredClone(proposal);delete changed.proposalHash;changed.proposals[0].source.expectedValue='other';reject(()=>approve(seal(changed)));
+const unsupported=structuredClone(proposal);delete unsupported.proposalHash;unsupported.proposals[0].source.field='Paid_Amount';reject(()=>approve(seal(unsupported)));
+const duplicate=structuredClone(proposal);delete duplicate.proposalHash;duplicate.proposals.push(duplicate.proposals[0]);reject(()=>approve(seal(duplicate)));
+const conflicting=structuredClone(proposal);delete conflicting.proposalHash;const wrong=snapshot.tables['40_MONTHLY_REVENUE'].rows[0];conflicting.proposals[0].target={...conflicting.proposals[0].target,sourceRow:wrong.sourceRow,legacyId:wrong.legacyId,expectedRowHash:wrong.rowHash};reject(()=>referenceGraph(snapshot,{...resolutions,financialLinkDecisions:approve(seal(conflicting))}));
+eq(referenceGraph(snapshot,resolutions).planHash,after.planHash);
+console.log('Financial owner link decisions: '+n+' assertions passed; physical rows, approval seals, context, no source/money mutation.');

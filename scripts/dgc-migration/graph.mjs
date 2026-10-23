@@ -1,4 +1,5 @@
 import {verifySnapshot,masterPlan,digest,sourceDate} from './core.mjs';
+import {financialLinkOverrides} from './financial-link-decisions.mjs';
 const specs={
  '30_CONTRACTS':{Partner_ID:'21_DM_PARTNER'},
  '31_CONTRACT_SERVICES':{Contract_ID:'30_CONTRACTS',Service_ID:'20_DM_SERVICE'},
@@ -30,6 +31,7 @@ function fileId(v){const s=text(v);if(/^[A-Za-z0-9_-]{20,}$/.test(s))return s;re
 export function referenceGraph(snapshot,resolutions){
  verifySnapshot(snapshot);
  if(resolutions)masterPlan(snapshot,resolutions); // exact snapshot/row/owner decision validation
+ const approvedLinks=financialLinkOverrides(snapshot,resolutions?.financialLinkDecisions);
  const aliases=new Map((resolutions?.decisions??[]).filter(d=>d.sheet==='31_CONTRACT_SERVICES'&&d.field==='Service_ID').map(d=>[name(d.expectedValue),d.value]));
  const indexes={},duplicates=[],nodes=[];
  for(const [sheet,t] of Object.entries(snapshot.tables)){
@@ -67,7 +69,7 @@ export function referenceGraph(snapshot,resolutions){
   const raw=text(row.values[field]);if(!raw)continue;
   const ids=field.startsWith('Related_')?[...new Set(raw.split(/[,;\n]/).map(text).filter(Boolean))]:[raw];
   for(const legacyId of ids){
-   const alias=targetSheet==='20_DM_SERVICE'?aliases.get(name(legacyId)):null,lookupId=alias??legacyId,candidates=indexes[targetSheet].get(lookupId)??[];
+   const approved=approvedLinks.get(sheet+'|'+row.sourceRow+'|'+field),alias=targetSheet==='20_DM_SERVICE'?aliases.get(name(legacyId)):null,lookupId=approved?.target.legacyId??alias??legacyId,candidates=approved?[snapshot.tables[targetSheet].rows.find(r=>r.sourceRow===approved.target.sourceRow)]:indexes[targetSheet].get(lookupId)??[];
    const from={...context(sheet,row)};
    if(targetSheet==='21_DM_PARTNER')from.partner=lookupId;
    if(targetSheet==='30_CONTRACTS'){from.contract=lookupId;if(field.startsWith('Input_'))from.partner=text(row.values.Input_Partner_ID)||null;delete from.service;}
@@ -90,7 +92,8 @@ export function referenceGraph(snapshot,resolutions){
    let state='MISSING',selected=null;
    if(candidates.length===1){state=evaluations[0].conflicts.length?'CONTEXT_CONFLICT':alias?'OWNER_ALIAS_COMPARISON':'UNIQUE_ID';if(state!=='CONTEXT_CONFLICT')selected=evaluations[0].target;}
    else if(candidates.length>1){state='AMBIGUOUS';if(compatible.length===1){const e=compatible[0],strong=e.matched.includes('file')||e.matched.includes('doc')||e.matched.includes('period')&&(e.matched.includes('partner')||e.matched.includes('service')||e.matched.includes('contract'));if(strong){state='CONTEXT_MATCH';selected=e.target;}}}
-   links.push({source:address(sheet,snapshot.tables[sheet],row),field,targetSheet,legacyId,...(alias?{comparisonAlias:alias}:{}),state,target:selected,evidence:evaluations});
+   if(approved){if(!selected||evaluations[0].conflicts.length)throw Error('Approved financial target conflicts with source business context');state='OWNER_APPROVED_LINK';}
+   links.push({source:address(sheet,snapshot.tables[sheet],row),field,targetSheet,legacyId,...(alias?{comparisonAlias:alias}:{}),...(approved?{ownerDecision:{proposalHash:approved.proposalHash,approvalHash:approved.approvalHash,approvedAt:approved.approvedAt,sourceChanged:false,moneyChanged:false}}:{}),state,target:selected,evidence:evaluations});
   }
  }
  const counts=links.reduce((a,l)=>(a[l.state]=(a[l.state]??0)+1,a),{}),issues=links.filter(l=>!l.target);
