@@ -6,6 +6,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./dgc-invoice-balance": {
+      "types": "./prisma/dgc-invoice-balance.d.mts",
+      "import": "./prisma/dgc-invoice-balance.mjs"
+    },
     "./dgc-master-transfer": "./prisma/dgc-master-transfer.mjs",
     ".": {
       "development": "./src/index.ts",
