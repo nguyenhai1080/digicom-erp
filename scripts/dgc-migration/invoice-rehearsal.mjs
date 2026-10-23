@@ -5,7 +5,7 @@ import {requireStaging} from './staging.mjs';
 import {verifyInvoiceFiles} from './invoice-files.mjs';
 import {verifyReconFiles} from './recon-files.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
-import {rehearseRevenue,rehearseInvoiceRoundingSources} from './revenue-rehearsal.mjs';
+import {rehearseRevenue,rehearseInvoiceRoundingSources,masterResolver} from './revenue-rehearsal.mjs';
 import {verifyInvoiceRoundingPlan} from './invoice-rounding.mjs';
 import {verifyInvoiceOffsettingPlan,verifyInvoiceSourceRoundingPlan} from './invoice-offsetting.mjs';
 import {withSourcePlanningCache} from './planning-context.mjs';
@@ -22,10 +22,10 @@ async function verifiedFiles(snapshot,manifest,root,pin){
  const base=await realpath(root);for(const f of manifest.files){const stat=await lstat(resolve(base,f.relativePath));if(!stat.isFile()||stat.isSymbolicLink()||stat.size>64*1024*1024)throw Error('Invalid original Invoice file');}
  return verifyInvoiceFiles(snapshot,manifest,base);
 }
-async function materialize(tx,companyId,selected,plan,root,actorId){
+async function materialize(tx,companyId,selected,plan,root,actorId,resolveMaster){
  let created=0,unchanged=0;
  async function record(model,data,adopt){const old=await tx[model].findFirst({where:{companyId,id:data.id}});if(old){if(!adopt||hash(old,data)!==hash(data,data))throw Error('Unlinked or changed Invoice rehearsal target '+model);return old;}if(adopt)throw Error('Missing linked Invoice rehearsal target '+model);return tx[model].create({data});}
- async function linked(source,model){const links=await tx.dgcImportLink.findMany({where:{companyId,snapshotHash:plan.snapshotHash,sourceSpreadsheetId:SOURCE_ID,sheetId:source.sheetId,sourceRow:source.sourceRow,legacyId:source.legacyId,rowHash:source.rowHash,targetModel:model}});if(links.length!==1)throw Error('Missing or ambiguous source target '+model);return links[0].targetId;}
+ async function linked(source,model){if(['partner','contract','service','contractService'].includes(model))return resolveMaster(source,model);const links=await tx.dgcImportLink.findMany({where:{companyId,snapshotHash:plan.snapshotHash,sourceSpreadsheetId:SOURCE_ID,sheetId:source.sheetId,sourceRow:source.sourceRow,legacyId:source.legacyId,rowHash:source.rowHash,targetModel:model}});if(links.length!==1)throw Error('Missing or ambiguous source target '+model);return links[0].targetId;}
  async function provenance(source,model,data,required){
   const old=await tx.dgcImportLink.findFirst({where:{companyId,sourceSpreadsheetId:SOURCE_ID,sheetId:source.sheetId,sourceRow:source.sourceRow,legacyId:source.legacyId}}),targetHash=hash(data,data);
   if(old){if(old.snapshotHash!==plan.snapshotHash||old.rowHash!==source.rowHash||old.targetModel!==model||old.targetId!==data.id||old.targetHash!==targetHash)throw Error('Invoice rehearsal provenance drift');}
@@ -98,7 +98,7 @@ async function runInvoiceTrial(db,{snapshot,targetPlan,combined,reviewPin,manife
    if(e.message!=='DGC rehearsal rollback'||e.result?.snapshotHash!==snapshot.snapshotHash||e.result?.planHash!==targetPlan.planHash)throw e;
    const actorId=uuid(companyId,'technical-actor',restorePlan.planHash);if(await tx.user.findFirst({where:{OR:[{id:actorId},{email:'dgc-trial-'+actorId+'@example.invalid'}]}}))throw Error('Technical trial actor already exists');
    await tx.user.create({data:{id:actorId,companyId,email:'dgc-trial-'+actorId+'@example.invalid',fullName:'Disabled migration trial creator',passwordHash:'NO_LOGIN_REHEARSAL_ONLY',status:'INACTIVE'}});
-   const first=await materialize(tx,companyId,selected,restorePlan,root,actorId),replay=await materialize(tx,companyId,selected,restorePlan,root,actorId);if(replay.created||replay.unchanged!==selected.length)throw Error('Invoice rehearsal replay differs');
+   const first=await materialize(tx,companyId,selected,restorePlan,root,actorId,await masterResolver(tx,snapshot,companyId,decisions)),replay=await materialize(tx,companyId,selected,restorePlan,root,actorId,await masterResolver(tx,snapshot,companyId,decisions));if(replay.created||replay.unchanged!==selected.length)throw Error('Invoice rehearsal replay differs');
    await verifiedFiles(snapshot,manifest,root,manifestPin);
    if(roundingOptions)await verifyReconFiles(snapshot,roundingOptions.reconManifest,roundingOptions.reconRoot,roundingOptions.reconManifestPin);
    const inside=await counts(tx);

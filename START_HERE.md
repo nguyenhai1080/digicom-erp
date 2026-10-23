@@ -2,6 +2,8 @@
 
 Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
+**Mốc mới — v11/storage và nối staging tài chính:** [host finance bridge](docs/handover/DGC_HOST_FINANCE_BRIDGE_20261023.md): marker storage preserved qua redeploy v10→v11, backup website thành công và restore marker local khớp bytes/hash. Đã sửa Invoice resolver để nhận đúng 37 master links dùng hash gói riêng; trên clone backup host, stage đủ 3.154 raw rows rồi thử bốn Invoice–AR/revenue, replay 0 trùng/rollback sạch, 48 assertions và 56/217 PostgreSQL hồi quy + 32 suites đạt. Browser đã phục hồi. Chưa financial commit; còn bốn Issued Invoice held và adapter 51 receipts (bốn VND phần lẻ), files/registry/UAT.
+
 **Owner đã chốt tài chính:** [quyết định 23/10](docs/handover/DGC_FINANCIAL_OWNER_DECISIONS_20261023.md) xác nhận cả ba mapping Invoice/AR → revenue và SOA chỉ tính thu đến hết ngày chốt. Approval đã ghim snapshot/row/PDF; graph và toàn chuỗi plan đã dựng lại. Không còn chờ trả lời hai câu hỏi này; tài chính chưa import và source/PDF/số tiền không đổi.
 
 **V10 đã online và nguồn đã đối chiếu lại:** [kiểm triển khai/nguồn](docs/handover/DGC_SOURCE_DELTA_AND_V10_20261023.md): chính sách SOA mới hiển thị đúng trên website DGC, health/runtime trả 200. Đọc lại đúng workbook nguồn: 25 bảng/3.154 hàng khớp toàn bộ row hash snapshot 19/10; không thêm/xóa/sửa hoặc đổi header/bounds. Đây là multi-request read, chưa phải snapshot đã khóa tại cutover. Storage probe tạo file thành công trên v10; chưa chứng minh giữ qua redeploy.

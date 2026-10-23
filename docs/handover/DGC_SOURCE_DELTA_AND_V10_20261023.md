@@ -1,5 +1,7 @@
 # Đối chiếu nguồn và bản DGC v10
 
+Cập nhật tiếp: [v11/storage và host finance bridge](DGC_HOST_FINANCE_BRIDGE_20261023.md) đã xác minh marker preserved qua redeploy, backup website/restore marker local đạt; browser đã hết timeout. Các giới hạn/chưa kiểm dưới đây mô tả thời điểm v10; financial PDF/full application/config restore vẫn chưa nghiệm thu.
+
 Ngày 23/10/2026. Đọc cùng [quyết định owner](DGC_FINANCIAL_OWNER_DECISIONS_20261023.md), [master transfer](DGC_MASTER_TRANSFER_20261023.md) và [roadmap](DGC_ROADMAP_STATUS_20261022.md).
 
 ## Triển khai đã xác minh
