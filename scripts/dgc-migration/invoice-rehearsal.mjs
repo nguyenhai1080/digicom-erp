@@ -7,6 +7,8 @@ import {verifyReconFiles} from './recon-files.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
 import {rehearseRevenue,rehearseInvoiceRoundingSources} from './revenue-rehearsal.mjs';
 import {verifyInvoiceRoundingPlan} from './invoice-rounding.mjs';
+import {verifyInvoiceOffsettingPlan} from './invoice-offsetting.mjs';
+import {withSourcePlanningCache} from './planning-context.mjs';
 const models=['user','userRole','authSession','approvalRequest','reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','invoiceDocumentLink','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
 const normalized=v=>v instanceof Date?v.toISOString():typeof v==='bigint'?v.toString():v?.toFixed?v.toFixed():v;
@@ -63,6 +65,14 @@ export async function rehearseInvoiceRestore(db,{snapshot,targetPlan,combined,re
 
 export async function rehearseInvoiceRounding(db,options){
  return invoiceEvidenceSet(db,options,false);
+}
+export async function rehearseInvoiceOffsetting(db,options){
+ requireStaging(process.env.DATABASE_URL??'');
+ return withSourcePlanningCache(async()=>{const {invoiceOptions:i,offsettingPlan:p,sourceRows}=options;verifyInvoiceOffsettingPlan(p,options);
+  if(!Array.isArray(sourceRows)||!sourceRows.length||new Set(sourceRows).size!==sourceRows.length)throw Error('Select unique whole offsetting Invoices');
+  const selected=sourceRows.map(n=>p.entries.find(e=>e.source.sourceRow===n));if(selected.some(e=>!e||e.state!=='INVOICE_OFFSETTING_SHAPE_CANDIDATE'))throw Error('Other Invoice/source/scope gates remain held');
+  const r=await runInvoiceTrial(db,{...i,restorePlan:p,sourceRows},selected,options);return {...r,shapeProfile:'OFFSETTING_CHARACTERIZED_LINE_DELTAS',originalGatesUnchanged:true,commitAllowed:false};
+ });
 }
 // Whole-document trials may need strict and characterized-rounding Invoices
 // together. Both profiles are rederived; this never opens the regular importer.
