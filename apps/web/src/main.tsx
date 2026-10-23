@@ -19,6 +19,7 @@ import { Dashboard } from './Dashboard';
 import { Users } from './Users';
 import {CompanyBrandProvider,useBranding} from './CompanyBranding';
 import {AdminSetup} from './AdminSetup';
+import {MasterTransfer} from './MasterTransfer';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
@@ -85,6 +86,7 @@ function App() {
     {message && <p className="notice" role="alert">{message}</p>}
     <footer><span role="status">{health}</span><span>v{version} · Staging</span></footer>
   </section></main>;
+  if(session.user.companyCode==='DGC'&&session.user.permissions.includes('SYSTEM_CONFIG_EDIT')&&window.location.pathname==='/migration/masters')return <MasterTransfer request={api} csrf={session.csrfToken}/>;
   return <div className="shell"><aside><h2>{branding.appName}</h2><p className="sidebar-subtitle">Hệ thống quản lý công việc và tài chính<br/>{session.user.companyCode}</p><div className="nav-title">QUẢN LÝ</div><nav className="sidebar-nav" aria-label="Quản lý ERP">
     <button className={'nav ' + (page === 'dashboard' ? 'active' : '')} aria-current={page==='dashboard'?'page':undefined} onClick={() => { setPage('dashboard'); setMessage(''); }}>Dashboard</button>
     {session.user.permissions.includes('PROJECT_VIEW') && <button className={'nav ' + (page === 'projects' ? 'active' : '')} aria-current={page==='projects'?'page':undefined} onClick={() => setPage('projects')}>Quản lý Dự án</button>}

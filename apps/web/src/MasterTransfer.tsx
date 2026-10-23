@@ -1,0 +1,13 @@
+import React,{useState} from 'react';
+type Request=(path:string,body?:unknown,csrf?:string)=>Promise<any>;
+export function MasterTransfer({request,csrf}:{request:Request;csrf:string}){
+ const [selection,setSelection]=useState<any>(null),[proof,setProof]=useState<any>(null),[reason,setReason]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[done,setDone]=useState(false);
+ async function choose(event:React.ChangeEvent<HTMLInputElement>){
+  const file=event.currentTarget.files?.[0];setSelection(null);setProof(null);setDone(false);setMessage('');if(!file)return;
+  setBusy(true);try{if(file.size>1500000)throw Error('Gói danh mục tối đa 1,5 MB.');const input=JSON.parse(await file.text());if(!/^[a-f0-9]{64}$/.test(input.transferHash??'')||input.bundle?.format!=='dgc-master-transfer-v1')throw Error('Chọn đúng gói danh mục đã chuẩn bị.');setSelection(input);}catch(e){setMessage(e instanceof Error?e.message:'Không đọc được gói danh mục.');}finally{setBusy(false);}
+ }
+ async function run(apply:boolean){
+  setBusy(true);setMessage('');try{const result=await request('/dgc-migration/masters/'+(apply?'apply':'preview'),{...selection,...(apply?{previewToken:proof.previewToken,reason}:{})},csrf);setProof(result);setDone(apply);setMessage(apply?'Đã nhập và kiểm tra danh mục. Chưa nhập dữ liệu tài chính.':'Đã kiểm tra toàn bộ gói trong transaction và rollback. Chưa lưu danh mục.');}catch(e){setProof(null);setMessage(e instanceof Error?e.message:'Không xử lý được gói danh mục.');}finally{setBusy(false);}
+ }
+ return <main style={{maxWidth:850,margin:'30px auto',padding:20}}><a href="/">← Quay lại DGC ERP</a><h1>Nhập danh mục DGC</h1><p>Nhập dịch vụ, đối tác, hợp đồng và liên kết dịch vụ từ gói đã duyệt. Không tạo doanh thu, Invoice hoặc thu chi.</p><section className="panel"><fieldset disabled={busy}><label>Gói danh mục đã duyệt<input type="file" accept=".json,application/json" onChange={choose}/></label>{selection&&<p style={{overflowWrap:'anywhere'}}>Mã gói: {selection.transferHash}</p>}<button disabled={!selection||done} onClick={()=>void run(false)}>Kiểm tra trước khi nhập</button>{proof&&<><h2>Kết quả kiểm tra</h2><ul><li>Dịch vụ: {proof.counts.service}</li><li>Đối tác: {proof.counts.partner}</li><li>Hợp đồng: {proof.counts.contract}</li><li>Liên kết dịch vụ: {proof.counts.contractService}</li></ul></>}{proof?.previewToken&&!done&&<><label>Lý do nhập<input value={reason} onChange={e=>setReason(e.target.value)} minLength={10} maxLength={500}/></label><button className="primary" disabled={reason.trim().length<10} onClick={()=>void run(true)}>Nhập danh mục đã kiểm tra</button></>}</fieldset>{message&&<p role="status">{message}</p>}</section></main>;
+}
