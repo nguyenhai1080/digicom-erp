@@ -9,6 +9,7 @@ import {rehearseRevenue,rehearseInvoiceRoundingSources,masterResolver} from './r
 import {verifyInvoiceRoundingPlan} from './invoice-rounding.mjs';
 import {verifyInvoiceOffsettingPlan,verifyInvoiceSourceRoundingPlan} from './invoice-offsetting.mjs';
 import {withSourcePlanningCache} from './planning-context.mjs';
+import {verifyInvoiceBalancePlan} from './invoice-balance.mjs';
 const models=['user','userRole','authSession','approvalRequest','reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','invoiceDocumentLink','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
 const normalized=v=>v instanceof Date?v.toISOString():typeof v==='bigint'?v.toString():v?.toFixed?v.toFixed():v;
@@ -71,6 +72,14 @@ export async function rehearseInvoiceOffsetting(db,options){
 }
 export async function rehearseInvoiceSourceRounding(db,options){
  return exactHeaderTrial(db,options,true);
+}
+export async function rehearseInvoiceBalance(db,options){
+ requireStaging(process.env.DATABASE_URL??'');return withSourcePlanningCache(async()=>{
+  const p=verifyInvoiceBalancePlan(options.balancePlan,options),rows=options.sourceRows;
+  if(!Array.isArray(rows)||!rows.length||new Set(rows).size!==rows.length)throw Error('Select unique whole balancing Invoices');
+  const selected=rows.map(n=>p.entries.find(e=>e.source.sourceRow===n));if(selected.some(e=>e?.state!=='INVOICE_GROUP_BALANCE_SHAPE_CANDIDATE'))throw Error('Other Invoice/source/scope gates remain held');
+  const r=await runInvoiceTrial(db,{...options.invoiceOptions,restorePlan:p,sourceRows:rows},selected,options);return {...r,shapeProfile:'DONOR_GROUP_LAST_CHILD_BALANCING',originalGatesUnchanged:true,commitAllowed:false};
+ });
 }
 async function exactHeaderTrial(db,options,sourceOnly){
  requireStaging(process.env.DATABASE_URL??'');

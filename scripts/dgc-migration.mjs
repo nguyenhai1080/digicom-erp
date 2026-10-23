@@ -32,6 +32,8 @@ import {roundingExceptionPlan,verifyRoundingExceptionPlan} from './dgc-migration
 import {rehearseRoundingExceptions} from './dgc-migration/revenue-rehearsal.mjs';
 import {invoiceRoundingPlan,verifyInvoiceRoundingPlan} from './dgc-migration/invoice-rounding.mjs';
 import {rehearseInvoiceRounding,rehearseInvoiceOffsetting,rehearseInvoiceSourceRounding} from './dgc-migration/invoice-rehearsal.mjs';
+import {invoiceBalancePlan,verifyInvoiceBalancePlan} from './dgc-migration/invoice-balance.mjs';
+import {rehearseInvoiceBalance} from './dgc-migration/invoice-rehearsal.mjs';
 import {invoiceOffsettingPlan,verifyInvoiceOffsettingPlan,invoiceSourceRoundingPlan,verifyInvoiceSourceRoundingPlan} from './dgc-migration/invoice-offsetting.mjs';
 
 const [command,...args]=process.argv.slice(2);
@@ -66,20 +68,20 @@ if(command==='prepare'){
  const snapshot=verifySnapshot(await json(option('snapshot')));
  if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  console.log(JSON.stringify({command,...await verifyInputFiles(snapshot,await json(await privateArchivePath(option('manifest'))),await privateArchivePath(option('root')))}));
-}else if(['prepare-invoice-rounding','verify-invoice-rounding','rehearse-invoice-rounding','prepare-invoice-offsetting','verify-invoice-offsetting','rehearse-invoice-offsetting','prepare-invoice-source-rounding','verify-invoice-source-rounding','rehearse-invoice-source-rounding'].includes(command)){
- const sourceOnly=command.endsWith('invoice-source-rounding'),offsetting=command.endsWith('invoice-offsetting'),prepare=sourceOnly?invoiceSourceRoundingPlan:offsetting?invoiceOffsettingPlan:invoiceRoundingPlan,verify=sourceOnly?verifyInvoiceSourceRoundingPlan:offsetting?verifyInvoiceOffsettingPlan:verifyInvoiceRoundingPlan;
+}else if(['prepare-invoice-rounding','verify-invoice-rounding','rehearse-invoice-rounding','prepare-invoice-offsetting','verify-invoice-offsetting','rehearse-invoice-offsetting','prepare-invoice-source-rounding','verify-invoice-source-rounding','rehearse-invoice-source-rounding','prepare-invoice-balance','verify-invoice-balance','rehearse-invoice-balance'].includes(command)){
+ const balancing=command.endsWith('invoice-balance'),sourceOnly=command.endsWith('invoice-source-rounding'),offsetting=command.endsWith('invoice-offsetting'),prepare=balancing?invoiceBalancePlan:sourceOnly?invoiceSourceRoundingPlan:offsetting?invoiceOffsettingPlan:invoiceRoundingPlan,verify=balancing?verifyInvoiceBalancePlan:sourceOnly?verifyInvoiceSourceRoundingPlan:offsetting?verifyInvoiceOffsettingPlan:verifyInvoiceRoundingPlan;
  const snapshot=verifySnapshot(await json(option('snapshot')));if(option('snapshot-hash')!==snapshot.snapshotHash)throw Error('Snapshot digest does not match');
  const input=async name=>json(await privateArchivePath(option(name))),invoiceOptions={snapshot,targetPlan:await input('plan'),combined:await input('review'),reviewPin:option('review-hash'),manifest:await input('manifest'),manifestPin:option('manifest-hash'),restorePlan:await input('restore-plan'),decisions:resolutions};
  const inputs={invoiceOptions,rounding:await input('rounding-review'),roundingPin:option('rounding-review-hash'),exceptionPlan:await input('exception-plan')};let report;
  if(command.startsWith('prepare-'))report=prepare(inputs);
  else{
-  const p=verify(await input(sourceOnly?'source-rounding-plan':offsetting?'offsetting-plan':'invoice-rounding-plan'),inputs);
+  const p=verify(await input(balancing?'balance-plan':sourceOnly?'source-rounding-plan':offsetting?'offsetting-plan':'invoice-rounding-plan'),inputs);
   if(command.startsWith('verify-'))console.log(JSON.stringify({command,verified:true,planHash:p.planHash,counts:p.counts,commitAllowed:false}));
   else{
-   requireStaging(process.env.DATABASE_URL??'');invoiceOptions.root=await privateArchivePath(option('root'));const candidate=sourceOnly?'INVOICE_SOURCE_ROUNDING_SHAPE_CANDIDATE':offsetting?'INVOICE_OFFSETTING_SHAPE_CANDIDATE':'INVOICE_ROUNDING_SHAPE_CANDIDATE',sourceRows=option('source-rows')==='all-candidates'?p.entries.filter(e=>e.state===candidate).map(e=>e.source.sourceRow):option('source-rows').split(',').map(Number);
+   requireStaging(process.env.DATABASE_URL??'');invoiceOptions.root=await privateArchivePath(option('root'));const candidate=balancing?'INVOICE_GROUP_BALANCE_SHAPE_CANDIDATE':sourceOnly?'INVOICE_SOURCE_ROUNDING_SHAPE_CANDIDATE':offsetting?'INVOICE_OFFSETTING_SHAPE_CANDIDATE':'INVOICE_ROUNDING_SHAPE_CANDIDATE',sourceRows=option('source-rows')==='all-candidates'?p.entries.filter(e=>e.state===candidate).map(e=>e.source.sourceRow):option('source-rows').split(',').map(Number);
    if(!sourceRows.length||new Set(sourceRows).size!==sourceRows.length||sourceRows.some(n=>p.entries.find(e=>e.source.sourceRow===n)?.state!==candidate))throw Error('Select unique whole candidate Invoices');
    const reconManifest=await input('recon-manifest'),reconManifestPin=option('recon-manifest-hash'),reconRoot=await privateArchivePath(option('recon-root'));
-   const {PrismaClient}=createRequire(new URL('../packages/db/package.json',import.meta.url))('@prisma/client'),db=new PrismaClient();try{invoiceOptions.companyId=(await db.company.findUniqueOrThrow({where:{companyCode:'DGC'}})).id;report=await (sourceOnly?rehearseInvoiceSourceRounding:offsetting?rehearseInvoiceOffsetting:rehearseInvoiceRounding)(db,{...inputs,[sourceOnly?'sourceRoundingPlan':offsetting?'offsettingPlan':'invoiceExceptionPlan']:p,sourceRows,reconManifest,reconManifestPin,reconRoot});}finally{await db.$disconnect();}
+   const {PrismaClient}=createRequire(new URL('../packages/db/package.json',import.meta.url))('@prisma/client'),db=new PrismaClient();try{invoiceOptions.companyId=(await db.company.findUniqueOrThrow({where:{companyCode:'DGC'}})).id;report=await (balancing?rehearseInvoiceBalance:sourceOnly?rehearseInvoiceSourceRounding:offsetting?rehearseInvoiceOffsetting:rehearseInvoiceRounding)(db,{...inputs,[balancing?'balancePlan':sourceOnly?'sourceRoundingPlan':offsetting?'offsettingPlan':'invoiceExceptionPlan']:p,sourceRows,reconManifest,reconManifestPin,reconRoot});}finally{await db.$disconnect();}
   }
  }
  if(report){const out=await privateArchivePath(option('out'));await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,JSON.stringify(report,null,2),{encoding:'utf8',mode:0o600});console.log(JSON.stringify({command,planHash:report.planHash??report.restorePlanHash,counts:report.counts,first:report.first,replay:report.replay,rolledBack:report.rolledBack,originalGatesUnchanged:true,commitAllowed:false}));}

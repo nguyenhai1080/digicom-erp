@@ -2,6 +2,8 @@
 
 Cập nhật 23/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
 
+Invoice mới: [donor group balancing V4](DGC_INVOICE_GROUP_BALANCING_20261023.md) đã trial riêng một Invoice–AR/bốn revenue nguồn thật (hàng 79), replay/rollback và reader guards đạt. Có bốn Issued strict + một V4 đã trial riêng, còn ba Issued held; không đổi strict/V1/V2/V3 hoặc số tiền nguồn. Full financial importer/registry V3/V4/files/UAT vẫn pending; tài chính thực tế chưa nhập, website vẫn v12.
+
 Receipt adapter mới: [51 source receipts](DGC_SOURCE_RECEIPTS_20261023.md) đã lưu/đọc thử đủ trên clone host, giữ raw VND/FX/actor/date, không local approval/cash, replay/rollback sạch. V12/deploy `28270590` đã online sau backup DB thành công: schema25/no pending, health 200, storage marker preserved; DB/API/UI guards đã triển khai. Đây chưa phải full Invoice/revenue/AR restoration hoặc source financial acceptance; bốn Issued Invoice held, operational importer/files/registry/UAT vẫn đường găng.
 
 Mốc mới: [v11/storage và staging trên clone host](DGC_HOST_FINANCE_BRIDGE_20261023.md) đã kiểm preserved qua redeploy, backup/restore marker; sửa resolver để nối hash master-transfer với full financial snapshot mà không sửa provenance. 3.154 raw rows stage local, bốn Issued Invoice–AR trial/replay/rollback đạt (48 assertions), 37 master links không đổi. Còn bốn Issued Invoice held, adapter 51 receipts/actor-date/precision, full files/registry/importer/UAT; 0 financial committed. Browser timeout đã hết. Restore financial PDFs/config đầy đủ vẫn chưa nghiệm thu.
