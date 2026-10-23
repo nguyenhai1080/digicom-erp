@@ -2,6 +2,8 @@
 
 Ngày 23/10/2026, giờ Việt Nam. Tiếp theo [kế hoạch một website/cutover](DGC_SINGLE_SITE_CUTOVER_20261023.md). Website online và khởi tạo kỹ thuật không đồng nghĩa financial cutover đã hoàn tất.
 
+Cập nhật sau kích hoạt: [master transfer v8/v9](DGC_MASTER_TRANSFER_20261023.md) đã nhập 37 danh mục lên DB DGC, kiểm UI và backup trước/sau. V9 online/health connected, master importer và bootstrap/seed đã tắt; tài chính vẫn pending.
+
 ## Môi trường đã xác minh qua phiên trình duyệt owner
 
 - Đúng tài khoản **Công ty Cổ Phần Đầu Tư và Truyền Thông Số** tại v2.tinhgon.xyz. Connector MCP vẫn trả tài khoản GST; đăng nhập browser không đổi token MCP. Đã dùng browser UI có sẵn, không tạo/cấp thêm agent token hoặc dùng service GST.

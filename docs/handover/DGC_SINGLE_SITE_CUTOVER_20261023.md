@@ -2,7 +2,7 @@
 
 Quyết định owner 23/10/2026: gộp web/API thành **một website**, giảm số dịch vụ host; báo cáo dùng **Asia/Ho_Chi_Minh**, vận hành USD/VND, mặc định USD. Owner đặt mục tiêu cắt chuyển xong hôm nay. Đây là kế hoạch thực thi có điều kiện, chưa phải xác nhận đã cutover.
 
-Cập nhật: [môi trường DGC thực tế đã online và seed kỹ thuật](DGC_HOST_ACTIVATION_20261023.md), dùng browser owner đúng tài khoản; các dòng "chưa có môi trường" bên dưới là mốc lúc lập kế hoạch. Admin credential còn cần owner handoff, financial import/UAT/cutover chưa hoàn tất.
+Cập nhật: [môi trường DGC đã online và admin đã tạo](DGC_HOST_ACTIVATION_20261023.md), [37 danh mục đã nhập thật qua v8/v9](DGC_MASTER_TRANSFER_20261023.md), dùng browser owner đúng tài khoản; các dòng "chưa có môi trường" bên dưới là mốc lúc lập kế hoạch. Bootstrap/seed/importer đã tắt. Financial import/UAT/cutover chưa hoàn tất.
 
 Repo owner cung cấp: `https://github.com/nguyenhai1080/digicom-erp.git`, branch `dgc/main`. Không dùng upstream/DB/storage/secret GST. Kiểm read-only repo ban đầu không có refs. Connector Vibehost ngày 23/10 vẫn chỉ thấy hai dịch vụ GST, khác ảnh owner có ba website; phải kết nối đúng tài khoản DGC trước thao tác host.
 
