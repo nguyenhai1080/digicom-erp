@@ -2,6 +2,8 @@
 
 Ngày 23/10/2026. Tiếp sau [Invoice rounding V1](DGC_INVOICE_ROUNDING_REHEARSAL_20261022.md) và [registry trial](DGC_REFERENCE_ROUNDING_REHEARSAL_20261023.md). Đã hoàn tất trial riêng cho ba Invoice; chưa ghép profile này vào SOA/package hoặc nhập tài chính chính thức.
 
+Cập nhật tiếp cùng ngày: [whole-document offsetting registry trial](DGC_REFERENCE_OFFSETTING_REHEARSAL_20261023.md) đã hoàn tất bốn package/bốn links cho ba Invoice này. Các đoạn dưới giữ lại phạm vi và bước tiếp theo tại mốc Invoice riêng; trạng thái registry hiện hành ở bàn giao mới.
+
 ## Bằng chứng và triển khai
 
 Donor v61 `40_Invoice_Core.js`, khoảng dòng 786–812, cộng Revenue/WHT/Payable độc lập rồi làm tròn từng tổng. Header có thể khớp phép trừ trong khi các dòng có sai lệch trái dấu bù nhau. Giữ nguyên từng component, không tính lại Payable để ép identity.

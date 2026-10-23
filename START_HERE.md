@@ -4,6 +4,8 @@ Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
 ## Trạng thái sau tiếp nhận 19–22/10
 
+[Registry với Invoice có delta trái dấu](docs/handover/DGC_REFERENCE_OFFSETTING_REHEARSAL_20261023.md): thêm bốn package/bốn links/ba Invoice–AR với 17 nhóm/26 revenue đã ghi/đọc thử, guard 3/3 và replay/rollback 23 model counts đạt. 31 suite/135 PostgreSQL mới và hồi quy đạt. Worklist còn 36 Invoice dependencies chặn 35 documents có refs; 31 package no-ref riêng. Chưa nhập tài chính hoặc promote source Approved.
+
 [Invoice có sai lệch trái dấu bù nhau](docs/handover/DGC_INVOICE_OFFSETTING_REHEARSAL_20261023.md): ba Invoice–AR/17 nhóm/26 revenue đã ghi và đọc thử đủ, replay 0 trùng/rollback 23 model counts khớp. 30 suite/104 PostgreSQL mới và hồi quy đạt; giữ nguyên components/gates strict/V1. Chưa ghép profile mới vào SOA/package hoặc nhập tài chính.
 
 **[Roadmap hiện hành và mốc tiếp theo](docs/handover/DGC_ROADMAP_STATUS_20261022.md): đang diễn tập migration tài chính địa phương, chưa nhập chính thức hoặc go-live.** Đọc bảng này để xem toàn cảnh; các mục dưới là lịch sử từng đợt, không phải các chặng đã nghiệm thu.

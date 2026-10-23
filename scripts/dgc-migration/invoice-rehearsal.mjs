@@ -74,14 +74,15 @@ export async function rehearseInvoiceOffsetting(db,options){
   const r=await runInvoiceTrial(db,{...i,restorePlan:p,sourceRows},selected,options);return {...r,shapeProfile:'OFFSETTING_CHARACTERIZED_LINE_DELTAS',originalGatesUnchanged:true,commitAllowed:false};
  });
 }
-// Whole-document trials may need strict and characterized-rounding Invoices
-// together. Both profiles are rederived; this never opens the regular importer.
+// Whole-document trials may combine strict, nonzero-header and offsetting-line
+// shapes. Every supplied profile is rederived; the regular importer stays closed.
 export async function rehearseInvoiceEvidenceSet(db,options){return invoiceEvidenceSet(db,options,true);}
 async function invoiceEvidenceSet(db,options,allowStrict){
  requireStaging(process.env.DATABASE_URL??'');const {invoiceOptions:i,invoiceExceptionPlan:p,sourceRows}=options;verifyInvoiceRoundingPlan(p,options);
+ const offsetting=allowStrict&&options.offsettingPlan;if(offsetting)verifyInvoiceOffsettingPlan(offsetting,options);
  if(!Array.isArray(sourceRows)||!sourceRows.length||new Set(sourceRows).size!==sourceRows.length)throw Error('Select unique whole rounding Invoices');
- const selected=sourceRows.map(n=>{const e=p.entries.find(e=>e.source.sourceRow===n);if(e?.state==='INVOICE_ROUNDING_SHAPE_CANDIDATE')return e;const strict=i.restorePlan.entries.find(e=>e.source.sourceRow===n);return allowStrict&&strict?.state==='CANDIDATE_FOR_VERIFIED_ROLLBACK_TRIAL'?strict:null;});if(selected.some(e=>!e))throw Error('Other Invoice/source/scope gates remain held');
- const result=await runInvoiceTrial(db,{...i,restorePlan:p,sourceRows},selected,options);return {...result,shapeProfile:allowStrict?'STRICT_AND_CAPTURED_INVOICE_SHAPES':'CAPTURED_INVOICE_ROUNDING_ONLY',originalGatesUnchanged:true,commitAllowed:false};
+ const selected=sourceRows.map(n=>{const e=p.entries.find(e=>e.source.sourceRow===n);if(e?.state==='INVOICE_ROUNDING_SHAPE_CANDIDATE')return e;const strict=i.restorePlan.entries.find(e=>e.source.sourceRow===n);if(allowStrict&&strict?.state==='CANDIDATE_FOR_VERIFIED_ROLLBACK_TRIAL')return strict;const o=offsetting&&offsetting.entries.find(e=>e.source.sourceRow===n);return o?.state==='INVOICE_OFFSETTING_SHAPE_CANDIDATE'?o:null;});if(selected.some(e=>!e))throw Error('Other Invoice/source/scope gates remain held');
+ const result=await runInvoiceTrial(db,{...i,restorePlan:offsetting||p,sourceRows},selected,options);return {...result,shapeProfile:offsetting?'STRICT_ROUNDING_AND_OFFSETTING_INVOICE_SHAPES':allowStrict?'STRICT_AND_CAPTURED_INVOICE_SHAPES':'CAPTURED_INVOICE_ROUNDING_ONLY',originalGatesUnchanged:true,commitAllowed:false};
 }
 
 async function runInvoiceTrial(db,{snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions,restorePlan,sourceRows,root,companyId},selected,roundingOptions){
