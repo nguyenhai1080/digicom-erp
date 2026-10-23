@@ -1,0 +1,10 @@
+import {fixture,cell} from './fixtures.mjs';
+import {normalizeCapture} from './core.mjs';
+export function evidenceTransferFixture(){
+ const c=fixture(),e=c.find(e=>e.data.sheets[0].properties.title==='20_DM_SERVICE'),t=e.data.sheets[0],rows=t.data[0].rowData,headers=rows[0].values.map(c=>c.effectiveValue.stringValue),base=rows.slice(1).find(r=>r.values?.[0]?.effectiveValue?.stringValue);
+ for(let n=1;n<=33;n++){const row=structuredClone(base);for(const [field,value] of Object.entries({Service_ID:'EVIDENCE_SERVICE_'+n,Service_Code:'EVIDENCE_CODE_'+n,Service_Name:'Synthetic evidence service '+n}))if(headers.includes(field))row.values[headers.indexOf(field)]=cell(value);rows.push(row);}
+ rows[0].values.push(cell('Source_Serial_Evidence'));for(const r of rows.slice(1))if(r.values)r.values.push(cell(r.values?.[0]?.effectiveValue?.stringValue?46245.657010740746:''));t.properties.gridProperties.columnCount++;t.properties.gridProperties.rowCount=rows.length;
+ let count=t.properties.gridProperties.columnCount,col='';while(count){col=String.fromCharCode(65+(count-1)%26)+col;count=Math.floor((count-1)/26);}e.requestedRange=`'20_DM_SERVICE'!A1:${col}${rows.length}`;
+ const invoices=c.find(e=>e.data.sheets[0].properties.title==='48_INVOICE_HEADER'),ih=['Invoice_ID','Invoice_Number','Partner_ID','Status','Currency','Revision_No','Invoice_Date','Payment_Due_Date','Revenue_Month','Total_Revenue_USD','Total_WHT_USD','Total_Payable_USD','Paid_Amount_USD','Outstanding_Amount_USD'];
+ invoices.data.sheets[0].properties.gridProperties={rowCount:22,columnCount:ih.length};invoices.requestedRange="'48_INVOICE_HEADER'!A1:N22";invoices.data.sheets[0].data[0].rowData=[{values:ih.map(cell)},...Array.from({length:21},(_,i)=>({values:['EVIDENCE_INV_'+(i+1),'EVIDENCE/'+(i+1),'SYNTH_PARTNER','Issued','USD',1,46023,46063,46023,100,10,90,0,90].map((v,j)=>{const x=cell(v);if([6,7,8].includes(j))x.effectiveFormat={numberFormat:{type:'DATE',pattern:'yyyy-mm-dd'}};return x;})}))];return normalizeCapture(c);
+}

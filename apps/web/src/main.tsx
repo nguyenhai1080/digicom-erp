@@ -20,6 +20,7 @@ import { Users } from './Users';
 import {CompanyBrandProvider,useBranding} from './CompanyBranding';
 import {AdminSetup} from './AdminSetup';
 import {MasterTransfer} from './MasterTransfer';
+import {EvidenceTransfer} from './EvidenceTransfer';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
@@ -28,7 +29,7 @@ async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin',
     headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout((path === '/invoices/create' || path.endsWith('/finalize') || path.startsWith('/input-recon/')) ? 65000 : (path.endsWith('/documents') || path === '/company-assets' || path === '/output-recon/uploads' || path === '/output-recon/inspect' || path.endsWith('/read')) ? (path.endsWith('/read') || path === '/output-recon/inspect' ? 120000 : 60000) : 15000)
+    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(path.startsWith('/dgc-migration/evidence/') ? 120000 : (path === '/invoices/create' || path.endsWith('/finalize') || path.startsWith('/input-recon/')) ? 65000 : (path.endsWith('/documents') || path === '/company-assets' || path === '/output-recon/uploads' || path === '/output-recon/inspect' || path.endsWith('/read')) ? (path.endsWith('/read') || path === '/output-recon/inspect' ? 120000 : 60000) : 15000)
   });
   if (response.status === 401 && path === '/auth/me') return null;
   if (response.status === 401) window.dispatchEvent(new Event('erp-session-expired'));
@@ -87,6 +88,7 @@ function App() {
     <footer><span role="status">{health}</span><span>v{version} · Staging</span></footer>
   </section></main>;
   if(session.user.companyCode==='DGC'&&session.user.permissions.includes('SYSTEM_CONFIG_EDIT')&&window.location.pathname==='/migration/masters')return <MasterTransfer request={api} csrf={session.csrfToken}/>;
+  if(session.user.companyCode==='DGC'&&session.user.permissions.includes('SYSTEM_CONFIG_EDIT')&&window.location.pathname==='/migration/evidence')return <EvidenceTransfer request={api} csrf={session.csrfToken}/>;
   return <div className="shell"><aside><h2>{branding.appName}</h2><p className="sidebar-subtitle">Hệ thống quản lý công việc và tài chính<br/>{session.user.companyCode}</p><div className="nav-title">QUẢN LÝ</div><nav className="sidebar-nav" aria-label="Quản lý ERP">
     <button className={'nav ' + (page === 'dashboard' ? 'active' : '')} aria-current={page==='dashboard'?'page':undefined} onClick={() => { setPage('dashboard'); setMessage(''); }}>Dashboard</button>
     {session.user.permissions.includes('PROJECT_VIEW') && <button className={'nav ' + (page === 'projects' ? 'active' : '')} aria-current={page==='projects'?'page':undefined} onClick={() => setPage('projects')}>Quản lý Dự án</button>}

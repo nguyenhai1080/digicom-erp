@@ -6,6 +6,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./dgc-evidence-transfer": {
+      "types": "./prisma/dgc-evidence-transfer.d.mts",
+      "import": "./prisma/dgc-evidence-transfer.mjs"
+    },
     "./dgc-invoice-balance": {
       "types": "./prisma/dgc-invoice-balance.d.mts",
       "import": "./prisma/dgc-invoice-balance.mjs"

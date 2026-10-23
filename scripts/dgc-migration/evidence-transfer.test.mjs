@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {evidenceBundle,verifyEvidenceBundle,invoiceEvidenceRows} from '../../packages/db/prisma/dgc-evidence-transfer.mjs';
+import {evidenceTransferFixture} from './evidence-transfer.fixtures.mjs';
+import {canonical,digest} from './core.mjs';
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;},throws=(f,re)=>{assert.throws(f,re);n++;};const snapshot=evidenceTransferFixture(),before=canonical(snapshot),selection=evidenceBundle(snapshot),plan=verifyEvidenceBundle(selection.bundle,selection.bundleHash);
+eq(plan.items.length,37);eq(canonical(snapshot),before);eq(selection.bundle.financialPosting,false);eq(selection.bundle.sourceValuesChanged,false);throws(()=>verifyEvidenceBundle(selection.bundle,'0'.repeat(64)),/Unpinned/);
+const altered=structuredClone(selection.bundle);altered.snapshot.tables['48_INVOICE_HEADER'].rows[0].values.Total_Payable_USD=1;throws(()=>verifyEvidenceBundle(altered,selection.bundleHash),/Unpinned/);throws(()=>verifyEvidenceBundle(altered,digest(altered)),/snapshot checksum/);
+const table=snapshot.tables['48_INVOICE_HEADER'],stored=table.rows.map(r=>({snapshotHash:snapshot.snapshotHash,sheetName:'48_INVOICE_HEADER',sourceRow:r.sourceRow,legacyId:r.legacyId,rowHash:r.rowHash,payload:r})),receipt={sourceSnapshotHash:snapshot.snapshotHash,invoiceSources:stored.map(r=>({sourceRow:r.sourceRow,legacyId:r.legacyId,rowHash:r.rowHash}))},view=invoiceEvidenceRows(stored,receipt);
+eq(view.length,21);eq(view[0].invoiceNumber,'EVIDENCE/1');eq(view[0].partnerKey,'SYNTH_PARTNER');eq(view[0].period,'2026-01');eq(view[0].payable,'90');eq(view[0].sourceStatus,'Issued');eq(Object.keys(view[0]).some(k=>/bank|actor|password|cells|payload|captured/i.test(k)),false);
+throws(()=>invoiceEvidenceRows(stored.slice(1),receipt),/coverage/);const bad=structuredClone(stored);bad[0].payload.values.Invoice_Number='Changed';bad[0].rowHash=digest({values:bad[0].payload.values,cells:bad[0].payload.cells});bad[0].payload.rowHash=bad[0].rowHash;throws(()=>invoiceEvidenceRows(bad,receipt),/fingerprint/);throws(()=>invoiceEvidenceRows(stored,{...receipt,sourceSnapshotHash:'0'.repeat(64)}),/fingerprint/);
+console.log(`Source evidence transfer: ${n} assertions passed; pinned raw snapshot, 37 masters and safe Invoice projection`);
