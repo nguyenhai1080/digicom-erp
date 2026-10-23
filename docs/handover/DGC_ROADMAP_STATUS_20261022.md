@@ -2,7 +2,9 @@
 
 Cập nhật 23/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
 
-Mốc hiện hành 24/10: [kho nguồn đã vào DGC thật](DGC_EVIDENCE_HOST_TRANSFER_20261024.md): v13 apply 3.154 raw rows / 25 bảng; reader 91 Invoice có phân trang/search. Backup và restore local dump thật đạt 34 assertions; giữ 37 master links và 0 financial records. V14 đã online; runtime flag false, preview bị chặn và reader vẫn hoạt động. Tài chính vẫn chưa ghi sổ/cutover, không đạt hạn 23/10. Các mốc bên dưới là quá trình trước chuyển kho nguồn.
+Mốc phát triển 24/10: [Invoice nhiều kỳ](DGC_MULTIPERIOD_INVOICE_20261024.md) đã có proposal và trial riêng một Invoice–AR / ba revenue / ba scopes tháng 03–05/2019, giữ kỳ header 05/2019. Source/PDF/graph được ghim; strict và unified cũ không đổi. Còn PDF evidence cho revenue nên chưa financial acceptance hoặc thêm vào unified set. Host vẫn v14.
+
+Mốc host hiện hành 24/10: [kho nguồn đã vào DGC thật](DGC_EVIDENCE_HOST_TRANSFER_20261024.md): v13 apply 3.154 raw rows / 25 bảng; reader 91 Invoice có phân trang/search. Backup và restore local dump thật đạt 34 assertions; giữ 37 master links và 0 financial records. V14 đã online; runtime flag false, preview bị chặn và reader vẫn hoạt động. Tài chính vẫn chưa ghi sổ/cutover, không đạt hạn 23/10. Các mốc bên dưới là quá trình trước chuyển kho nguồn.
 
 Mốc tổng hợp trước chuyển nguồn: [unified staging](DGC_UNIFIED_FINANCIAL_STAGING_20261023.md) đã trial cùng transaction 17 Invoice–AR, 113 revenue, 12 documents/12 links, 13 receipts vào parent đầy đủ; replay/rollback sạch, 37 master links giữ nguyên. Còn 34 dependencies/34 referenced documents, 38 receipts ngoài candidate parent set và ba Issued held. Source PDF cho thấy historical multi-period và CRBT FX=0 cần xử lý có evidence; không đổi raw/source amounts. 310 source/173 synthetic và 35 suites đạt; chưa operational import/cutover, host vẫn v12.
 
