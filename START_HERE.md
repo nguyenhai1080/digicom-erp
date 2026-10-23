@@ -2,6 +2,8 @@
 
 Cập nhật ngày 23/10/2026, giờ Việt Nam.
 
+**Lưu ý nhập GitHub trên host:** chọn nhánh triển khai **`codex/dgc-deploy`**, không chọn nhánh mã nguồn `dgc/main` trong bộ quét tự động nhiều dự án. Release được đóng gói thành một Fastify app tại gốc, UI build trong `public`, `ERP_WEB_ROOT=/app/public`; giữ cổng 3000 và volume `/app/storage`. Xem [hướng dẫn một website](docs/handover/DGC_SINGLE_SITE_CUTOVER_20261023.md).
+
 **Ưu tiên mới của owner:** cắt chuyển trong ngày, triển khai **một website ERP DGC** (web/API chung Node process). Repo riêng `https://github.com/nguyenhai1080/digicom-erp.git`, nhánh `dgc/main`; timezone đã chốt `Asia/Ho_Chi_Minh`. Owner xác nhận chưa có môi trường đích; connector hiện vẫn là GST. Làm theo [chuẩn bị một website và checklist cutover](docs/handover/DGC_SINGLE_SITE_CUTOVER_20261023.md), không tiếp tục chia nhỏ các đợt ngoại lệ trước đường găng môi trường → nhập/đối chiếu staging → UAT → snapshot cuối/backup/chuyển vận hành.
 
 [Đã chốt phần Invoice source rounding đang làm](docs/handover/DGC_INVOICE_SOURCE_ROUNDING_20261023.md): một Invoice–AR/sáu nhóm/chín revenue đọc đủ, 23 model counts rollback khớp; 32 suites/118 PostgreSQL mới và hồi quy đạt. Registry worklist vẫn 36/35 do chưa ghép profile này; chưa nhập tài chính.

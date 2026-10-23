@@ -6,7 +6,7 @@ Repo owner cung cấp: `https://github.com/nguyenhai1080/digicom-erp.git`, branc
 
 ## Owner chuẩn bị ngay
 
-1. Trong đúng tài khoản host DGC, tạo **một website `dgc-erp`** từ repo trên, branch `dgc/main`, thư mục build gốc `/`, Dockerfile gốc `Dockerfile`, cổng container **3000**. Không chọn `apps/web` hoặc tạo API/web thành hai website. Dùng URL HTTPS tạm của host để UAT trước khi chuyển domain.
+1. Trong đúng tài khoản host DGC, tạo **một website `dgc-erp`** từ repo trên, branch **`codex/dgc-deploy`**, thư mục build gốc `/`, Dockerfile gốc `Dockerfile`, cổng container **3000**. Nhánh mã nguồn `dgc/main` vẫn bị bộ quét GitHub của host nhận apps/api + apps/web thành hai dự án; branch deploy đã bỏ cấu trúc này, chỉ còn một ứng dụng Fastify và UI build sẵn trong public. Dùng URL HTTPS tạm của host để UAT trước khi chuyển domain.
 2. Tạo PostgreSQL DGC riêng (nền địa phương đang dùng PostgreSQL 16), database/user/secret riêng. Gắn DB bằng biến môi trường bảo mật của website; không restore DB GST làm nền DGC. PostgreSQL là dịch vụ dữ liệu, không phải website thứ hai.
 3. Gắn ổ lưu trữ bền vững riêng vào **`/app/storage`** của website. PDF, logo, stamp và ảnh ký cần còn nguyên sau restart/redeploy. Không chỉ lưu trong filesystem tạm của container.
 4. Nhập cấu hình dưới đây vào phần environment/secrets của host, thay các placeholder bằng thông tin DGC thật. Không gửi mật khẩu/token trong chat hoặc commit chúng vào repo.
@@ -30,11 +30,13 @@ ERP_SEED_ON_START=false
 AUTH_BOOTSTRAP_ENABLED=false
 ```
 
-`ERP_WEB_ROOT=/app/apps/web/dist` đã đặt trong Dockerfile; không cần `API_BASE_URL`, website proxy hoặc biến VITE API host. `APP_URL` là URL website người dùng truy cập, gồm scheme HTTPS, không thêm đường dẫn. Khi đổi domain cuối, cập nhật APP_URL và kiểm lại đăng nhập.
+`ERP_WEB_ROOT=/app/public` đã đặt trong Dockerfile của branch deploy; nếu host đã có giá trị cũ `/app/apps/web/dist`, cần đổi sang `/app/public`. Không cần `API_BASE_URL`, website proxy hoặc biến VITE API host. `APP_URL` là URL website người dùng truy cập, gồm scheme HTTPS, không thêm đường dẫn. Khi đổi domain cuối, cập nhật APP_URL và kiểm lại đăng nhập.
 
 5. Kết nối connector đúng tài khoản DGC và cung cấp website/project ID, URL HTTPS cùng xác nhận DB/volume đã gắn. URL Git đã có. Thông tin này đủ để tiếp tục cấu hình/kiểm tra, không cần gửi bí mật. DNS chỉ chuyển sau khi các gate bên dưới đạt.
 
 ## Kiến trúc đã chuẩn bị trong code
+
+Cập nhật đóng gói sau ảnh owner báo host tạo hai dự án: `scripts/package-single-site.mjs <artifacts/output-moi>` tạo tree triển khai phẳng từ API source/assets, UI Vite đã build và database library/schema/migrations. Chỉ root package có Fastify, không có workspaces/apps hoặc Vite package. Dependency trực tiếp được ghim theo phiên bản đã cài/kiểm trong checkout; tạo package-lock và build Docker Node 22 trước khi publish. Nhánh phát triển dgc/main giữ nguyên; nhánh deploy codex/dgc-deploy phải được tái tạo/kiểm/publish sau mỗi thay đổi mã nguồn, không tự đồng bộ khi chỉ push dgc/main. DEPLOYMENT.json ghi source commit, không chứa source tài chính/secrets.
 
 Root Dockerfile build cả API và Vite UI. Một Fastify/Node process phục vụ UI tại `/`, file build và các SPA paths; `/api/v1/*` vẫn dùng chính API handlers/quyền/CSRF/upload/download hiện có. `/api/v1/health` kiểm DB. Không có reverse-proxy Node thứ hai. Static fallback không trả HTML cho unknown API paths, không phục vụ dotfiles/source maps hoặc symlink thoát thư mục UI.
 
