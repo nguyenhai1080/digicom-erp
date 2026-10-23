@@ -6,6 +6,8 @@ import {CommandError,date,parse} from './commands.js';
 
 const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v);
 const round=(v:Prisma.Decimal)=>v.toDecimalPlaces(2,Prisma.Decimal.ROUND_HALF_UP);
+// Owner decision 2026-10-23: future receipts do not reduce an earlier SOA.
+export const DGC_SOA_CUTOFF_POLICY='THROUGH_AS_OF_INCLUSIVE' as const;
 function fail(message:string):never{throw new CommandError(409,message);}
 type Receipt={paymentDate:Date;allocationAmount:Prisma.Decimal;allocationCurrency:string};
 export function cutoffAmounts(amount:Prisma.Decimal,currency:string,asOf:string,receipts:Receipt[]){
@@ -16,7 +18,7 @@ export function cutoffAmounts(amount:Prisma.Decimal,currency:string,asOf:string,
   if(p.paymentDate.toISOString().slice(0,10)<=asOf)through=through.plus(p.allocationAmount);else after=after.plus(p.allocationAmount);
  }
  const all=round(through.plus(after));through=round(through);after=round(after);
- return {amount:round(amount).toFixed(2),paidThrough:through.toFixed(2),paidAfter:after.toFixed(2),paidAll:all.toFixed(2),remainingThrough:round(amount.minus(through)).toFixed(2),remainingAll:round(amount.minus(all)).toFixed(2)};
+ return {amount:round(amount).toFixed(2),paidThrough:through.toFixed(2),paidAfter:after.toFixed(2),paidAll:all.toFixed(2),remainingThrough:round(amount.minus(through)).toFixed(2),remainingAll:round(amount.minus(all)).toFixed(2),paidAtCutoff:through.toFixed(2),outstandingAtCutoff:round(amount.minus(through)).toFixed(2)};
 }
 const query=z.object({partnerId:z.uuid(),asOf:date,page:z.coerce.number().int().min(1).max(100000).default(1)}).strict();
 const issued=['ISSUED','OVERDUE','PARTIALLY_PAID','PAID'];
@@ -48,7 +50,7 @@ export async function soaCutoffReviewRoutes(app:FastifyInstance,_config:AuthConf
     return {id:i.id,invoiceNumber:i.invoiceNumber,invoiceDate:i.invoiceDate.toISOString().slice(0,10),currency:i.currency,...amounts};
    });
    const total=rows.length,pages=Math.max(1,Math.ceil(total/10)),page=Math.min(q.page,pages);
-   return {reviewOnly:true,cutoffPolicy:'AWAITING_OWNER',asOf:q.asOf,partner,total,page,pages,pageSize:10,affectedInvoices:rows.filter(r=>D(r.paidAfter).gt(0)).length,totals:Object.entries(totals).map(([currency,t])=>({currency,...Object.fromEntries(Object.entries(t).map(([k,v])=>[k,v.toFixed(2)]))})),items:rows.slice((page-1)*10,page*10)};
+   return {reviewOnly:true,cutoffPolicy:DGC_SOA_CUTOFF_POLICY,asOf:q.asOf,partner,total,page,pages,pageSize:10,affectedInvoices:rows.filter(r=>D(r.paidAfter).gt(0)).length,totals:Object.entries(totals).map(([currency,t])=>({currency,...Object.fromEntries(Object.entries(t).map(([k,v])=>[k,v.toFixed(2)]))})),items:rows.slice((page-1)*10,page*10)};
   },{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead,timeout:15000});
  });
 }
