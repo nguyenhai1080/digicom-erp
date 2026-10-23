@@ -1,9 +1,0 @@
-# GST Invoice PDF layout — v0.6.26
-
-Authoritative visual reference: user-supplied `GST - INVOICE (5).pdf`, one A4 page. The reference overrides the DGC 41_Invoice_PDF.js HTML layout (Arial, orange divider, boxed parties and invoice table); this is an explicit requested GST visual adaptation, not a claim of pixel-identical DGC output.
-
-Layout follows the reference's serif typography, brown English issuer heading, compact logo, centered INVOICE, ruled metadata lines, recipient labels, No./DESCRIPTION/AMOUNT/TAX/TOTAL table, formula row, beige alternating rows, remaining USD amount, italic words, and beneficiary/bank/payment-reference block. Uses built-in Times family instead of the reference's embedded Sylfaen. Unicode text falls back to the existing licensed Noto font. Company/bank/recipient details remain sourced from the configured template and live partner; no sample identity or financial data is imported. The five current parent services fit one page. Long invoices paginate and require signing on the last page; placement is rejected if it overlaps payment details or falls outside the page. New preview default moves the signing image below the payment block.
-
-Parent-only financial lines, monetary calculations, maturity terms, Invoice creation/issue and AR behavior are unchanged. Existing saved PDFs are immutable; preview/create new drafts uses this layout. Workbook keeps the original GST source workbook mapping, not the newly adapted PDF rendering.
-
-Validation: API/UI builds, layout characterization (one page for five services, long-data pagination, signing page/overlap/bounds), parent-line regression, visual inspection of the actual GST logo/signing assets and a sample five-parent PDF. Full PostgreSQL integration remains unavailable while the local Docker daemon is stopped.

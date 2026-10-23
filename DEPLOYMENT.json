@@ -1,0 +1,11 @@
+{
+  "format": "dgc-single-site-release-v1",
+  "sourceCommit": "20fc0c3279ad3a8e23edc486064e9acfef9af48f",
+  "sourceBranch": "dgc/main",
+  "deploymentBranch": "codex/dgc-deploy",
+  "applicationCount": 1,
+  "entry": "start.mjs",
+  "webRoot": "/app/public",
+  "port": 3000,
+  "sourceFinancialDataIncluded": false
+}

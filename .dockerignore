@@ -1,14 +1,8 @@
+node_modules
+dist
+database/dist
 .git
-**/node_modules
-**/dist
-**/*.tsbuildinfo
 .env
 .env.*
-**/.env
-**/.env.*
 !.env.example
-artifacts
 storage
-Host_DB.txt
-**/*.dump
-**/*.zip

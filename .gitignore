@@ -1,19 +1,7 @@
 node_modules/
 dist/
-coverage/
+database/dist/
 .env
 .env.*
 !.env.example
-!deploy/dgc.env.example
-storage/*
-!storage/.gitkeep
-*.log
-.DS_Store
-.vscode/
-.idea/
-
-*.tsbuildinfo
-artifacts/
-Host_DB.txt
-# Local financial source files and import progress.
-/output/
+storage/
