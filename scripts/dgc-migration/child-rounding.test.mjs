@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {compoundChildGroup} from './invoice-child-rounding.mjs';
+import {canonical} from './core.mjs';
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+const source={sheetId:40,sourceRow:3,rowHash:'a'.repeat(64)},detail={sheetId:44,sourceRow:2,rowHash:'b'.repeat(64)};
+const g={groupKey:'g',state:'HELD',reasons:['REVENUE_REQUIRES_REVIEW'],entries:[{source,bindings:{Source_Recon_Detail_ID:detail}}]},c={state:'EVIDENCE_REVIEW_HELD',reasons:['BUSINESS_HELD','PRINTED_CHILD_OR_CAPTURED_USD_LINK_UNVERIFIED'],rows:[{source,childState:'CAPTURED_NATIVE_DETAIL_DIFFERS'}]},x={reasons:['OTHER_PDF_OR_LIFECYCLE_EVIDENCE_HOLD']},r={entries:[{source,sourceDetail:detail,state:'CHILD_NATIVE_FALLBACK_BOUND'}]},before=canonical({g,c,x,r});
+const p=compoundChildGroup(g,c,x,r);eq(p.state,'COMPOUND_CHILD_GROUP_CANDIDATE');eq(p.children.length,1);eq(p.originalBusinessState,'HELD');eq(p.originalBusinessReasons,['REVENUE_REQUIRES_REVIEW']);eq(canonical({g,c,x,r}),before);
+const clear={...g,state:'REHEARSABLE',reasons:[]},childOnly={...c,reasons:['PRINTED_CHILD_OR_CAPTURED_USD_LINK_UNVERIFIED']};eq(compoundChildGroup(clear,childOnly,{reasons:['NO_CHARACTERIZED_ROUNDING_EXCEPTION']},r).state,'COMPOUND_CHILD_GROUP_CANDIDATE');
+for(const extra of ['PDF_BYTES_MISSING','PRINTED_USD_TOTAL_DIFFERS','LIFECYCLE_UNVERIFIED'])eq(compoundChildGroup(g,{...c,reasons:[...c.reasons,extra]},x,r).state,'COMPOUND_CHILD_GROUP_HELD');
+for(const extra of ['OTHER_REVENUE_SOURCE_OR_NATIVE_ISSUE','NO_CHARACTERIZED_ROUNDING_EXCEPTION'])eq(compoundChildGroup(g,c,{reasons:[...x.reasons,extra]},r).state,'COMPOUND_CHILD_GROUP_HELD');
+for(const bad of [{...g,reasons:['OTHER_BUSINESS_HOLD']},{...g,state:'REHEARSABLE'},{...g,state:'HELD',reasons:[]}])eq(compoundChildGroup(bad,c,x,r).state,'COMPOUND_CHILD_GROUP_HELD');
+for(const bad of [{entries:[]},{entries:[{...r.entries[0],state:'CHILD_NATIVE_EVIDENCE_HELD'}]},{entries:[{...r.entries[0],sourceDetail:{...detail,rowHash:'c'.repeat(64)}}]},{entries:[{...r.entries[0],source:{...source,rowHash:'d'.repeat(64)}}]}])eq(compoundChildGroup(g,c,x,bad).state,'COMPOUND_CHILD_GROUP_HELD');
+eq(compoundChildGroup(g,{...c,rows:[]},x,r).state,'COMPOUND_CHILD_GROUP_HELD');
+eq(compoundChildGroup(g,{...c,state:'EVIDENCE_CLEAR_FOR_NEXT_REVIEW'},x,r).state,'COMPOUND_CHILD_GROUP_HELD');
+console.log(`Compound child/native and captured USD rounding: ${n} assertions passed; unrelated holds preserved`);

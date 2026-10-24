@@ -1,6 +1,8 @@
 # Bắt đầu làm việc với DGC Finance
 
-Cập nhật ngày 24/10/2026, giờ Việt Nam.
+Cập nhật ngày 25/10/2026, giờ Việt Nam.
+
+**Paid Invoice: phối hợp child/native và USD rounding:** [bàn giao 25/10](docs/handover/DGC_CHILD_ROUNDING_20261025.md) thêm tám Paid qua profile riêng; clone host/Linux đạt 560 assertions cho 29 Invoice–AR / 207 revenue / 23 documents-links / 24 receipts. Lỗi giữa lúc ghi, replay/rollback và 37 master links đều đạt; 41 suites/57 source assertions đạt. Còn 27 receipts, 22 Invoice dependencies giữ 23 referenced docs; hai Issued/22 Paid ngoài set. Chưa financial commit/cutover; ưu tiên tiếp theo là current AR, operational importer và UAT, không thêm các đợt nhỏ ngoài đường găng.
 
 **Paid Invoice và native OCR fallback:** [bàn giao 24/10](docs/handover/DGC_CHILD_NATIVE_FALLBACK_20261024.md) đã characterize chính xác 41 child native exceptions, giữ sáu held; ba Paid hàng 13/25/42 vào profile riêng. Clone host/Linux đạt 381 assertions: 21 Invoice–AR / 139 revenue / 15 documents-links / 16 receipts, replay/rollback sạch, 37 master links giữ nguyên, không cash. 40 suites, 69 byte/input guard và 173 unified PostgreSQL hồi quy đạt. Còn 35 receipts, 30 Invoice dependencies giữ 31 referenced docs; source/runtime importers vẫn đóng, chưa financial commit/cutover.
 
