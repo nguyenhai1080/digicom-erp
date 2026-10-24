@@ -4,11 +4,15 @@ import {revenueScopePlan} from './revenue-scopes.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
 import {verifyInvoiceFiles} from './invoice-files.mjs';
 import {withSourcePlanningCache} from './planning-context.mjs';
+import {reviewReconOcr} from './recon-ocr.mjs';
 import {readFile,realpath} from 'node:fs/promises';import {resolve,relative,isAbsolute} from 'node:path';import {createHash} from 'node:crypto';
 const same=(a,b)=>canonical(a)===canonical(b),fields=[['revenue','Total_Revenue_USD','Revenue_USD','Invoice_Revenue_USD'],['wht','Total_WHT_USD','WHT_USD','Invoice_WHT_USD'],['payable','Total_Payable_USD','Payable_USD','Invoice_Payable_USD']];
 const text=v=>String(v??'').trim().toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
 import {createRequire} from 'node:module';const {Prisma}=createRequire(new URL('../../packages/db/package.json',import.meta.url))('@prisma/client'),D=v=>new Prisma.Decimal(String(v)),valid=v=>['string','number'].includes(typeof v)&&/^\d+(?:\.\d+)?$/.test(String(v))&&String(v).length<=80,eq=(a,b)=>valid(a)&&valid(b)&&D(a).eq(b);
 async function render(root,f){if(typeof f?.relativePath!=='string'||!Number.isSafeInteger(f.size)||f.size<=0||!/^[a-f0-9]{64}$/.test(f.sha256??''))throw Error('Invalid Invoice visual render');const base=await realpath(root),p=await realpath(resolve(base,f.relativePath)),rel=relative(base,p);if(!rel||rel==='..'||rel.startsWith('../')||rel.startsWith('..\\')||isAbsolute(rel))throw Error('Invoice render escaped evidence root');const b=await readFile(p);if(b.length!==f.size||createHash('sha256').update(b).digest('hex')!==f.sha256)throw Error('Invoice render checksum differs');}
+// Byte recheck only; callers must first fully rederive the plan and bind all
+// immutable inputs. This helper cannot select or authorize any source row.
+export async function verifyNativeInvoiceEvidenceFiles(o){const n=o.nativeUsdOptions.nativeOptions,i=o.invoiceOptions;await reviewReconOcr(n.snapshot,n.manifest,n.root,n.manifestPin,n.ocrManifest,n.ocrRoot,n.ocrManifestPin);await verifyInvoiceFiles(i.snapshot,i.manifest,i.root);for(const observed of o.nativeUsdOptions.invoiceObservations.invoices)await render(o.nativeUsdOptions.invoiceObservationRoot,observed.visualRender);}
 // Independent profile: both documents and exact source graph, never changing
 // strict PDF gates or presenting a captured FX value as printed/derived FX.
 export async function invoiceNativeUsdPlan(o){return withSourcePlanningCache(async()=>{

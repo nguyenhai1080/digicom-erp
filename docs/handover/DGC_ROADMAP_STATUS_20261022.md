@@ -2,6 +2,8 @@
 
 Cập nhật 24/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
 
+Mốc Paid 24/10: [child/native fallback](DGC_CHILD_NATIVE_FALLBACK_20261024.md) thêm ba Paid qua profile riêng, giữ source amounts và old gates. Set chung đã trial/rollback 21 Invoice–AR / 139 revenue / 15 documents-links / 16 receipts trên clone host/Linux (381 assertions), 40 suites/69 byte-input/173 hồi quy đạt. Còn 35 receipts ngoài set, 30 Invoice dependencies giữ 31 referenced docs; hai Issued và 30 Paid vẫn ngoài set, chưa financial acceptance/import/cutover.
+
 Mốc native/Invoice USD 24/10: [profile hàng 84](DGC_NATIVE_INVOICE_USD_20261024.md) đối chiếu được ba USD components từ original Invoice cùng native Recon/captured FX; standalone clone trial đạt, chưa operational acceptance. Bốn scan khác vẫn held, strict/unified cũ không đổi; extension riêng đã trial/rollback 18 Invoice–AR / 114 revenue / 12 documents-links / 13 receipts, 319 source assertions và 39 suites đạt. Worklist còn 33 dependencies/34 referenced docs, 38 receipts ngoài set; hai Issued hàng 85/86 còn evidence holds. Chưa financial commit/cutover.
 
 Mốc phát triển 24/10: [Invoice nhiều kỳ](DGC_MULTIPERIOD_INVOICE_20261024.md) đã có proposal và trial riêng một Invoice–AR / ba revenue / ba scopes tháng 03–05/2019, giữ kỳ header 05/2019. Source/PDF/graph được ghim; strict và unified cũ không đổi. Còn PDF evidence cho revenue nên chưa financial acceptance hoặc thêm vào unified set. Host vẫn v14.
