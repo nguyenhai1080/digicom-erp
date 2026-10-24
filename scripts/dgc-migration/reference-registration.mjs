@@ -1,8 +1,8 @@
 import {canonical,digest,SOURCE_ID} from './core.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
 import {reviewReferenceCustody,verifyReferenceFiles} from './reference-files.mjs';
-import {rehearseInvoiceRestore,rehearseInvoiceEvidenceSet,rehearseInvoiceUnifiedSet} from './invoice-rehearsal.mjs';
-import {verifyReferenceUnifiedPlan} from './reference-unified.mjs';
+import {rehearseInvoiceRestore,rehearseInvoiceEvidenceSet,rehearseInvoiceUnifiedSet,rehearseInvoiceUnifiedNativeSet} from './invoice-rehearsal.mjs';
+import {verifyReferenceUnifiedPlan,verifyReferenceUnifiedNativePlan} from './reference-unified.mjs';
 import {verifyReferenceRoundingPlan,verifyReferenceOffsettingPlan} from './reference-rounding.mjs';
 import {withSourcePlanningCache} from './planning-context.mjs';
 import {requireStaging} from './staging.mjs';
@@ -84,7 +84,10 @@ export async function rehearseReferenceOffsetting(db,options){
 export async function rehearseReferenceUnified(db,options){
  requireStaging(process.env.DATABASE_URL??'');return withSourcePlanningCache(async()=>{await verifyReferenceUnifiedPlan(options.unifiedReferencePlan,options);return runReferenceTrial(db,options,options.unifiedReferencePlan,'UNIFIED');});
 }
-async function runReferenceTrial(db,options,plan,rounding){
+export async function rehearseReferenceUnifiedNative(db,options){
+ requireStaging(process.env.DATABASE_URL??'');return withSourcePlanningCache(async()=>{await verifyReferenceUnifiedNativePlan(options.unifiedReferencePlan,options);return runReferenceTrial(db,options,options.unifiedReferencePlan,'UNIFIED',true);});
+}
+async function runReferenceTrial(db,options,plan,rounding,nativeExtended=false){
  const {documentSources,invoiceOptions:i}=options;
  // The rounding profile has already rederived all required plans and whole
  // dependency closure. Bind every input here; inside the transaction recheck
@@ -109,6 +112,6 @@ async function runReferenceTrial(db,options,plan,rounding){
    throw new ReferenceRollback({mode:'ROLLBACK_ONLY',registrationPlanHash:plan.planHash,invoiceSourceRows:sourceRows,invoiceTrial:e.result,first,replay,before,inside,proof,filesVerified:true,fileVerificationScope:rounding?'ORIGINAL_INVOICE_RECON_AND_REFERENCE_PDFS':'ORIGINAL_INVOICE_AND_REFERENCE_PDFS_ONLY',reconFilesReverified:Boolean(rounding),originalGatesUnchanged:true,postingAllowed:false,acceptance:false,registryCommitAllowed:false,historicalCashPosting:false});
   }
  },settings);const x=target[prop];return typeof x==='function'?x.bind(target):x;}});
- try{if(rounding==='UNIFIED')await rehearseInvoiceUnifiedSet(proxy,{...options,sourceRows});else if(rounding)await rehearseInvoiceEvidenceSet(proxy,{...options,offsettingPlan:rounding==='OFFSET'?options.offsettingPlan:undefined,sourceRows});else await rehearseInvoiceRestore(proxy,{...i,sourceRows});throw Error('Reference trial unexpectedly committed');}catch(e){if(e instanceof ReferenceRollback)result=e.result;else failure=e;}
+ try{if(rounding==='UNIFIED'){if(nativeExtended)await rehearseInvoiceUnifiedNativeSet(proxy,{...options,sourceRows});else await rehearseInvoiceUnifiedSet(proxy,{...options,sourceRows});}else if(rounding)await rehearseInvoiceEvidenceSet(proxy,{...options,offsettingPlan:rounding==='OFFSET'?options.offsettingPlan:undefined,sourceRows});else await rehearseInvoiceRestore(proxy,{...i,sourceRows});throw Error('Reference trial unexpectedly committed');}catch(e){if(e instanceof ReferenceRollback)result=e.result;else failure=e;}
  const after=await counts(db);if(canonical(before)!==canonical(after))throw Error('Reference trial rollback footprint differs');if(failure)throw failure;return {...result,after,rolledBack:true};
 }

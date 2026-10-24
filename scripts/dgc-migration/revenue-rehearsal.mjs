@@ -4,6 +4,7 @@ import {requireStaging} from './staging.mjs';
 import {verifyRevenueTargetPlan} from './revenue-target.mjs';
 import {verifyRoundingExceptionPlan} from './rounding-exception.mjs';
 import {verifyReconFiles} from './recon-files.mjs';
+import {verifyInvoiceUnifiedNativePlan} from './native-unified.mjs';
 const {Prisma}=createRequire(new URL('../../packages/db/package.json',import.meta.url))('@prisma/client');
 const models=['reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
@@ -77,16 +78,25 @@ export async function rehearseRoundingExceptions(prisma,{snapshot,companyId,targ
  return runRoundingProfile(prisma,{snapshot,companyId,targetPlan,combined,combinedPin,rounding,roundingPin,exceptionPlan,groupKeys,decisions,manifest,root,manifestPin},false);
 }
 export async function rehearseInvoiceRoundingSources(prisma,options){return runRoundingProfile(prisma,options,true);}
-async function runRoundingProfile(prisma,{snapshot,companyId,targetPlan,combined,combinedPin,rounding,roundingPin,exceptionPlan,groupKeys,decisions,manifest,root,manifestPin},allowStrict){
+export async function rehearseInvoiceNativeUnifiedSources(prisma,options,unifiedOptions){
+ requireStaging(process.env.DATABASE_URL??'');const plan=await verifyInvoiceUnifiedNativePlan(unifiedOptions.unifiedInvoicePlan,unifiedOptions),i=unifiedOptions.invoiceOptions;
+ if(canonical(options.snapshot)!==canonical(i.snapshot)||canonical(options.targetPlan)!==canonical(i.targetPlan)||options.companyId!==i.companyId||canonical(options.decisions)!==canonical(i.decisions)||canonical(options.combined)!==canonical(i.combined)||options.combinedPin!==i.reviewPin)throw Error('Native unified revenue inputs differ');
+ const rows=unifiedOptions.sourceRows;if(!Array.isArray(rows)||!rows.length||new Set(rows).size!==rows.length)throw Error('Unique native unified Invoice rows required');
+ const selected=rows.map(row=>plan.entries.find(e=>e.source.sourceRow===row));if(selected.some(e=>e?.state!=='UNIFIED_INVOICE_SHAPE_CANDIDATE')||canonical([...new Set(selected.flatMap(e=>e.revenueGroupKeys))].sort())!==canonical([...options.groupKeys].sort()))throw Error('Native unified whole Invoice source set differs');
+ const nativeGroups=new Set(selected.filter(e=>e.sourceProfile==='NATIVE_USD').flatMap(e=>e.revenueGroupKeys));
+ const result=await runRoundingProfile(prisma,options,true,{nativeGroups,reverify:async()=>verifyInvoiceUnifiedNativePlan(plan,unifiedOptions)});
+ return {...result,shapeProfile:'STRICT_ROUNDING_AND_NATIVE_INVOICE_PRINTED_USD',nativeInvoicePlanHash:plan.nativeInvoicePlanHash,nativeGroupKeys:[...nativeGroups],operationalFxDerived:false};
+}
+async function runRoundingProfile(prisma,{snapshot,companyId,targetPlan,combined,combinedPin,rounding,roundingPin,exceptionPlan,groupKeys,decisions,manifest,root,manifestPin},allowStrict,nativeContext){
  requireStaging(process.env.DATABASE_URL??'');verifyRoundingExceptionPlan(exceptionPlan,snapshot,targetPlan,combined,combinedPin,rounding,roundingPin,decisions);
  if(!Array.isArray(groupKeys)||!groupKeys.length||new Set(groupKeys).size!==groupKeys.length)throw Error('Select unique whole rounding groups');
- const selected=groupKeys.map(k=>exceptionPlan.groups.find(g=>g.groupKey===k));if(selected.some(g=>!g||g.state!=='CAPTURED_ROUNDING_SHAPE_TRIAL_CANDIDATE'&&!(allowStrict&&targetPlan.groups.find(t=>t.groupKey===g.groupKey)?.state==='REHEARSABLE'&&combined.groups.find(t=>t.groupKey===g.groupKey)?.state==='EVIDENCE_CLEAR_FOR_NEXT_REVIEW')))throw Error('Other source/PDF/lifecycle gates remain held');
+ const selected=groupKeys.map(k=>exceptionPlan.groups.find(g=>g.groupKey===k));if(selected.some(g=>!g||g.state!=='CAPTURED_ROUNDING_SHAPE_TRIAL_CANDIDATE'&&!(allowStrict&&targetPlan.groups.find(t=>t.groupKey===g.groupKey)?.state==='REHEARSABLE'&&(combined.groups.find(t=>t.groupKey===g.groupKey)?.state==='EVIDENCE_CLEAR_FOR_NEXT_REVIEW'||nativeContext?.nativeGroups.has(g.groupKey)))))throw Error('Other source/PDF/lifecycle gates remain held');
  const custody=await verifyReconFiles(snapshot,manifest,root,manifestPin);
  if(combined.manifestHash!==manifestPin)throw Error('Rounding source PDF manifest differs');
  const groups=groupKeys.map(k=>targetPlan.groups.find(g=>g.groupKey===k));
  if(groups.some(g=>custody.missingFiles.includes(g.sourceFileId)))throw Error('Missing rounding source PDF bytes');
  const footprint=async()=>Object.fromEntries(await Promise.all([...models,'user','userRole','authSession','approvalRequest','invoiceDocumentLink'].map(async m=>[m,await prisma[m].count()]))),before=await footprint();let result,failure;
- try{result=await runRevenueTrial(prisma,snapshot,companyId,targetPlan,groups,groupKeys,decisions,exceptionPlan,async()=>verifyReconFiles(snapshot,manifest,root,manifestPin));}catch(e){failure=e;}
+ try{result=await runRevenueTrial(prisma,snapshot,companyId,targetPlan,groups,groupKeys,decisions,exceptionPlan,async()=>{await verifyReconFiles(snapshot,manifest,root,manifestPin);if(nativeContext)await nativeContext.reverify();});}catch(e){failure=e;}
  const after=await footprint();if(canonical(before)!==canonical(after))throw Error('Rounding shape trial rollback footprint differs');if(failure)throw failure;
  return {...result,shapeProfile:allowStrict?'ROUNDING_WITH_STRICT_INVOICE_SOURCES':'CAPTURED_ROUNDING_EXCEPTION_ONLY',exceptionPlanHash:exceptionPlan.planHash,originalGatesUnchanged:true,commitAllowed:false,originalPdfBytesReverified:true,pdfSemanticsVerified:false,footprintBefore:before,footprintAfter:after};
 }

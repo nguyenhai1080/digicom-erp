@@ -1,6 +1,6 @@
 import {canonical,digest,SOURCE_ID} from './core.mjs';
 import {requireStaging} from './staging.mjs';
-import {rehearseReferenceUnified} from './reference-registration.mjs';
+import {rehearseReferenceUnified,rehearseReferenceUnifiedNative} from './reference-registration.mjs';
 import {verifyReceiptTargetPlan} from './receipt-target.mjs';
 import {withSourcePlanningCache} from './planning-context.mjs';
 const models=['user','userRole','authSession','approvalRequest','reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','invoiceDocumentLink','dgcImportSnapshot','dgcImportRow','dgcImportLink','auditLog'];
@@ -39,6 +39,12 @@ async function receipts(tx,options,invoiceRows){
 }
 
 export async function rehearseUnifiedFinancialSet(db,options,verify){
+ return financialSet(db,options,verify,false);
+}
+export async function rehearseUnifiedNativeFinancialSet(db,options,verify){
+ return financialSet(db,options,verify,true);
+}
+async function financialSet(db,options,verify,nativeExtended){
  requireStaging(process.env.DATABASE_URL??'');return withSourcePlanningCache(async()=>{
   const {invoiceOptions:i}=options;verifyReceiptTargetPlan(options.receiptPlan,i.snapshot,i.decisions);
   const before=await counts(db);for(const m of ['invoice','revenue','accountReceivable','invoicePayment','cashAccount','cashEntry'])if(before[m])throw Error('Unified trial requires an isolated empty financial ledger');
@@ -50,7 +56,7 @@ export async function rehearseUnifiedFinancialSet(db,options,verify){
    const inside=await counts(tx);for(const m of ['userRole','authSession','approvalRequest','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','dgcImportSnapshot','dgcImportRow'])if(inside[m]!==before[m])throw Error('Unexpected unified financial side effect '+m);
    throw new FinancialRollback({mode:'ROLLBACK_ONLY',snapshotHash:i.snapshot.snapshotHash,invoicePlanHash:options.unifiedInvoicePlan.planHash,referencePlanHash:options.unifiedReferencePlan.planHash,receiptPlanHash:options.receiptPlan.planHash,reference:e.result,receipts:receiptProof,before,inside,operationalAcceptance:false,commitAllowed:false,historicalCashPosting:false});
   }},settings);const v=t[k];return typeof v==='function'?v.bind(t):v;}});
-  try{await rehearseReferenceUnified(proxy,options);throw Error('Unified financial trial unexpectedly committed');}catch(e){if(e instanceof FinancialRollback)result=e.result;else failure=e;}
+  try{await (nativeExtended?rehearseReferenceUnifiedNative:rehearseReferenceUnified)(proxy,options);throw Error('Unified financial trial unexpectedly committed');}catch(e){if(e instanceof FinancialRollback)result=e.result;else failure=e;}
   const after=await counts(db);if(canonical(before)!==canonical(after))throw Error('Unified financial rollback footprint differs');if(failure)throw failure;return {...result,after,rolledBack:true};
  });
 }

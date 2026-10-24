@@ -5,13 +5,15 @@ import {requireStaging} from './staging.mjs';
 import {verifyInvoiceFiles} from './invoice-files.mjs';
 import {verifyReconFiles} from './recon-files.mjs';
 import {verifyInvoiceRestorePlan} from './invoice-restore.mjs';
-import {rehearseRevenue,rehearseInvoiceRoundingSources,masterResolver} from './revenue-rehearsal.mjs';
+import {rehearseRevenue,rehearseInvoiceRoundingSources,rehearseInvoiceNativeUnifiedSources,masterResolver} from './revenue-rehearsal.mjs';
 import {verifyInvoiceRoundingPlan} from './invoice-rounding.mjs';
 import {verifyInvoiceOffsettingPlan,verifyInvoiceSourceRoundingPlan} from './invoice-offsetting.mjs';
 import {withSourcePlanningCache} from './planning-context.mjs';
 import {verifyInvoiceBalancePlan} from './invoice-balance.mjs';
 import {verifyInvoiceUnifiedPlan} from './invoice-unified.mjs';
 import {invoiceMultiPeriodReview} from './invoice-multiperiod.mjs';
+import {invoiceNativeUsdPlan} from './invoice-native-usd.mjs';
+import {verifyInvoiceUnifiedNativePlan} from './native-unified.mjs';
 const models=['user','userRole','authSession','approvalRequest','reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','invoiceDocumentLink','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
 const normalized=v=>v instanceof Date?v.toISOString():typeof v==='bigint'?v.toString():v?.toFixed?v.toFixed():v;
@@ -46,6 +48,7 @@ async function materialize(tx,companyId,selected,plan,root,actorId,resolveMaster
   const snapshot={sourceKind:'DGC_INVOICE_REHEARSAL_ONLY',snapshotHash:plan.snapshotHash,restorePlanHash:plan.planHash,source:e.source,sourceStatus:e.sourceStatus,capturedHeaderJson:e.capturedHeaderJson,capturedDetailsJson:e.capturedDetailsJson,capturedReceivablesJson:e.capturedReceivablesJson,capturedPaymentsJson:e.capturedPaymentsJson,sourceRevenueIds:rows.map(r=>r.revenue.id),pdfEvidence:{sha256:e.pdf.sha256,size:e.pdf.size,fileId:e.pdf.fileId},noApprovalOrPosting:true,historicalCashPosting:false,paymentRestorePolicy:e.paymentRestorePolicy};
   if(e.invoiceRounding)snapshot.roundingException=e.invoiceRounding;
   if(e.multiPeriodEvidence)snapshot.multiPeriodEvidence=e.multiPeriodEvidence;
+  if(e.nativeUsdEvidence)snapshot.nativeUsdEvidence=e.nativeUsdEvidence;
   const data={id,companyId,invoiceNumber:s.invoiceNumber,businessKey:'DGC-TRIAL|'+plan.snapshotHash+'|'+e.source.sourceRow,revisionNo:s.sourceRevisionNo,isCurrent:false,status:s.safeTrialStatus,partnerId,period:s.period,invoiceMode:s.invoiceMode,serviceId:s.invoiceMode==='PER_SERVICE'?rows[0].revenue.serviceId:null,invoiceDate:new Date(s.invoiceDate+'T00:00:00Z'),dueDate:new Date(s.dueDate+'T00:00:00Z'),currency:s.currency,revenueAmount:s.revenueAmount,whtAmount:s.whtAmount,payableAmount:s.payableAmount,paidAmount:s.paidAmount,issuedAt:null,issuedById:null,snapshot,documentId,createdById:actorId};
   await record('invoice',data,adopt);await provenance(e.source,'invoice',data,adopt);
   for(const scope of e.scopes){const scopeId=uuid(companyId,'scope',scope.proposalScopeKey),contractId=await linked(scope.contractSource,'contract');
@@ -78,6 +81,18 @@ export async function rehearseInvoiceMultiPeriodStructure(db,options){
   const selected={...original,invoice:{...original.invoice,period:review.sourceHeaderPeriod},scopes:review.scopes,multiPeriodEvidence:evidence};
   const body={format:'dgc-multiperiod-structure-trial-plan-v1',snapshotHash:i.snapshot.snapshotHash,originalRestorePlanHash:i.restorePlan.planHash,reviewHash:review.reviewHash,entries:[selected],commitAllowed:false,acceptance:false},plan={...body,planHash:digest(body)};
   const result=await runInvoiceTrial(db,{...i,restorePlan:plan,sourceRows:[review.source.sourceRow]},[selected]);return {...result,multiPeriodReviewHash:review.reviewHash,profile:'MULTIPERIOD_STRUCTURE_ONLY_FINANCIAL_HOLDS_RETAINED',remainingFinancialReasons:review.remainingImportReasons};
+ });
+}
+
+// Original Invoice USD print + native recon print/captured-rate replay. This
+// local entry point retains every original strict hold and always rolls back.
+export async function rehearseInvoiceNativeUsd(db,options){
+ requireStaging(process.env.DATABASE_URL??'');return withSourcePlanningCache(async()=>{
+  const plan=await invoiceNativeUsdPlan(options),i=options.invoiceOptions;
+  if(plan.planHash!==options.nativeInvoicePlanPin||!Array.isArray(options.sourceRows)||!options.sourceRows.length||new Set(options.sourceRows).size!==options.sourceRows.length)throw Error('Pinned native/USD Invoice plan and unique source rows required');
+  const selected=options.sourceRows.map(row=>plan.entries.find(e=>e.source.sourceRow===row));if(selected.some(e=>!e||e.state!=='NATIVE_INVOICE_USD_SHAPE_CANDIDATE'))throw Error('Native/USD Invoice selection remains held');
+  const result=await runInvoiceTrial(db,{...i,restorePlan:plan,sourceRows:options.sourceRows},selected);
+  return {...result,profile:'NATIVE_AND_INVOICE_PRINTED_USD_ONLY',nativeReviewHash:plan.nativeReviewHash,nativeInvoicePlanHash:plan.planHash,originalGatesUnchanged:true};
  });
 }
 
@@ -117,6 +132,14 @@ export async function rehearseInvoiceUnifiedSet(db,options){
   const r=await runInvoiceTrial(db,{...options.invoiceOptions,restorePlan:p,sourceRows:rows},selected,options);return {...r,shapeProfile:'STRICT_AND_V1_V2_V3_V4_UNIFIED',originalGatesUnchanged:true,commitAllowed:false};
  });
 }
+export async function rehearseInvoiceUnifiedNativeSet(db,options){
+ requireStaging(process.env.DATABASE_URL??'');return withSourcePlanningCache(async()=>{
+  const p=await verifyInvoiceUnifiedNativePlan(options.unifiedInvoicePlan,options),rows=options.sourceRows;
+  if(!Array.isArray(rows)||!rows.length||new Set(rows).size!==rows.length)throw Error('Select unique whole native unified Invoices');
+  const selected=rows.map(n=>p.entries.find(e=>e.source.sourceRow===n));if(selected.some(e=>e?.state!=='UNIFIED_INVOICE_SHAPE_CANDIDATE'))throw Error('Native unified Invoice/source/scope gates remain held');
+  const r=await runInvoiceTrial(db,{...options.invoiceOptions,restorePlan:p,sourceRows:rows},selected,options,options);return {...r,shapeProfile:'STRICT_V1_V2_V3_V4_AND_NATIVE_USD',originalGatesUnchanged:true,commitAllowed:false};
+ });
+}
 async function invoiceEvidenceSet(db,options,allowStrict){
  requireStaging(process.env.DATABASE_URL??'');const {invoiceOptions:i,invoiceExceptionPlan:p,sourceRows}=options;verifyInvoiceRoundingPlan(p,options);
  const offsetting=allowStrict&&options.offsettingPlan;if(offsetting)verifyInvoiceOffsettingPlan(offsetting,options);
@@ -125,7 +148,7 @@ async function invoiceEvidenceSet(db,options,allowStrict){
  const result=await runInvoiceTrial(db,{...i,restorePlan:offsetting||p,sourceRows},selected,options);return {...result,shapeProfile:offsetting?'STRICT_ROUNDING_AND_OFFSETTING_INVOICE_SHAPES':allowStrict?'STRICT_AND_CAPTURED_INVOICE_SHAPES':'CAPTURED_INVOICE_ROUNDING_ONLY',originalGatesUnchanged:true,commitAllowed:false};
 }
 
-async function runInvoiceTrial(db,{snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions,restorePlan,sourceRows,root,companyId},selected,roundingOptions){
+async function runInvoiceTrial(db,{snapshot,targetPlan,combined,reviewPin,manifest,manifestPin,decisions,restorePlan,sourceRows,root,companyId},selected,roundingOptions,nativeUnifiedOptions){
  await verifiedFiles(snapshot,manifest,root,manifestPin);const before=await counts(db),groups=[...new Set(selected.flatMap(e=>e.revenueGroupKeys))];let result,failure;
  const proxy=new Proxy(db,{get(target,prop){if(prop==='$transaction')return async(fn,options)=>target.$transaction(async tx=>{
   try{await fn(tx);throw Error('Revenue rehearsal unexpectedly returned');}catch(e){
@@ -138,10 +161,10 @@ async function runInvoiceTrial(db,{snapshot,targetPlan,combined,reviewPin,manife
    const inside=await counts(tx);
    for(const model of ['approvalRequest','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','invoiceDocumentLink','userRole','authSession'])if(inside[model]!==before[model])throw Error('Unexpected Invoice rehearsal downstream effect');
    const invoices=await tx.invoice.findMany({where:{companyId,id:{in:selected.map(e=>uuid(companyId,'invoice',e.source))}},include:{receivable:true,scopes:{include:{items:true}}}});
-   const proof=invoices.map(i=>{const e=selected.find(e=>e.source.sourceRow===i.snapshot.source.sourceRow),raw=JSON.parse(i.snapshot.capturedHeaderJson);if(digest({values:raw.values,cells:raw.cells})!==e.source.rowHash||i.isCurrent||i.status!=='CANCELLED'||i.issuedAt||i.issuedById||i.scopes.some(s=>s.isCurrent||s.status!=='BLOCKED'||s.items.some(x=>x.isCurrent)))throw Error('Trial lifecycle or captured Invoice evidence changed');if(e.multiPeriodEvidence){const periods=i.scopes.map(s=>s.periodStart.toISOString().slice(0,7)).sort();if(i.period!==e.multiPeriodEvidence.sourceHeaderPeriod||canonical(periods)!==canonical(e.multiPeriodEvidence.scopePeriods)||canonical(i.snapshot.multiPeriodEvidence)!==canonical(e.multiPeriodEvidence)||i.scopes.some(s=>s.totalAmount.toFixed()!==e.scopes.find(p=>p.period===s.periodStart.toISOString().slice(0,7))?.totalAmount))throw Error('Multi-period stored calendar, components or evidence differs');}return {source:e.source,status:i.status,isCurrent:i.isCurrent,...(e.multiPeriodEvidence?{sourceHeaderPeriod:i.period,scopePeriods:i.scopes.map(s=>s.periodStart.toISOString().slice(0,7)).sort(),multiPeriodEvidenceVerified:true}:{}),payable:i.payableAmount.toFixed(),paid:i.paidAmount.toFixed(),receivable:{original:i.receivable.originalAmount.toFixed(),paid:i.receivable.paidAmount.toFixed(),outstanding:i.receivable.outstandingAmount.toFixed(),status:i.receivable.status},scopes:i.scopes.length,scopeItems:i.scopes.reduce((n,s)=>n+s.items.length,0),capturedHeaderHashVerified:true};});
+   const proof=invoices.map(i=>{const e=selected.find(e=>e.source.sourceRow===i.snapshot.source.sourceRow),raw=JSON.parse(i.snapshot.capturedHeaderJson);if(digest({values:raw.values,cells:raw.cells})!==e.source.rowHash||i.isCurrent||i.status!=='CANCELLED'||i.issuedAt||i.issuedById||i.scopes.some(s=>s.isCurrent||s.status!=='BLOCKED'||s.items.some(x=>x.isCurrent)))throw Error('Trial lifecycle or captured Invoice evidence changed');if(e.multiPeriodEvidence){const periods=i.scopes.map(s=>s.periodStart.toISOString().slice(0,7)).sort();if(i.period!==e.multiPeriodEvidence.sourceHeaderPeriod||canonical(periods)!==canonical(e.multiPeriodEvidence.scopePeriods)||canonical(i.snapshot.multiPeriodEvidence)!==canonical(e.multiPeriodEvidence)||i.scopes.some(s=>s.totalAmount.toFixed()!==e.scopes.find(p=>p.period===s.periodStart.toISOString().slice(0,7))?.totalAmount))throw Error('Multi-period stored calendar, components or evidence differs');}if(e.nativeUsdEvidence&&canonical(i.snapshot.nativeUsdEvidence)!==canonical(e.nativeUsdEvidence))throw Error('Stored native/USD evidence differs');return {source:e.source,status:i.status,isCurrent:i.isCurrent,...(e.nativeUsdEvidence?{nativeUsdEvidenceVerified:true}:{}),...(e.multiPeriodEvidence?{sourceHeaderPeriod:i.period,scopePeriods:i.scopes.map(s=>s.periodStart.toISOString().slice(0,7)).sort(),multiPeriodEvidenceVerified:true}:{}),payable:i.payableAmount.toFixed(),paid:i.paidAmount.toFixed(),receivable:{original:i.receivable.originalAmount.toFixed(),paid:i.receivable.paidAmount.toFixed(),outstanding:i.receivable.outstandingAmount.toFixed(),status:i.receivable.status},scopes:i.scopes.length,scopeItems:i.scopes.reduce((n,s)=>n+s.items.length,0),capturedHeaderHashVerified:true};});
    throw new InvoiceRollback({mode:'ROLLBACK_ONLY',restorePlanHash:restorePlan.planHash,invoiceManifestHash:manifestPin,sourceRows,revenueRehearsal:{first:e.result.first,replay:e.result.replay},first,replay,before,inside,proof,postingAllowed:false,acceptance:false,historicalCashPosting:false,paymentRowsRestored:false,technicalActorPolicy:'EPHEMERAL_INACTIVE_NO_ROLES_OR_SESSION',filesVerified:true,fileVerificationScope:roundingOptions?'ORIGINAL_INVOICE_AND_RECON_PDFS':'ORIGINAL_INVOICE_PDFS_ONLY',reconFilesReverified:Boolean(roundingOptions)});
   }
  },options);const member=target[prop];return typeof member==='function'?member.bind(target):member;}});
- try{if(roundingOptions)await rehearseInvoiceRoundingSources(proxy,{snapshot,companyId,targetPlan,combined,combinedPin:reviewPin,rounding:roundingOptions.rounding,roundingPin:roundingOptions.roundingPin,exceptionPlan:roundingOptions.exceptionPlan,groupKeys:groups,decisions,manifest:roundingOptions.reconManifest,manifestPin:roundingOptions.reconManifestPin,root:roundingOptions.reconRoot});else await rehearseRevenue(proxy,snapshot,companyId,targetPlan,groups,targetPlan.planHash,decisions);throw Error('Invoice rehearsal unexpectedly completed');}catch(e){if(e instanceof InvoiceRollback)result=e.result;else failure=e;}
+ try{if(roundingOptions){const input={snapshot,companyId,targetPlan,combined,combinedPin:reviewPin,rounding:roundingOptions.rounding,roundingPin:roundingOptions.roundingPin,exceptionPlan:roundingOptions.exceptionPlan,groupKeys:groups,decisions,manifest:roundingOptions.reconManifest,manifestPin:roundingOptions.reconManifestPin,root:roundingOptions.reconRoot};if(nativeUnifiedOptions)await rehearseInvoiceNativeUnifiedSources(proxy,input,nativeUnifiedOptions);else await rehearseInvoiceRoundingSources(proxy,input);}else await rehearseRevenue(proxy,snapshot,companyId,targetPlan,groups,targetPlan.planHash,decisions);throw Error('Invoice rehearsal unexpectedly completed');}catch(e){if(e instanceof InvoiceRollback)result=e.result;else failure=e;}
  const after=await counts(db);if(canonical(after)!==canonical(before))throw Error('Invoice rehearsal rollback footprint differs');if(failure)throw failure;return {...result,after,rolledBack:true};
 }
