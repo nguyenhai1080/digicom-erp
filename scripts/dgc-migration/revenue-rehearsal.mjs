@@ -7,6 +7,7 @@ import {verifyReconFiles} from './recon-files.mjs';
 import {verifyInvoiceUnifiedNativePlan} from './native-unified.mjs';
 import {verifyNativeInvoiceEvidenceFiles} from './invoice-native-usd.mjs';
 import {verifyChildNativeFiles} from './child-native.mjs';
+import {verifyInvoiceUsdAuthorityFiles} from './invoice-usd-authority.mjs';
 const {Prisma}=createRequire(new URL('../../packages/db/package.json',import.meta.url))('@prisma/client');
 const models=['reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
@@ -85,7 +86,7 @@ export async function rehearseInvoiceNativeUnifiedSources(prisma,options,unified
  if(canonical(options.snapshot)!==canonical(i.snapshot)||canonical(options.targetPlan)!==canonical(i.targetPlan)||options.companyId!==i.companyId||canonical(options.decisions)!==canonical(i.decisions)||canonical(options.combined)!==canonical(i.combined)||options.combinedPin!==i.reviewPin)throw Error('Native unified revenue inputs differ');
  const rows=unifiedOptions.sourceRows;if(!Array.isArray(rows)||!rows.length||new Set(rows).size!==rows.length)throw Error('Unique native unified Invoice rows required');
  const selected=rows.map(row=>plan.entries.find(e=>e.source.sourceRow===row));if(selected.some(e=>e?.state!=='UNIFIED_INVOICE_SHAPE_CANDIDATE')||canonical([...new Set(selected.flatMap(e=>e.revenueGroupKeys))].sort())!==canonical([...options.groupKeys].sort()))throw Error('Native unified whole Invoice source set differs');
- const nativeGroups=new Set(selected.filter(e=>['NATIVE_USD','CHILD_NATIVE'].includes(e.sourceProfile)).flatMap(e=>e.revenueGroupKeys));
+ const nativeGroups=new Set(selected.filter(e=>['NATIVE_USD','CHILD_NATIVE','ORIGINAL_INVOICE_USD'].includes(e.sourceProfile)).flatMap(e=>e.revenueGroupKeys));
  // Only compound groups rederived from the complete selected Invoice plans
  // qualify here. The original exception/target/combined plans stay held.
  const compoundGroups=new Set(selected.filter(e=>e.sourceProfile==='CHILD_ROUNDING_V1').flatMap(e=>e.childNativeEvidence.groups.filter(g=>g.state==='COMPOUND_CHILD_GROUP_CANDIDATE').map(g=>g.groupKey)));
@@ -93,7 +94,7 @@ export async function rehearseInvoiceNativeUnifiedSources(prisma,options,unified
  // bytes/text/renders and an exact input fingerprint inside it, without doing
  // the expensive pure graph audit again while database locks are held.
  const validatedInputsHash=digest(unifiedOptions);
- const result=await runRoundingProfile(prisma,options,true,{nativeGroups,compoundGroups,reverify:async()=>{if(digest(unifiedOptions)!==validatedInputsHash)throw Error('Unified native input drift');await verifyNativeInvoiceEvidenceFiles(unifiedOptions);if(unifiedOptions.childNativeOptions)await verifyChildNativeFiles({...unifiedOptions.childNativeOptions,snapshot:i.snapshot,targetPlan:i.targetPlan});if(digest(unifiedOptions)!==validatedInputsHash)throw Error('Unified native input drift');}});
+ const result=await runRoundingProfile(prisma,options,true,{nativeGroups,compoundGroups,reverify:async()=>{if(digest(unifiedOptions)!==validatedInputsHash)throw Error('Unified native input drift');await verifyNativeInvoiceEvidenceFiles(unifiedOptions);if(unifiedOptions.childNativeOptions)await verifyChildNativeFiles({...unifiedOptions.childNativeOptions,snapshot:i.snapshot,targetPlan:i.targetPlan});if(unifiedOptions.invoiceUsdAuthorityOptions)await verifyInvoiceUsdAuthorityFiles(unifiedOptions);if(digest(unifiedOptions)!==validatedInputsHash)throw Error('Unified native input drift');}});
  return {...result,shapeProfile:plan.childRoundingInvoicePlanHash?'STRICT_ROUNDING_NATIVE_USD_CHILD_AND_COMPOUND_V1':plan.childNativeInvoicePlanHash?'STRICT_ROUNDING_NATIVE_USD_AND_CHILD_NATIVE':'STRICT_ROUNDING_AND_NATIVE_INVOICE_PRINTED_USD',...(plan.childNativeInvoicePlanHash?{childNativeInvoicePlanHash:plan.childNativeInvoicePlanHash}:{}),...(plan.childRoundingInvoicePlanHash?{childRoundingInvoicePlanHash:plan.childRoundingInvoicePlanHash,compoundGroupKeys:[...compoundGroups]}:{}),nativeInvoicePlanHash:plan.nativeInvoicePlanHash,nativeGroupKeys:[...nativeGroups],operationalFxDerived:false};
 }
 async function runRoundingProfile(prisma,{snapshot,companyId,targetPlan,combined,combinedPin,rounding,roundingPin,exceptionPlan,groupKeys,decisions,manifest,root,manifestPin},allowStrict,nativeContext){

@@ -1,0 +1,9 @@
+# DGC — owner giữ phạm vi cắt chuyển đầy đủ sổ lịch sử
+
+Ngày 25/10/2026 (Asia/Ho_Chi_Minh), owner đã chọn **“Nhập đầy đủ sổ lịch sử trước — giữ mục tiêu migration gốc”** khi so hai phương án trong private `artifacts/dgc-migration/20261025/cutover/CUTOVER_OPTIONS.md`. Không chuyển sang số dư đầu kỳ/vận hành mới trước rồi backfill lịch sử. Không hỏi lại lựa chọn này, không tự giảm scope vì deadline.
+
+Snapshot đang xét có tám Invoice nguồn còn phải thu, tổng captured AR **25.328,54 USD**. Đây là dữ liệu snapshot cũ chưa frozen, không phải số dư đã nhập/đã nghiệm thu tại ngày cắt chuyển. Tập 29 đã rollback thử gồm 23 Paid và sáu Issued; còn 22 Paid và hai Issued ngoài set, cùng receipts/tài liệu phụ thuộc. Mốc 29/207/23/24 và 560 assertions xem [compound trial](DGC_CHILD_ROUNDING_20261025.md).
+
+Ưu tiên đường găng: hoàn chỉnh dữ liệu/lifecycle/financial acceptance của toàn bộ sổ → importer vận hành riêng và đối chiếu commit/replay/rollback → gán/kiểm quyền người dùng thật, UAT kế toán → chốt dừng ghi nguồn/snapshot cuối/delta, backup DB/files/restore → quyết định chuyển vận hành. Không promote trial rows, sửa amounts/raw/PDF/legacy IDs, mở lại master/evidence/bootstrap/local staging gates hoặc lấy kết quả rollback làm operational acceptance.
+
+Đang kiểm riêng bằng chứng original Invoice USD cho hàng 85/86 để giải quyết current AR. Hàng 85 giữ header tháng 05 và ba scope 03–05/2019; không biến tổng in trên Invoice thành bằng chứng rằng từng allocation Revenue/WHT theo tháng đã in. Scan native/FX còn vấn đề được giữ nguyên evidence, không suy operational FX/MZN. Printed contract text của Invoice 85 khác captured Contract_No; giữ cả hai và không khẳng định legal equivalence hoặc sửa master. Hàng 86 có original Invoice scan đủ nội dung, không dựa riêng footer của Recon để khẳng định full Recon identity. Chưa có financial commit/cutover.

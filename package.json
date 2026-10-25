@@ -109,6 +109,8 @@
     "test:migration:child-native-source": "node scripts/dgc-migration/child-native.source.test.mjs",
     "test:migration:child-native-source-staging": "node scripts/dgc-migration/child-native-source.integration.mjs",
     "test:migration:child-rounding-source": "node scripts/dgc-migration/child-rounding.source.test.mjs",
-    "test:migration:child-rounding-source-staging": "node scripts/dgc-migration/child-rounding-source.integration.mjs"
+    "test:migration:child-rounding-source-staging": "node scripts/dgc-migration/child-rounding-source.integration.mjs",
+    "test:migration:invoice-usd-authority-source": "node scripts/dgc-migration/invoice-usd-authority.source.test.mjs",
+    "test:migration:invoice-usd-authority-source-staging": "node scripts/dgc-migration/invoice-usd-authority-source.integration.mjs"
   }
 }
