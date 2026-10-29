@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {normalizeCapture,canonical} from './core.mjs';
+import {revenueCaptures,changeRevenueCapture} from './revenue-fixtures.mjs';
+import {sourcePhysicalIdentityPlan,sameLegacyRevenueScope} from './source-identity.mjs';
+import {cell} from './fixtures.mjs';
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+const captures=revenueCaptures();for(const sheet of ['40_MONTHLY_REVENUE','41_RECONCILIATION'])for(const row of [1,2])changeRevenueCapture(captures,sheet,row,'Revenue_ID','SHARED');
+const snapshot=normalizeCapture(captures),before=canonical(snapshot),plan=sourcePhysicalIdentityPlan(snapshot),entries=plan.revenueCollisions[0].entries;
+eq(plan.counts,{collidingRevenueIds:1,revenueRows:2,collidingInvoiceNumbers:0});eq(new Set(entries.map(e=>e.proposedLocalCode)).size,2);eq(entries.map(e=>e.displayLegacyId),['SHARED','SHARED']);eq(entries.every(e=>!e.sourceIdChanged&&!e.legacyRelationInvented&&!e.financialAdmissionAllowed),true);eq(entries.every(e=>e.matchingLegacyRows.length===1),true);eq(entries.every(e=>e.otherSameIdLegacyRows.length===1),true);eq(plan.otherHoldsUnchanged,true);eq(plan.acceptance,false);eq(plan.commitAllowed,false);eq(plan.readyToImport,false);eq(canonical(snapshot),before);eq(sourcePhysicalIdentityPlan(snapshot),plan);
+const r=snapshot.tables['40_MONTHLY_REVENUE'].rows[0],l=snapshot.tables['41_RECONCILIATION'].rows.find(l=>sameLegacyRevenueScope(r,l));eq(!!l,true);
+for(const field of ['Revenue_ID','Partner_ID','Contract_ID','Service_ID','Recon_Month']){const other=structuredClone(l);other.values[field]='DIFFERENT';delete other.cells[field];eq(sameLegacyRevenueScope(r,other),false);}
+const changed=structuredClone(snapshot);changed.tables['40_MONTHLY_REVENUE'].rows[0].values.Service_ID='ALTERED';assert.throws(()=>sourcePhysicalIdentityPlan(changed),/checksum|row/i);n++;
+function invoiceCollision(bothCurrent=false){const c=revenueCaptures(),e=c.find(e=>e.data.sheets[0].properties.title==='48_INVOICE_HEADER'),s=e.data.sheets[0];s.properties.gridProperties={rowCount:3,columnCount:4};e.requestedRange="'48_INVOICE_HEADER'!A1:D3";s.data[0].rowData=[['Invoice_ID','Invoice_Number','Is_Current','Status'],['ARCHIVE','LEGAL-NUMBER',bothCurrent,'Superseded'],['CURRENT','LEGAL-NUMBER',true,'Paid']].map(r=>({values:r.map(cell)}));return sourcePhysicalIdentityPlan(normalizeCapture(c));}
+const collision=invoiceCollision().invoiceNumberCollisions[0];eq(collision.state,'ONE_CURRENT_WITH_SEPARATE_ARCHIVE_EVIDENCE');eq(collision.currentRows.map(r=>r.legacyId),['CURRENT']);eq(collision.archiveRows.map(r=>r.legacyId),['ARCHIVE']);eq(collision.successorRelationshipInferred,false);eq(collision.legalInvoiceNumberChanged,false);eq(collision.financialAdmissionAllowed,false);eq(invoiceCollision(true).invoiceNumberCollisions[0].state,'UNRESOLVED_CURRENT_NUMBER_COLLISION');
+console.log(`Physical source identity: ${n} assertions passed; duplicate labels stay separate, no invented legacy links or financial admission`);

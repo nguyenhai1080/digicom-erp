@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {historicalRevenueFixture} from './historical-revenue-source.fixtures.mjs';
 import {readHistoricalRevenueSource} from '../dist/modules/projects/historical-revenue-source.js';
 import {roundingExceptionInputs} from '../../../scripts/dgc-migration/rounding-exception.fixtures.mjs';
-import {roundingExceptionPlan} from '../../../scripts/dgc-migration/rounding-exception.mjs';
+import {roundingExceptionPlan,capturedRoundingEvidence} from '../../../scripts/dgc-migration/rounding-exception.mjs';
 import {cell} from '../../../scripts/dgc-migration/fixtures.mjs';
 import {canonical} from '../../../scripts/dgc-migration/core.mjs';
 let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;},reject=async fn=>{await assert.rejects(fn,e=>e.statusCode===409);n++;};
@@ -10,7 +10,7 @@ function fixture(o=roundingExceptionInputs()){
  const p=roundingExceptionPlan(o.snapshot,o.targetPlan,o.combined,o.combinedPin,o.rounding,o.roundingPin);
  const f=historicalRevenueFixture(c=>{for(const e of c){const s=e.data.sheets[0],t=o.snapshot.tables[s.properties.title];s.properties.sheetId=t.sheetId;s.properties.gridProperties=t.gridBounds;e.requestedRange=t.requestedRange;const rows=Array.from({length:t.gridBounds.rowCount},()=>({}));rows[0]={values:t.headers.map(cell)};for(const r of t.rows)rows[r.sourceRow-1]={values:t.headers.map(h=>r.cells[h])};s.data[0].rowData=rows;}});
  assert.equal(f.snapshot.snapshotHash,o.snapshot.snapshotHash);
- f.revenue.calculationJson.roundingException=structuredClone(p.groups[0].entries[0].exceptionEvidence);f.reconciliation.ocrRawJson.roundingReviewHash=o.roundingPin;f.reseal();return f;
+ f.revenue.calculationJson.roundingException=structuredClone(p.groups[0].entries[0].exceptionEvidence??capturedRoundingEvidence(o.snapshot.snapshotHash,o.targetPlan.groups[0].entries[0],o.rounding.revenues.find(r=>canonical(r.source)===canonical(o.targetPlan.groups[0].entries[0].source)),o.roundingPin));f.reconciliation.ocrRawJson.roundingReviewHash=o.roundingPin;f.reseal();return f;
 }
 const f=fixture(),before=canonical(f.revenue),read=f=>readHistoricalRevenueSource(f.tx,f.companyId,f.id,f.snapshot.snapshotHash),r=await read(f);
 eq(r.capturedAmounts.invoiceUsd,{revenue:'33.33',wht:'3.67',payable:'29.67'});eq(r.historicalArithmetic.identityDelta,'0.01');eq(r.historicalArithmetic.components,r.capturedAmounts.invoiceUsd);eq(r.historicalArithmetic.sourceArithmeticReplayed,true);eq(r.historicalArithmetic.operationalUseAllowed,false);eq(r.historicalArithmetic.originalPdfVerified,false);eq(r.historicalArithmetic.operationalFxDerived,false);eq(r.historicalArithmetic.gateOverrideAllowed,false);eq(r.historicalArithmetic.acceptance,false);eq(r.approvalEvidence.localApprovalCreated,false);eq(canonical(f.revenue),before);eq(JSON.stringify(r).includes('Exchange_Rate'),false);eq(JSON.stringify(r).includes('Remuneration_Provider_MZN'),false);
@@ -36,4 +36,23 @@ const negative=fixture(roundingExceptionInputs((c,ch)=>{for(const row of [1,2]){
  for(const [field,value] of Object.entries({Gross_Revenue:30.33,Net_Revenue:30.33,Company_Share:30.33,Invoice_Revenue_USD:33.67,Invoice_WHT_USD:3.33,Invoice_Payable_USD:30.33}))ch('40_MONTHLY_REVENUE',field,value,row);
  for(const field of ['Gross_Revenue','Net_Revenue','Company_Share'])ch('41_RECONCILIATION',field,30.33,row);
 }})),nr=await read(negative);eq(nr.historicalArithmetic.identityDelta,'-0.01');eq(nr.capturedAmounts.invoiceUsd,{revenue:'33.67',wht:'3.33',payable:'30.33'});
+// A native delta small enough to leave all three captured USD conversions
+// unchanged still fails V1. Only the explicit V2 can preserve it as a warning.
+function nativeDifferenceFixture(){
+ const f=fixture(roundingExceptionInputs((_c,ch)=>{for(const row of [1,2])ch('44_RECON_PDF_DETAIL','Partner_Revenue_MZN',89.001,row);}));
+ Object.assign(f.revenue.calculationJson.roundingException,{format:'DGC_CAPTURED_NATIVE_IDENTITY_DIFFERENCE_V2',nativeIdentityDelta:'0.001',nativeIdentityAccepted:false});f.reseal();return f;
+}
+const v2=nativeDifferenceFixture(),v2before=canonical(v2.revenue),v2read=await read(v2);
+eq(v2read.historicalArithmetic.format,'DGC_CAPTURED_NATIVE_IDENTITY_DIFFERENCE_V2');eq(v2read.historicalArithmetic.nativeIdentityDelta,'0.001');eq(v2read.historicalArithmetic.nativeIdentityAccepted,false);eq(v2read.operationalUseAllowed,false);eq(v2read.acceptance,false);eq(v2read.historicalArithmetic.sourceArithmeticReplayed,true);eq(canonical(v2.revenue),v2before);
+for(const mutate of [
+ f=>f.revenue.calculationJson.roundingException.nativeIdentityDelta='0',
+ f=>f.revenue.calculationJson.roundingException.nativeIdentityDelta='0.002',
+ f=>f.revenue.calculationJson.roundingException.nativeIdentityAccepted=true,
+ f=>delete f.revenue.calculationJson.roundingException.nativeIdentityAccepted,
+ f=>f.revenue.calculationJson.roundingException.format='DGC_CAPTURED_ROUNDING_EXCEPTION_V1',
+ f=>{const x=f.revenue.calculationJson.roundingException;x.format='DGC_CAPTURED_ROUNDING_EXCEPTION_V1';delete x.nativeIdentityDelta;delete x.nativeIdentityAccepted;},
+ f=>f.revenue.calculationJson.roundingException.operationalFxDerived=true,
+ f=>f.revenue.calculationJson.roundingException.components.payable='29.66',
+]){const f=nativeDifferenceFixture();mutate(f);f.reseal();await reject(()=>read(f));}
+const noDifference=fixture();Object.assign(noDifference.revenue.calculationJson.roundingException,{format:'DGC_CAPTURED_NATIVE_IDENTITY_DIFFERENCE_V2',nativeIdentityDelta:'0',nativeIdentityAccepted:false});noDifference.reseal();await reject(()=>read(noDifference));
 console.log(`Historical captured rounding reader: ${n} assertions passed (controlled source/target doubles)`);

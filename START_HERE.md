@@ -1,6 +1,10 @@
 # Bắt đầu làm việc với DGC Finance
 
-Cập nhật ngày 25/10/2026, giờ Việt Nam.
+Cập nhật ngày 29/10/2026, giờ Việt Nam.
+
+**Đã thử chung 43 Invoice:** [USD-reference 29/10](docs/handover/DGC_USD_REFERENCE_UNIFIED_20261029.md) thêm 12 Paid, giữ source/native/financial holds và các hash cũ khi không có option mới. Clone host/Linux đạt 862 assertions: 43 Invoice–AR / 313 revenue / 36 documents / 38 links / 40 receipts; late write failure, replay/full rollback, 37 master links/no cash. Reader nhận đúng ba owner-approved mappings, V1 giữ strict native identity và V2 giữ discrepancy unaccepted; Linux reader 210 checks, 173 PostgreSQL hồi quy và 45 migration suites đạt. Còn 10 Paid/11 receipts, tám Invoice dependencies giữ 10 referenced docs. Signed-copy Invoice 44 có source checks/proposal, PostgreSQL trial đang chạy; chưa tính vào mốc 43. Chưa financial commit/importer vận hành/UAT/cutover.
+
+**Nguồn và quyết định 29/10:** [đọc nguồn/định danh](docs/handover/DGC_SOURCE_AND_IDENTITY_20261029.md) kiểm đủ 25 bảng/3.154 hàng không có delta, chưa frozen. [Owner chốt Invoice 33/44](docs/handover/DGC_DOCUMENT_OWNER_DECISIONS_20261029.md), cùng [Invoice 14](docs/handover/DGC_INVOICE14_OWNER_DECISION_20261025.md); không hỏi lại. Source authority 18 checks, physical identity 26 checks, chưa tự mở financial admission hoặc áp writer cho mã trùng.
 
 **Đã thử đủ tám công nợ mở:** [original Invoice USD 25/10](docs/handover/DGC_ORIGINAL_INVOICE_USD_20261025.md) thêm hàng 85/86 qua profile riêng, giữ cảnh báo native/FX/contract text và ba scope 03–05/2019. Clone host/Linux đạt 587 assertions: 31 Invoice–AR / 211 revenue / 24 documents / 26 links / 24 receipts, full rollback/37 master links/no cash. Tám Issued nguồn còn phải thu 25.328,54 USD đều đã thử; chưa nhập thật. Owner chọn nhập đầy đủ sổ lịch sử trước vận hành; còn 22 Paid, 27 receipts, 20 Invoice dependencies/22 referenced docs, Draft/archive, importer và UAT.
 

@@ -6,8 +6,9 @@ import {verifyRoundingExceptionPlan} from './rounding-exception.mjs';
 import {verifyReconFiles} from './recon-files.mjs';
 import {verifyInvoiceUnifiedNativePlan} from './native-unified.mjs';
 import {verifyNativeInvoiceEvidenceFiles} from './invoice-native-usd.mjs';
-import {verifyChildNativeFiles} from './child-native.mjs';
+import {verifyChildNativeFiles,uniqueChildNativeFileVerificationInputs} from './child-native.mjs';
 import {verifyInvoiceUsdAuthorityFiles} from './invoice-usd-authority.mjs';
+import {verifySignedPackageCopyFiles} from './signed-package-copies.mjs';
 const {Prisma}=createRequire(new URL('../../packages/db/package.json',import.meta.url))('@prisma/client');
 const models=['reconciliation','reconciliationItem','revenue','invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document','dgcImportLink','auditLog'];
 const counts=async db=>Object.fromEntries(await Promise.all(models.map(async m=>[m,await db[m].count()])));
@@ -29,7 +30,7 @@ async function staged(tx,snapshot,companyId){
 export {masterResolver} from '../../packages/db/prisma/dgc-master-resolver.mjs';
 import {masterResolver} from '../../packages/db/prisma/dgc-master-resolver.mjs';
 
-async function materialize(tx,snapshot,companyId,plan,selected,resolve,exceptions){
+async function materialize(tx,snapshot,companyId,plan,selected,resolve,exceptions,nativeDifferences){
  let created=0,unchanged=0,groupsCreated=0;
  async function record(model,data,adopt){const old=await tx[model].findFirst({where:{companyId,id:data.id}});if(old){if(!adopt||hash(old,data)!==hash(data,data)){const fields=Object.keys(data).flatMap(k=>diffPaths(value(old[k]),value(data[k]),k));throw Error('Rehearsal target drift or unlinked existing record: '+model+' ['+fields.join(',')+']');}return old;}return tx[model].create({data});}
  for(const g of selected){
@@ -47,7 +48,7 @@ async function materialize(tx,snapshot,companyId,plan,selected,resolve,exception
   for(const [index,e] of g.entries.entries()){
    const s=e.source,serviceId=await resolve(e.bindings.Service_ID),parentServiceId=e.bindings.Parent_Service_ID?await resolve(e.bindings.Parent_Service_ID):null,itemId=uuid(companyId,'item',identity(s)),id=uuid(companyId,'revenue',identity(s)),scope=[partnerId,serviceId,g.period].join('|');
    const calc={dgc:true,sourceKind:'DGC_REHEARSAL_ONLY',filesVerified:false,snapshotHash:snapshot.snapshotHash,source:s,sourceStatus:e.sourceStatus,capturedRevenueJson:canonical(e.capturedRevenue),capturedManagement:e.capturedManagement,legacyReconciliationsJson:canonical(e.legacyReconciliations),legacyReconBases:e.legacyReconBases,rowType:e.aggregationMapping.rowType,includeInMonthlyTotal:e.aggregationMapping.includeInMonthlyTotal,parentServiceId,invoiceRevenueUsd:e.capturedInvoiceUsd.Invoice_Revenue_USD,invoiceWhtUsd:e.capturedInvoiceUsd.Invoice_WHT_USD,invoicePayableUsd:e.capturedInvoiceUsd.Invoice_Payable_USD,noApprovalOrPosting:true};
-   const capturedException=exceptions?.groups.find(x=>x.groupKey===g.groupKey)?.entries.find(x=>canonical(x.source)===canonical(s))?.exceptionEvidence;
+   const capturedException=nativeDifferences?.get(canonical(s))??exceptions?.groups.find(x=>x.groupKey===g.groupKey)?.entries.find(x=>canonical(x.source)===canonical(s))?.exceptionEvidence;
    if(capturedException)calc.roundingException=capturedException;
    const m=e.capturedManagement;
    await record('reconciliationItem',{id:itemId,companyId,reconciliationId:recId,serviceId,lineNo:index+1,businessScopeKey:scope,periodStart:start,periodEnd:end,isCurrent:false,grossRevenue:m.Gross_Revenue,partnerShareAmount:m.Partner_Share,companyShareAmount:m.Company_Share,taxAmount:m.Tax_Amount,whtAmount:'0',netRevenue:m.Company_Share,sourceRowReference:canonical(s),calculationJson:calc},allLinked);
@@ -90,28 +91,31 @@ export async function rehearseInvoiceNativeUnifiedSources(prisma,options,unified
  // Only compound groups rederived from the complete selected Invoice plans
  // qualify here. The original exception/target/combined plans stay held.
  const compoundGroups=new Set(selected.filter(e=>e.sourceProfile==='CHILD_ROUNDING_V1').flatMap(e=>e.childNativeEvidence.groups.filter(g=>g.state==='COMPOUND_CHILD_GROUP_CANDIDATE').map(g=>g.groupKey)));
+ const usdReferenceGroups=new Set(selected.filter(e=>e.sourceProfile==='USD_REFERENCE_V1').flatMap(e=>e.usdReferenceEvidence.dependencies.filter(g=>g.state==='USD_REFERENCE_SOURCE_SHAPE').map(g=>g.groupKey)));
+ const signedCopyGroups=new Set(selected.filter(e=>e.sourceProfile==='SIGNED_PACKAGE_COPIES_V1').flatMap(e=>e.signedPackageEvidence.groups.filter(g=>g.state==='SIGNED_PACKAGE_COPY_GROUP_BOUND').map(g=>g.groupKey)));
+ const nativeDifferences=new Map(selected.filter(e=>['USD_REFERENCE_V1','SIGNED_PACKAGE_COPIES_V1'].includes(e.sourceProfile)).flatMap(e=>e.nativeDifferenceRoundingEvidence.map(x=>[canonical(x.source),x])));
  // Full plans were rederived before opening the transaction. Recheck all
  // bytes/text/renders and an exact input fingerprint inside it, without doing
  // the expensive pure graph audit again while database locks are held.
  const validatedInputsHash=digest(unifiedOptions);
- const result=await runRoundingProfile(prisma,options,true,{nativeGroups,compoundGroups,reverify:async()=>{if(digest(unifiedOptions)!==validatedInputsHash)throw Error('Unified native input drift');await verifyNativeInvoiceEvidenceFiles(unifiedOptions);if(unifiedOptions.childNativeOptions)await verifyChildNativeFiles({...unifiedOptions.childNativeOptions,snapshot:i.snapshot,targetPlan:i.targetPlan});if(unifiedOptions.invoiceUsdAuthorityOptions)await verifyInvoiceUsdAuthorityFiles(unifiedOptions);if(digest(unifiedOptions)!==validatedInputsHash)throw Error('Unified native input drift');}});
- return {...result,shapeProfile:plan.childRoundingInvoicePlanHash?'STRICT_ROUNDING_NATIVE_USD_CHILD_AND_COMPOUND_V1':plan.childNativeInvoicePlanHash?'STRICT_ROUNDING_NATIVE_USD_AND_CHILD_NATIVE':'STRICT_ROUNDING_AND_NATIVE_INVOICE_PRINTED_USD',...(plan.childNativeInvoicePlanHash?{childNativeInvoicePlanHash:plan.childNativeInvoicePlanHash}:{}),...(plan.childRoundingInvoicePlanHash?{childRoundingInvoicePlanHash:plan.childRoundingInvoicePlanHash,compoundGroupKeys:[...compoundGroups]}:{}),nativeInvoicePlanHash:plan.nativeInvoicePlanHash,nativeGroupKeys:[...nativeGroups],operationalFxDerived:false};
+ const result=await runRoundingProfile(prisma,options,true,{nativeGroups,compoundGroups,usdReferenceGroups,signedCopyGroups,nativeDifferences,reverify:async()=>{if(digest(unifiedOptions)!==validatedInputsHash)throw Error('Unified native input drift');await verifyNativeInvoiceEvidenceFiles(unifiedOptions);for(const input of uniqueChildNativeFileVerificationInputs([unifiedOptions.childNativeOptions,unifiedOptions.usdReferenceOptions].filter(Boolean).map(o=>({...o,snapshot:i.snapshot,targetPlan:i.targetPlan}))))await verifyChildNativeFiles(input);if(unifiedOptions.invoiceUsdAuthorityOptions)await verifyInvoiceUsdAuthorityFiles(unifiedOptions);if(unifiedOptions.signedPackageCopyOptions)await verifySignedPackageCopyFiles({...unifiedOptions.signedPackageCopyOptions,snapshot:i.snapshot,targetPlan:i.targetPlan});if(digest(unifiedOptions)!==validatedInputsHash)throw Error('Unified native input drift');}});
+ return {...result,shapeProfile:plan.signedPackageCopyInvoicePlanHash?'STRICT_ROUNDING_REFERENCE_USD_AND_SIGNED_COPIES_V1':plan.usdReferenceInvoicePlanHash?'STRICT_ROUNDING_NATIVE_AND_REFERENCE_USD_V1':plan.childRoundingInvoicePlanHash?'STRICT_ROUNDING_NATIVE_USD_CHILD_AND_COMPOUND_V1':plan.childNativeInvoicePlanHash?'STRICT_ROUNDING_NATIVE_USD_AND_CHILD_NATIVE':'STRICT_ROUNDING_AND_NATIVE_INVOICE_PRINTED_USD',...(plan.childNativeInvoicePlanHash?{childNativeInvoicePlanHash:plan.childNativeInvoicePlanHash}:{}),...(plan.childRoundingInvoicePlanHash?{childRoundingInvoicePlanHash:plan.childRoundingInvoicePlanHash,compoundGroupKeys:[...compoundGroups]}:{}),...(plan.usdReferenceInvoicePlanHash?{usdReferenceInvoicePlanHash:plan.usdReferenceInvoicePlanHash,usdReferenceGroupKeys:[...usdReferenceGroups]}:{}),...(plan.signedPackageCopyInvoicePlanHash?{signedPackageCopyInvoicePlanHash:plan.signedPackageCopyInvoicePlanHash,signedCopyGroupKeys:[...signedCopyGroups],originalBytesRecovered:false}:{}),nativeInvoicePlanHash:plan.nativeInvoicePlanHash,nativeGroupKeys:[...nativeGroups],operationalFxDerived:false};
 }
 async function runRoundingProfile(prisma,{snapshot,companyId,targetPlan,combined,combinedPin,rounding,roundingPin,exceptionPlan,groupKeys,decisions,manifest,root,manifestPin},allowStrict,nativeContext){
  requireStaging(process.env.DATABASE_URL??'');verifyRoundingExceptionPlan(exceptionPlan,snapshot,targetPlan,combined,combinedPin,rounding,roundingPin,decisions);
  if(!Array.isArray(groupKeys)||!groupKeys.length||new Set(groupKeys).size!==groupKeys.length)throw Error('Select unique whole rounding groups');
- const selected=groupKeys.map(k=>exceptionPlan.groups.find(g=>g.groupKey===k));if(selected.some(g=>!g||g.state!=='CAPTURED_ROUNDING_SHAPE_TRIAL_CANDIDATE'&&!nativeContext?.compoundGroups?.has(g.groupKey)&&!(allowStrict&&targetPlan.groups.find(t=>t.groupKey===g.groupKey)?.state==='REHEARSABLE'&&(combined.groups.find(t=>t.groupKey===g.groupKey)?.state==='EVIDENCE_CLEAR_FOR_NEXT_REVIEW'||nativeContext?.nativeGroups.has(g.groupKey)))))throw Error('Other source/PDF/lifecycle gates remain held');
+ const selected=groupKeys.map(k=>exceptionPlan.groups.find(g=>g.groupKey===k));if(selected.some(g=>!g||g.state!=='CAPTURED_ROUNDING_SHAPE_TRIAL_CANDIDATE'&&!nativeContext?.compoundGroups?.has(g.groupKey)&&!nativeContext?.usdReferenceGroups?.has(g.groupKey)&&!nativeContext?.signedCopyGroups?.has(g.groupKey)&&!(allowStrict&&targetPlan.groups.find(t=>t.groupKey===g.groupKey)?.state==='REHEARSABLE'&&(combined.groups.find(t=>t.groupKey===g.groupKey)?.state==='EVIDENCE_CLEAR_FOR_NEXT_REVIEW'||nativeContext?.nativeGroups.has(g.groupKey)))))throw Error('Other source/PDF/lifecycle gates remain held');
  const custody=await verifyReconFiles(snapshot,manifest,root,manifestPin);
  if(combined.manifestHash!==manifestPin)throw Error('Rounding source PDF manifest differs');
  const groups=groupKeys.map(k=>targetPlan.groups.find(g=>g.groupKey===k));
- if(groups.some(g=>custody.missingFiles.includes(g.sourceFileId)))throw Error('Missing rounding source PDF bytes');
+ if(groups.some(g=>custody.missingFiles.includes(g.sourceFileId)&&!nativeContext?.signedCopyGroups?.has(g.groupKey)))throw Error('Missing rounding source PDF bytes');
  const footprint=async()=>Object.fromEntries(await Promise.all([...models,'user','userRole','authSession','approvalRequest','invoiceDocumentLink'].map(async m=>[m,await prisma[m].count()]))),before=await footprint();let result,failure;
- try{result=await runRevenueTrial(prisma,snapshot,companyId,targetPlan,groups,groupKeys,decisions,exceptionPlan,async()=>{await verifyReconFiles(snapshot,manifest,root,manifestPin);if(nativeContext)await nativeContext.reverify();});}catch(e){failure=e;}
+ try{result=await runRevenueTrial(prisma,snapshot,companyId,targetPlan,groups,groupKeys,decisions,exceptionPlan,async()=>{await verifyReconFiles(snapshot,manifest,root,manifestPin);if(nativeContext)await nativeContext.reverify();},nativeContext?.nativeDifferences);}catch(e){failure=e;}
  const after=await footprint();if(canonical(before)!==canonical(after))throw Error('Rounding shape trial rollback footprint differs');if(failure)throw failure;
  return {...result,shapeProfile:allowStrict?'ROUNDING_WITH_STRICT_INVOICE_SOURCES':'CAPTURED_ROUNDING_EXCEPTION_ONLY',exceptionPlanHash:exceptionPlan.planHash,originalGatesUnchanged:true,commitAllowed:false,originalPdfBytesReverified:true,pdfSemanticsVerified:false,footprintBefore:before,footprintAfter:after};
 }
 
-async function runRevenueTrial(prisma,snapshot,companyId,plan,selected,groupKeys,decisions,exceptions,reverify){
+async function runRevenueTrial(prisma,snapshot,companyId,plan,selected,groupKeys,decisions,exceptions,reverify,nativeDifferences){
  let result;
  try {await prisma.$transaction(async tx=>{
   const actual=await tx.$queryRaw`SELECT current_database() AS name`;
@@ -119,9 +123,9 @@ async function runRevenueTrial(prisma,snapshot,companyId,plan,selected,groupKeys
   await tx.$queryRaw`SELECT id FROM companies WHERE id=${companyId}::uuid FOR UPDATE`;
   const c=await tx.company.findUnique({where:{id:companyId}});if(!c||c.companyCode!=='DGC'||await tx.company.count()!==1)throw Error('Rehearsal requires exactly one DGC tenant');
   await staged(tx,snapshot,companyId);const before=await counts(tx);
-  const first=await materialize(tx,snapshot,companyId,plan,selected,await masterResolver(tx,snapshot,companyId,decisions),exceptions);
+  const first=await materialize(tx,snapshot,companyId,plan,selected,await masterResolver(tx,snapshot,companyId,decisions),exceptions,nativeDifferences);
   await staged(tx,snapshot,companyId);
-  const replay=await materialize(tx,snapshot,companyId,plan,selected,await masterResolver(tx,snapshot,companyId,decisions),exceptions),inside=await counts(tx);
+  const replay=await materialize(tx,snapshot,companyId,plan,selected,await masterResolver(tx,snapshot,companyId,decisions),exceptions,nativeDifferences),inside=await counts(tx);
   if(reverify)await reverify();
   if(replay.created||replay.groupsCreated||replay.unchanged!==selected.reduce((n,g)=>n+g.entries.length,0))throw Error('Rehearsal replay did not converge');
   for(const m of ['invoice','invoiceScope','invoiceScopeItem','accountReceivable','invoicePayment','inputReconciliation','accountPayable','cashAccount','cashEntry','cashHistory','cashTransfer','attachment','document'])if(inside[m]!==before[m])throw Error('Unexpected downstream effect during revenue rehearsal');

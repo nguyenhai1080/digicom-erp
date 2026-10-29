@@ -83,11 +83,16 @@ export async function readHistoricalRevenueSource(tx:Prisma.TransactionClient,co
    const n=Math.round((Number(detail[nf])/Number(fx)+Number.EPSILON)*100)/100,decimal=new Prisma.Decimal(detail[nf]).div(fx).toDecimalPlaces(2,Prisma.Decimal.ROUND_HALF_UP);
    if(!Number.isFinite(n)||!equalMoney(n,detail[df])||!equalMoney(n,decimal)||!equalMoney(detail[df],raw.values[rf]))invalid();
   }
-  if(!equalMoney(detail.Partner_Revenue_MZN,new Prisma.Decimal(detail.Remuneration_Provider_MZN).minus(detail.WHT_MZN)))invalid();
+  const nativeDelta=new Prisma.Decimal(detail.Partner_Revenue_MZN).minus(new Prisma.Decimal(detail.Remuneration_Provider_MZN).minus(detail.WHT_MZN));
+  const nativeDifference=x.format==='DGC_CAPTURED_NATIVE_IDENTITY_DIFFERENCE_V2';
+  // V1 keeps its exact native identity requirement. V2 records an independently
+  // captured discrepancy; it never accepts or corrects the native arithmetic.
+  if(nativeDifference?nativeDelta.isZero():!nativeDelta.isZero())invalid();
   const components={revenue:new Prisma.Decimal(raw.values.Invoice_Revenue_USD).toFixed(),wht:new Prisma.Decimal(raw.values.Invoice_WHT_USD).toFixed(),payable:new Prisma.Decimal(raw.values.Invoice_Payable_USD).toFixed()},delta=new Prisma.Decimal(components.payable).minus(new Prisma.Decimal(components.revenue).minus(components.wht));
   if(!delta.abs().eq('0.01'))invalid();
   const expected={format:'DGC_CAPTURED_ROUNDING_EXCEPTION_V1',mode:'BLOCKED_SHAPE_TRIAL_ONLY',snapshotHash:expectedSnapshotHash,source,sourceDocument:doc.data,sourceDetail:a,characterizationReviewHash:x.characterizationReviewHash,amountPolicy:'PRESERVE_INDEPENDENT_CAPTURED_COMPONENTS',currency:'USD',components,identityDelta:delta.toFixed(),sourceValuesChanged:false,operationalFxDerived:false,gateOverrideAllowed:false,acceptance:false};
-  if(canonical(x)!==canonical(expected))invalid();historicalArithmetic={...expected,sourceArithmeticReplayed:true,originalPdfVerified:false,operationalUseAllowed:false};
+  const versionedExpected=nativeDifference?{...expected,format:'DGC_CAPTURED_NATIVE_IDENTITY_DIFFERENCE_V2',nativeIdentityDelta:nativeDelta.toFixed(),nativeIdentityAccepted:false}:expected;
+  if(canonical(x)!==canonical(versionedExpected))invalid();historicalArithmetic={...versionedExpected,sourceArithmeticReplayed:true,originalPdfVerified:false,operationalUseAllowed:false};
  }
  return {historicalArithmetic,readOnly:true,operationalUseAllowed:false,acceptance:false,postingAllowed:false,historicalCashPosting:false,verificationScope:'PINNED_REHEARSAL_ROW_AND_TARGET_NOT_FINANCIAL_ACCEPTANCE',source:{spreadsheetId:sourceId,snapshotHash:expectedSnapshotHash,...source,status:raw.values.Status,rowType:j.rowType,includeInMonthlyTotal:j.includeInMonthlyTotal,document:doc.data,fileId:fileIds[0],documentStatus:document.values.Status??null,legacyReconciliationCount:legacy.length},approvalEvidence:{sourceApprovedBy:raw.values.Approved_By??null,sourceApprovedAt:dateEvidence(raw,'Approved_At'),sourceCreatedAt:dateEvidence(raw,'Created_At'),localApprovedById:null,localApprovedAt:null,localApprovalCreated:false},migrationProvenance:{recordedAt:link.createdAt.toISOString(),targetHash:link.targetHash,sourceRowHashVerified:true,targetHashVerified:true,originalPdfVerified:false},capturedAmounts:{currency:rv.currency,management:{gross:value(rv.grossAmount),partnerShare:value(rv.partnerShareAmount),companyShare:value(rv.companyShareAmount),tax:value(rv.taxAmount),sourceNet:j.capturedManagement.Net_Revenue,targetNet:value(rv.netAmount)},invoiceUsd:{revenue:j.invoiceRevenueUsd,wht:j.invoiceWhtUsd,payable:j.invoicePayableUsd}},localState:{status:rv.status,isCurrent:rv.isCurrent}};
 }

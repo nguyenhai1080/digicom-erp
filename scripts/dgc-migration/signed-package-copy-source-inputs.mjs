@@ -1,0 +1,8 @@
+import {readFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {reviewOwnerDocumentAuthority} from './document-authority.mjs';
+export async function signedPackageCopySourceInputs(){
+ const b='artifacts/dgc-migration/',w=b+'20261025/cutover/',j=async p=>JSON.parse(await readFile(p,'utf8')),snapshot=await j(b+'20261019/prepared/snapshot.json'),targetPlan=await j(b+'20261023/owner-financial-decisions/refreshed/revenue-target-plan.json'),observations=await j(w+'package44/observations.json'),ocrManifest=await j(w+'package44/ocr-manifest.json'),reconManifest=await j(b+'20261021/source-recons/recon-files-manifest.json');
+ const authorityOptions={amountDecision:await j(w+'invoice14-owner-decision.json'),documentDecision:await j(w+'document-authority-owner-decision.json'),invoiceManifest:await j(b+'20261020/source-invoices/all-invoices-manifest.json'),invoiceRoot:resolve(b+'20261020/source-invoices'),referenceManifest:await j(b+'20261022/source-references/reference-files-manifest.json'),referenceRoot:resolve(b+'20261022/source-references'),renderRoot:resolve(w)},authority=await reviewOwnerDocumentAuthority({...authorityOptions,snapshot}),rounding=await j(b+'20261023/owner-financial-decisions/refreshed/donor-rounding-review.json');
+ return {snapshot,targetPlan,decisions:await j(b+'20261023/owner-financial-decisions/owner-decisions.json'),rounding,roundingPin:rounding.reviewHash,observations,observationPin:observations.observationHash,ocrManifest,ocrManifestPin:ocrManifest.manifestHash,ocrRoot:resolve(w+'package44'),reconManifest,reconManifestPin:reconManifest.manifestHash,reconRoot:resolve(b+'20261021/source-recons'),authorityOptions,authorityReviewPin:authority.reviewHash};
+}

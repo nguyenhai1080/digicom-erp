@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {signedPackageCopySourceInputs} from './signed-package-copy-source-inputs.mjs';
+import {invoiceSignedPackageCopiesPlan,invoiceSignedPackageCopiesProposal} from './invoice-signed-package-copies.mjs';
+import {canonical,digest} from './core.mjs';
+import {withSourcePlanningCache} from './planning-context.mjs';
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+await withSourcePlanningCache(async()=>{
+ const b='artifacts/dgc-migration/',r=b+'20261023/owner-financial-decisions/refreshed/',j=async p=>JSON.parse(await readFile(p,'utf8')),signed=await signedPackageCopySourceInputs(),combined=await j(r+'combined-review.json'),manifest=await j(b+'20261020/source-invoices/all-invoices-manifest.json'),review=await j(b+'20261029/signed-package-copies/review.json');signed.reviewPin=review.reviewHash;
+ const o={invoiceOptions:{snapshot:signed.snapshot,targetPlan:signed.targetPlan,combined,reviewPin:combined.reviewHash,decisions:signed.decisions,manifest,manifestPin:manifest.manifestHash,root:resolve(b+'20261020/source-invoices'),restorePlan:await j(r+'invoice-restore-plan.json')},rounding:signed.rounding,roundingPin:signed.roundingPin,exceptionPlan:await j(r+'rounding-exceptions.json'),signedPackageCopyOptions:signed},before=canonical(o),plan=await invoiceSignedPackageCopiesPlan(o),e=plan.entries[0];
+ eq(plan.counts,{SIGNED_PACKAGE_COPY_INVOICE_CANDIDATE:1});eq(e.source.sourceRow,44);eq(e.sourceStatus,'Paid');eq(e.invoiceRounding.format,'DGC_CAPTURED_INVOICE_ROUNDING_V1');eq(e.invoiceRounding.components,{revenue:'17389.41',wht:'1738.94',payable:'15650.46'});eq(e.invoiceRounding.identityDelta,'-0.01');eq(e.signedPackageEvidence.groups.length,5);eq(e.signedPackageEvidence.originalMissingFiles.length,5);eq(e.signedPackageEvidence.originalBytesRecovered,false);eq(e.signedPackageEvidence.nativeIdentityAccepted,false);eq(e.signedPackageEvidence.pdfAuthorRoundingPolicyProven,false);eq(e.signedPackageEvidence.sourceValuesChanged,false);eq(e.signedPackageEvidence.acceptance,false);eq(plan.commitAllowed,false);eq(plan.acceptance,false);eq(o.invoiceOptions.restorePlan.entries.find(e=>e.source.sourceRow===44).state,'RESTORE_HELD');eq(canonical(o),before);
+ const incomplete=structuredClone(review);incomplete.groups.pop();delete incomplete.reviewHash;incomplete.reviewHash=digest(incomplete);const held=invoiceSignedPackageCopiesProposal({...o,signedPackageCopyOptions:{...signed,reviewPin:incomplete.reviewHash}},incomplete);eq(held.entries[0].state,'SIGNED_PACKAGE_COPY_INVOICE_HELD');eq(held.entries[0].invoiceRounding,null);
+ const out=b+'20261029/signed-package-copies/';await mkdir(out,{recursive:true});await writeFile(out+'invoice-plan.json',JSON.stringify(plan,null,2)+'\n',{mode:0o600});console.log(JSON.stringify({planHash:plan.planHash,assertions:n,rows:[44],originalMissingFiles:5,originalBytesRecovered:false,financialAcceptance:false,remoteChanged:false}));
+});
