@@ -4,6 +4,8 @@
   "private": true,
   "packageManager": "pnpm@10.18.3",
   "scripts": {
+    "migration:prepare-document-store": "node scripts/dgc-migration/prepare-document-store.mjs",
+    "test:migration:document-store-source": "node scripts/dgc-migration/document-store.source.guard.test.mjs",
     "test:migration:invoice-ledger-authority-source": "node scripts/dgc-migration/invoice-ledger-authority.source.test.mjs",
     "migration:review-source-delta": "node scripts/dgc-source-delta.mjs",
     "test:migration:source-delta": "node scripts/dgc-migration/source-delta.test.mjs",

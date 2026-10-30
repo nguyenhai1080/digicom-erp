@@ -8,4 +8,6 @@ Kết quả nguồn đạt **27 assertions**. Header giữ Revenue 16.298,88 / W
 
 Review hash: `972b51264e4cf449efb1b29ccca2459f7c8395e3017fa254877cf02219c9edc0`. Proof private tại `artifacts/dgc-migration/20261030/invoice-ledger-authority/`. Mốc thử chung hoàn tất vẫn 43 Invoice; signed-copy 44 chạy trong container riêng giữ log/exit status, không tự xóa container khi mất kết nối.
 
+Chạy lại phép dựng review trên Linux trả đúng cùng hash với Windows; đây là kiểm tính nhất quán của source adapter, không phải ghi thử Invoice 14 vào PostgreSQL.
+
 Mã nguồn `ebf1133` và release một website `f4a635a` đã được đẩy lên kho DGC. Runtime 124 file khớp byte với bản Linux đã build/kiểm reader; gói 126 file không chứa donor records/secrets. Chưa thực hiện redeploy host hoặc nhập tài chính từ các commit này.
