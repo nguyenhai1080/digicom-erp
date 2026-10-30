@@ -1,6 +1,8 @@
 # Roadmap DGC Finance → DGC-ERP
 
-Cập nhật 29/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
+Mốc 30/10: [Invoice 14](DGC_LEDGER_VARIANCE_20261030.md) đạt 27 source assertions, giữ riêng sổ/chi tiết/PDF và cả ba delta 0,01 USD, không điều chỉnh/AR mới; chưa financial admission. [Invoice 4](DGC_LEGACY_RECON_EVIDENCE_20261030.md) tìm được PDF nguồn và trang ký khớp, nhưng thiếu header/detail graph và trùng Upload_ID; adapter riêng còn pending. Signed-copy 44 đang chạy lại với log/exit status giữ lại; chưa tăng mốc 43. Source ebf1133/deploy f4a635a đã push, runtime khớp bản Linux tested, chưa manual host redeploy/financial import. 45 migration suites đạt.
+
+Cập nhật 30/10/2026. Đây là bảng trạng thái hiện hành, đọc cùng START_HERE; các release/project-first và host GST trong `docs/LOCAL_GITHUB_VIBEHOST_ROADMAP.md` là lịch sử upstream, không phải kế hoạch triển khai DGC. Thứ tự kế thừa nghiệp vụ vẫn theo `docs/DGC_INHERITANCE_BASELINE.md`.
 
 Mốc 29/10: [USD-reference unified 43](DGC_USD_REFERENCE_UNIFIED_20261029.md) đã trial/rollback 43 Invoice–AR, 313 revenues, 36 documents/38 links và 40 receipts trên 35 parent đầy đủ; 862 assertions, late-write failure và full rollback/37 masters/no cash đạt. Còn 10 Paid, 11 receipts, tám dependencies/10 referenced docs; signed-copy Invoice 44 đang trial riêng, chưa cộng vào mốc 43. Owner đã chốt Invoice 14/33/44; đọc lại 25 bảng/3.154 hàng không đổi, chưa frozen. Mục tiêu vẫn full history trước cutover; chưa financial commit, importer vận hành hoặc UAT.
 

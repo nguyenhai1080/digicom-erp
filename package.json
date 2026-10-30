@@ -4,6 +4,7 @@
   "private": true,
   "packageManager": "pnpm@10.18.3",
   "scripts": {
+    "test:migration:invoice-ledger-authority-source": "node scripts/dgc-migration/invoice-ledger-authority.source.test.mjs",
     "migration:review-source-delta": "node scripts/dgc-source-delta.mjs",
     "test:migration:source-delta": "node scripts/dgc-migration/source-delta.test.mjs",
     "test:migration:host-finance": "node scripts/dgc-migration/host-finance-staging.integration.mjs",

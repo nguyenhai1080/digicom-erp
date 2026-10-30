@@ -1,6 +1,8 @@
 # Bắt đầu làm việc với DGC Finance
 
-Cập nhật ngày 29/10/2026, giờ Việt Nam.
+Cập nhật ngày 30/10/2026, giờ Việt Nam.
+
+**Tiếp tục 30/10:** [Invoice 14 giữ riêng header/chi tiết](docs/handover/DGC_LEDGER_VARIANCE_20261030.md) đạt 27 source assertions, giữ cả ba delta 0,01 USD, Paid/AR zero và không tạo điều chỉnh; chưa financial admission. [Đã tìm PDF nguồn cho Invoice 4](docs/handover/DGC_LEGACY_RECON_EVIDENCE_20261030.md), nhưng header/detail nguồn không tồn tại và Upload_ID bị trùng; không tạo giả graph. [Signed-copy validation](docs/handover/DGC_SIGNED_COPY_VALIDATION_20261030.md) giữ kết quả 43-set; lượt 44 chạy lại trong container riêng lưu log/exit status, chưa tính đạt. Mã nguồn `ebf1133`/release một website `f4a635a` đã push; chưa redeploy host hoặc nhập tài chính.
 
 **Đã thử chung 43 Invoice:** [USD-reference 29/10](docs/handover/DGC_USD_REFERENCE_UNIFIED_20261029.md) thêm 12 Paid, giữ source/native/financial holds và các hash cũ khi không có option mới. Clone host/Linux đạt 862 assertions: 43 Invoice–AR / 313 revenue / 36 documents / 38 links / 40 receipts; late write failure, replay/full rollback, 37 master links/no cash. Reader nhận đúng ba owner-approved mappings, V1 giữ strict native identity và V2 giữ discrepancy unaccepted; Linux reader 210 checks, 173 PostgreSQL hồi quy và 45 migration suites đạt. Còn 10 Paid/11 receipts, tám Invoice dependencies giữ 10 referenced docs. Signed-copy Invoice 44 có source checks/proposal, PostgreSQL trial đang chạy; chưa tính vào mốc 43. Chưa financial commit/importer vận hành/UAT/cutover.
 
