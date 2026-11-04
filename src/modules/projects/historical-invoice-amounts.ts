@@ -4,6 +4,7 @@ import {replayDonorInvoiceBalance} from '@erp/db/dgc-invoice-balance';
 import {CommandError} from './commands.js';
 import {readHistoricalRevenueSource} from './historical-revenue-source.js';
 import {historicalOwnerApprovedRevenueLink} from './historical-owner-links.js';
+import {historicalInvoice4Authority} from './historical-invoice4-authority.js';
 const sourceId='1xDrNhKbLTSSidbX6R1Ajo-7AkX2QY2AcSPBDefeaF6A',hex=/^[a-f0-9]{64}$/;
 const sorted=(v:any):any=>Array.isArray(v)?v.map(sorted):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sorted(v[k])])):v;
 const canonical=(v:any)=>JSON.stringify(sorted(v)),digest=(v:any)=>createHash('sha256').update(canonical(v)).digest('hex');
@@ -82,7 +83,14 @@ export async function readHistoricalInvoiceAmounts(tx:Prisma.TransactionClient,c
   }
   if(!adjusted||!hex.test(x.balanceReviewHash??''))invalid();
  }
+ let documentAuthority:any=null;const legacySources=[...cache.values()].filter(r=>r.evidence.legacyFileEvidence);
+ if(legacySources.length||j.legacySourceFileEvidence!==undefined||j.ownerInvoice4DecisionJson!==undefined){
+  const evidence=j.legacySourceFileEvidence;
+  if(legacySources.length!==1||evidence?.format!=='DGC_LEGACY_SOURCE_FILE_INVOICE_REHEARSAL_V1'||evidence.snapshotHash!==snapshotHash||canonical(evidence.source)!==canonical(j.source)||canonical(evidence.legacyReview)!==canonical(legacySources[0].evidence.legacyFileEvidence)||evidence.originalGraphReconstructed!==false||evidence.nativeIdentityAccepted!==false||evidence.acceptance!==false)invalid();
+  documentAuthority=historicalInvoice4Authority(j.ownerInvoice4DecisionJson,snapshotHash,j.source,{'48_INVOICE_HEADER':[raw],'49_INVOICE_DETAIL':details,'50_AR_AP':ars,'52_INVOICE_PAYMENT':captured(j.capturedPaymentsJson)},{fileId:raw.values.Pdf_File_ID,sha256:doc.attachment.checksumSha256});
+  if(evidence.ownerDecisionHash!==documentAuthority.decisionHash)invalid();
+ }
  for(const h of [x.sourceRestorePlanHash,x.characterizationReviewHash,x.revenueExceptionPlanHash])if(!hex.test(h??''))invalid();
  const expected={format:balancing?'DGC_CAPTURED_INVOICE_ROUNDING_V4':sourceOnly?'DGC_CAPTURED_INVOICE_ROUNDING_V3':offsetting?'DGC_CAPTURED_INVOICE_ROUNDING_V2':'DGC_CAPTURED_INVOICE_ROUNDING_V1',...(balancing?{headerArithmetic:'DONOR_GROUP_LAST_CHILD_BALANCING'}:sourceOnly?{headerArithmetic:'EXACT_PRESENTED_LINES_WITH_SOURCE_ROUNDING'}:offsetting?{headerArithmetic:'OFFSETTING_CHARACTERIZED_LINE_DELTAS'}:{}),mode:'BLOCKED_SHAPE_TRIAL_ONLY',snapshotHash,source:j.source,sourceRestorePlanHash:x.sourceRestorePlanHash,characterizationReviewHash:x.characterizationReviewHash,revenueExceptionPlanHash:x.revenueExceptionPlanHash,...(balancing?{balanceReviewHash:x.balanceReviewHash}:{}),amountPolicy:'PRESERVE_INDEPENDENT_CAPTURED_COMPONENTS',currency:'USD',components:header,identityDelta:delta.toFixed(),characterizedLineDelta:lineDelta.toFixed(),lines,...(sourceOnly||balancing?{sourceRevenueSet}:{}),sourceReceivable:addr('50_AR_AP',al.sheetId,a),sourceValuesChanged:false,historicalCashPosting:false,localApprovalCreated:false,acceptance:false};if(canonical(x)!==canonical(expected))invalid();
- return {readOnly:true,operationalUseAllowed:false,postingAllowed:false,acceptance:false,historicalCashPosting:false,localApprovalCreated:false,originalPdfVerified:false,datesAndActorsMapped:false,source:j.source,sourceStatus:raw.values.Status,components:header,ar:{original:ar.originalAmount.toFixed(),paid:ar.paidAmount.toFixed(),outstanding:ar.outstandingAmount.toFixed(),sourceStatus:a.values.Status},roundingException:expected,scopeItems:scopeIds.size,sourceRevenueRowsRead:cache.size};
+ return {...(documentAuthority?{documentAuthority}:{}),readOnly:true,operationalUseAllowed:false,postingAllowed:false,acceptance:false,historicalCashPosting:false,localApprovalCreated:false,originalPdfVerified:false,datesAndActorsMapped:false,source:j.source,sourceStatus:raw.values.Status,components:header,ar:{original:ar.originalAmount.toFixed(),paid:ar.paidAmount.toFixed(),outstanding:ar.outstandingAmount.toFixed(),sourceStatus:a.values.Status},roundingException:expected,scopeItems:scopeIds.size,sourceRevenueRowsRead:cache.size};
 }
