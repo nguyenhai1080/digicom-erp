@@ -13,6 +13,7 @@ import {asset,checkedFile,derivedBytes,persistPdf,persistWorkbook,placementSchem
 import {usdWords,type InvoiceData,type InvoiceLine} from './invoice-template.js';
 import {previewReconPage} from './recon-reader.js';
 import {assertManualRevenue} from './manual-revenue.js';
+import {assertCapturedRevenue} from './captured-book-source.js';
 import {revenueAmounts,nativeAmount} from './revenue-money.js';
 import {invoiceParentLines} from './invoice-lines.js';
 import {dgcInvoiceLines,dgcInvoiceNumber} from './dgc-invoice-lines.js';
@@ -31,12 +32,12 @@ async function plan(tx:Prisma.TransactionClient,companyId:string,body:Input){
  const rows=await tx.revenue.findMany({where:{companyId,partnerId:partner.id,isCurrent:true,status:{in:['INVOICE_READY','INVOICED']},currency:body.currency,periodStart:start,periodEnd:end,reconciliation:{companyId,isCurrent:true,status:'APPROVED'}},include:{service:true,contract:true,reconciliation:true},orderBy:[{service:{serviceKey:'asc'}},{revenueCode:'asc'}],take:2001});
  if(rows.length>2000)throw new CommandError(409,'Kỳ vượt giới hạn 2000 dòng.');
  if(rows.some(v=>v.service.companyId!==companyId||v.contract.companyId!==companyId||v.reconciliation.companyId!==companyId))throw new CommandError(409,'Liên kết doanh thu không thuộc cùng công ty.');
- const candidates=rows.filter(v=>{const j=v.calculationJson as any;return j?.dgc===true&&j?.approvedById&&revenueAmounts(v).payable&&D(revenueAmounts(v).payable).gt(0);});
+ const candidates=rows.filter(v=>{const j=v.calculationJson as any;return j?.dgc===true&&(j?.approvedById||j.sourceKind==='DGC_CAPTURED_BOOK_V1')&&revenueAmounts(v).payable&&D(revenueAmounts(v).payable).gt(0);});
  const headers=candidates.filter(v=>{const j=v.calculationJson as any;return j.rowType==='TOTAL'&&j.includeInMonthlyTotal===true&&(!body.serviceId||v.serviceId===body.serviceId);});
  if(!headers.length)throw new CommandError(409,'Chưa có doanh thu TOTAL đã chốt từ đối soát đang hiệu lực trong kỳ này.');
- const reconIds=[...new Set(candidates.map(v=>v.reconciliationId))],uploadIds=[...new Set(candidates.filter(v=>(v.calculationJson as any).sourceKind!=='MANUAL_PERIOD').map(v=>(v.calculationJson as any).uploadId as string))];
+ const reconIds=[...new Set(candidates.map(v=>v.reconciliationId))],uploadIds=[...new Set(candidates.filter(v=>!['MANUAL_PERIOD','DGC_CAPTURED_BOOK_V1'].includes((v.calculationJson as any).sourceKind)).map(v=>(v.calculationJson as any).uploadId as string))];
  const uploads=await tx.outputReconUpload.findMany({where:{companyId,id:{in:uploadIds},status:'APPROVED'},include:{attachment:true}});
- for(const h of headers){if((h.calculationJson as any)?.sourceKind==='MANUAL_PERIOD'){await assertManualRevenue(tx,companyId,h);continue;}const j=h.calculationJson as any,u=uploads.find(u=>u.id===j.uploadId),f=(u?.extractionData as any)?.finalization,snap=h.reconciliation.approvedSnapshot as any;
+ for(const h of headers){if((h.calculationJson as any)?.sourceKind==='DGC_CAPTURED_BOOK_V1'){await assertCapturedRevenue(tx,companyId,h);continue;}if((h.calculationJson as any)?.sourceKind==='MANUAL_PERIOD'){await assertManualRevenue(tx,companyId,h);continue;}const j=h.calculationJson as any,u=uploads.find(u=>u.id===j.uploadId),f=(u?.extractionData as any)?.finalization,snap=h.reconciliation.approvedSnapshot as any;
   if(!u||!f?.documentId||f.reconciliationId!==h.reconciliationId||snap?.uploadId!==u.id||snap?.sourceChecksum!==j.sourceChecksum||u.attachment.checksumSha256!==j.sourceChecksum)throw new CommandError(409,'Doanh thu không còn liên kết đầy đủ với PDF đã chốt.');
   if(!await tx.document.findFirst({where:{companyId,id:f.documentId,status:'ACTIVE',entityId:u.id,entityType:'OutputReconUpload',documentType:'RECON_SIGNED'}}))throw new CommandError(409,'Bản PDF đã chốt không còn hiệu lực.');
  }
@@ -95,10 +96,10 @@ export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
   if(dgc&&q.status==='OVERDUE'&&!asOf)throw new CommandError(400,'Chọn ngày chốt để lọc Invoice quá hạn.');
   const statusFilter:Prisma.InvoiceWhereInput|undefined=dgc&&q.status==='OVERDUE'?{status:'ISSUED',isCurrent:true,paidAmount:0,payableAmount:{gt:0},dueDate:{lt:asOf!}}:q.status?{status:q.status}:undefined;
   const where:Prisma.InvoiceWhereInput={companyId:request.auth!.companyId,status:{not:'CANCELLED'},...(q.period?{period:q.period}:{}),...(q.partnerId?{partnerId:q.partnerId}:{}),...(q.publication==='issued'?{OR:[{issuedAt:{not:null}},{status:{in:['ISSUED','OVERDUE','PARTIALLY_PAID','PAID']}}]}:q.publication==='unissued'?{issuedAt:null,status:{notIn:['CANCELLED','ISSUED','OVERDUE','PARTIALLY_PAID','PAID']}}:{}),...(statusFilter?{AND:[statusFilter]}:{})};
-  const [items,total]=await prisma.$transaction([prisma.invoice.findMany({where,select:{id:true,invoiceNumber:true,invoiceDate:true,dueDate:true,period:true,invoiceMode:true,status:true,revisionNo:true,updatedAt:true,isCurrent:true,revenueAmount:true,whtAmount:true,payableAmount:true,paidAmount:true,currency:true,partner:{select:{legalName:true,partnerKey:true}}},orderBy:[{period:'desc'},{invoiceNumber:'asc'},{id:'asc'}],skip:(q.page-1)*q.limit,take:q.limit}),prisma.invoice.count({where})]);
+  const [items,total]=await prisma.$transaction([prisma.invoice.findMany({where,select:{snapshot:true,id:true,invoiceNumber:true,invoiceDate:true,dueDate:true,period:true,invoiceMode:true,status:true,revisionNo:true,updatedAt:true,isCurrent:true,revenueAmount:true,whtAmount:true,payableAmount:true,paidAmount:true,currency:true,partner:{select:{legalName:true,partnerKey:true}}},orderBy:[{period:'desc'},{invoiceNumber:'asc'},{id:'asc'}],skip:(q.page-1)*q.limit,take:q.limit}),prisma.invoice.count({where})]);
   // Read-only display against an explicit calendar date. No company/reporting
   // timezone is inferred and no historical invoice/payment amount is changed.
-  return {items:items.map(i=>({...i,...(dgc&&asOf?{displayStatus:i.isCurrent&&i.status==='ISSUED'&&i.paidAmount.isZero()&&i.payableAmount.gt(0)&&i.dueDate<asOf?'OVERDUE':i.status}:{})})),total,page:q.page,limit:q.limit,...(dgc&&q.asOf?{asOf:q.asOf}:{})};
+  return {items:items.map(({snapshot,...i})=>({...i,documentWarnings:Array.isArray((snapshot as any)?.documentWarnings)?(snapshot as any).documentWarnings:[],...(dgc&&asOf?{displayStatus:i.isCurrent&&i.status==='ISSUED'&&i.paidAmount.isZero()&&i.payableAmount.gt(0)&&i.dueDate<asOf?'OVERDUE':i.status}:{})})),total,page:q.page,limit:q.limit,...(dgc&&q.asOf?{asOf:q.asOf}:{})};
  });
  app.post('/api/v1/invoices/:id/delete',{onRequest:writeGuard('INVOICE_CANCEL',config)},async request=>{
   const {id}=parse(z.object({id:z.uuid()}).strict(),request.params),body=parse(z.object({expectedUpdatedAt:timestamp,confirmed:z.literal(true)}).strict(),request.body),user=request.auth!;

@@ -7,6 +7,7 @@ import {sha,derivedBytes} from './financial-documents.js';
 import {financialPeriodLock} from './recon-finalize.js';
 import {sourceBytes} from './output-recon.js';
 import {assertManualRevenue} from './manual-revenue.js';
+import {assertCapturedRevenue} from './captured-book-source.js';
 import {calculateInputRecon} from './input-recon-math.js';
 
 const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v);
@@ -27,9 +28,11 @@ export async function inputReconPlan(tx:Prisma.TransactionClient,companyId:strin
  const rv=await tx.revenue.findFirst({where:{companyId,id:revenueId},include:{reconciliation:true,service:true,contract:true,partner:true}});
  if(!rv)throw new CommandError(404,'Không tìm thấy doanh thu của công ty.');
  const rec=rv.reconciliation,j=rv.calculationJson as any;
- if(!rv.isCurrent||!['INVOICE_READY','INVOICED','PARTIALLY_PAID','PAID'].includes(rv.status)||rec.status!=='APPROVED'||!rec.isCurrent||!rec.approvedById||!j?.dgc||!j.approvedById||[rv.service,rv.contract,rv.partner,rec].some(x=>x.companyId!==companyId)||rv.contract.dgcDirection!=='Output'||rv.contract.partnerId!==rv.partnerId||rec.partnerId!==rv.partnerId||!['USD','VND'].includes(rv.currency))fail('Cần doanh thu đầu ra đã duyệt, còn hiệu lực và đúng liên kết công ty.');
+ if(!rv.isCurrent||!['INVOICE_READY','INVOICED','PARTIALLY_PAID','PAID'].includes(rv.status)||rec.status!=='APPROVED'||!rec.isCurrent||(!rec.approvedById&&j?.sourceKind!=='DGC_CAPTURED_BOOK_V1')||!j?.dgc||(!j.approvedById&&j.sourceKind!=='DGC_CAPTURED_BOOK_V1')||[rv.service,rv.contract,rv.partner,rec].some(x=>x.companyId!==companyId)||rv.contract.dgcDirection!=='Output'||rv.contract.partnerId!==rv.partnerId||rec.partnerId!==rv.partnerId||!['USD','VND'].includes(rv.currency))fail('Cần doanh thu đầu ra đã duyệt, còn hiệu lực và đúng liên kết công ty.');
  let base:string,provenance:unknown;
- if(j.sourceKind==='MANUAL_PERIOD'){
+ if(j.sourceKind==='DGC_CAPTURED_BOOK_V1'){
+  provenance=await assertCapturedRevenue(tx,companyId,rv);base=D(j.invoicePayableUsd).toFixed(2);
+ }else if(j.sourceKind==='MANUAL_PERIOD'){
   await assertManualRevenue(tx,companyId,rv);
   if(rv.currency==='VND'&&(!j.reportingFxRate||!D(j.reportingFxRate).gt(0)))fail('Nguồn VND thiếu tỷ giá USD đã duyệt.');
   base=rv.currency==='USD'?rv.netAmount.toFixed(2):rv.netAmount.div(j.reportingFxRate).toDecimalPlaces(2,Prisma.Decimal.ROUND_HALF_UP).toFixed(2);
@@ -97,7 +100,11 @@ export async function inputReconRoutes(app:FastifyInstance,config:AuthConfig){
   return prisma.$transaction(async tx=>{await requireDgc(tx,user.companyId);const initial=await tx.inputReconciliation.findFirst({where:{companyId:user.companyId,id:rid}});if(!initial)throw new CommandError(404,'Không tìm thấy đối soát.');await lockInputSource(tx,user.companyId,initial.sourceRevenueId);const r=await tx.inputReconciliation.findUniqueOrThrow({where:{id:rid},include:{payable:true}});
    assertInputSnapshot(r);
    if(r.status==='APPROVED'){if(!r.payable||!r.payable.originalAmount.eq(r.payableAmount)||r.payable.currency!==r.currency||!r.payable.outstandingAmount.eq(r.payable.originalAmount.minus(r.payable.paidAmount)))fail('AP không khớp bản đã duyệt; cần đối chiếu.');return {item:r,payable:r.payable,created:false};}
-   unchanged(r,b.expectedUpdatedAt);if(!['DRAFT','GENERATED'].includes(r.status)||r.payable)fail('Trạng thái đối soát không cho phép duyệt.');const p=await inputReconPlan(tx,user.companyId,r.sourceRevenueId);if(p.sourceDigest!==r.sourceDigest)fail('Nguồn hoặc số liệu nháp đã thay đổi. Cần xem lại/cập nhật trước khi duyệt.');
+   unchanged(r,b.expectedUpdatedAt);if(!['DRAFT','GENERATED'].includes(r.status)||r.payable)fail('Trạng thái đối soát không cho phép duyệt.');
+   if((r.sourceSnapshot as any)?.sourceKind==='DGC_CAPTURED_BOOK_V1'){
+    const s=(r.sourceSnapshot as any).source,link=await tx.dgcImportLink.findFirst({where:{companyId:user.companyId,targetModel:'inputReconciliation',targetId:r.id,rowHash:s.rowHash,sheetId:s.sheetId,sourceRow:s.sourceRow}});
+    if(!link||!await tx.auditLog.findFirst({where:{companyId:user.companyId,action:'DGC_CAPTURED_BOOK_TRANSFER'}}))fail('Chưa có biên nhận chuyển đối soát đầu vào.');
+   }else{const p=await inputReconPlan(tx,user.companyId,r.sourceRevenueId);if(p.sourceDigest!==r.sourceDigest)fail('Nguồn hoặc số liệu nháp đã thay đổi. Cần xem lại/cập nhật trước khi duyệt.');}
    const payable=await tx.accountPayable.create({data:{companyId:user.companyId,inputReconId:r.id,currency:r.currency,originalAmount:r.payableAmount,outstandingAmount:r.payableAmount}});
    const item=await tx.inputReconciliation.update({where:{id:r.id},data:{status:'APPROVED',approvedById:user.userId,approvedAt:new Date()}});await audit(tx,user,'INPUT_RECON_APPROVE','InputReconciliation',r.id,r,{item,payable});return {item,payable,created:true};
   },{timeout:30000});

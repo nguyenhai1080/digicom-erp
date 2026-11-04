@@ -5,6 +5,8 @@ import {createHash} from 'node:crypto';
 import {z} from 'zod';
 import {requirePermission,type AuthConfig} from '../auth/access.js';
 import {CommandError,parse} from './commands.js';
+import {prisma} from '@erp/db';
+import {storageRoot} from './financial-documents.js';
 
 // Read an explicitly mounted evidence package; never import it into financial tables.
 const sha=(v:Buffer|string)=>createHash('sha256').update(v).digest('hex');
@@ -46,6 +48,22 @@ async function payload(c:Config,e:Entry){
  return p;
 }
 const summary=(e:Entry,p:any)=>({id:e.archiveId,source:e.source,invoiceNumber:e.invoiceNumber,sourceStatus:e.sourceStatus,invoiceDate:value(p.capturedHeader.cells?.Invoice_Date?.formattedValue)??value(p.capturedHeader.values.Invoice_Date),currency:value(p.capturedHeader.values.Currency),payable:value(p.capturedHeader.values.Total_Payable_USD),integrity:p.integrity,issueCount:Array.isArray(p.issues)?p.issues.length:0});
+async function capturedArchive(companyId:string){
+ const stored=await prisma.configuration.findUnique({where:{companyId_configKey:{companyId,configKey:'DGC_CAPTURED_BOOK_HISTORY'}}});if(!stored?.configValue)return null;
+ const history=JSON.parse(stored.configValue),receipt=await prisma.auditLog.findFirst({where:{companyId,action:'DGC_CAPTURED_BOOK_TRANSFER',traceId:history.bundleHash}});
+ if(!receipt)throw new CommandError(409,'Chưa có biên nhận nhập lịch sử.');
+ const snapshots=[history.snapshotHash,(receipt.newValue as any)?.sourceAppendixHash].filter(Boolean);
+ const invoiceSources=await prisma.dgcImportRow.findMany({where:{companyId,snapshotHash:{in:snapshots},sheetName:'48_INVOICE_HEADER'},select:{legacyId:true,sourceRow:true,sheetId:true,rowHash:true}});
+ const items=[];
+ for(const r of history.archives){
+  const header=JSON.parse(r.headerJson),details=JSON.parse(r.detailsJson),d=await prisma.document.findFirst({where:{companyId,id:r.documentId,documentType:'DGC_INVOICE_HISTORY'},include:{attachment:true}});
+  if(!d||d.attachment.companyId!==companyId)throw new CommandError(409,'Thiếu chứng từ lịch sử đã chuyển.');
+  const e:Entry={archiveId:digest({snapshotHash:history.snapshotHash,source:r.source}),source:r.source,invoiceNumber:r.invoiceNumber,sourceStatus:r.sourceStatus,payloadPath:'',payloadHash:digest(r),pdf:{fileId:r.pdf.fileId,path:d.attachment.storagePath,size:r.pdf.size,sha256:r.pdf.sha256}};
+  const revisionLinks=['Supersedes_Invoice_ID','Superseded_By_Invoice_ID'].filter(f=>header.values[f]).map(field=>{const targets=invoiceSources.filter(s=>s.legacyId===header.values[field]);return {field,legacyId:header.values[field],target:targets.length===1?targets[0]:null};});
+  items.push({e,p:{capturedHeader:header,capturedDetails:details,issues:[],revisionLinks,integrity:'CAPTURED_UNCHANGED'}});
+ }
+ return {c:{root:storageRoot(),hash:history.bundleHash,companyId},a:{archiveHash:history.bundleHash,snapshotHash:history.snapshotHash},items};
+}
 async function read<T>(fn:()=>Promise<T>){try{return await fn();}catch(e){if(e instanceof CommandError)throw e;throw new CommandError(409,'Kho Invoice lịch sử không khớp bằng chứng đã chốt hoặc không đọc được. Cần kiểm tra lại kho.');}}
 export async function invoiceHistoryRoutes(app:FastifyInstance,_config:AuthConfig){
  const guard=requirePermission('INVOICE_VIEW');
@@ -53,6 +71,7 @@ export async function invoiceHistoryRoutes(app:FastifyInstance,_config:AuthConfi
  const tenant=(companyId:string)=>{const c=configuration();if(c&&c.companyId!==companyId)throw new CommandError(404,'Không tìm thấy kho lịch sử của công ty.');return c;};
  app.get('/api/v1/invoice-history',{preHandler:access},async req=>{
   const q=parse(z.object({invoiceNumber:z.string().trim().max(200).optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict(),req.query),c=tenant(req.auth!.companyId);
+  const book=await capturedArchive(req.auth!.companyId);if(book){const matches=book.items.filter(x=>!q.invoiceNumber||x.e.invoiceNumber===q.invoiceNumber),pages=Math.max(1,Math.ceil(matches.length/10)),page=Math.min(q.page,pages);return {configured:true,readOnly:true,postingAllowed:false,...book.a,items:matches.slice((page-1)*10,page*10).map(x=>summary(x.e,x.p)),total:matches.length,page,pages,pageSize:10};}
   if(!c)return {configured:false,readOnly:true,items:[],total:0,page:1,pages:1,pageSize:10};
   return read(async()=>{const a=await index(c),matches=a.entries.filter(e=>!q.invoiceNumber||e.invoiceNumber===q.invoiceNumber),pages=Math.max(1,Math.ceil(matches.length/10)),page=Math.min(q.page,pages),items=[];
    for(const e of matches.slice((page-1)*10,page*10))items.push(summary(e,await payload(c,e)));
@@ -60,9 +79,9 @@ export async function invoiceHistoryRoutes(app:FastifyInstance,_config:AuthConfi
   });
  });
  const id=(params:unknown)=>parse(z.object({id:z.string().regex(hex)}).strict(),params).id;
- async function selected(companyId:string,archiveId:string){const c=tenant(companyId);if(!c)throw new CommandError(404,'Chưa kết nối kho Invoice lịch sử.');const a=await index(c),e=a.entries.find(e=>e.archiveId===archiveId);if(!e)throw new CommandError(404,'Không tìm thấy Invoice lịch sử.');return {c,a,e,p:await payload(c,e)};}
+ async function selected(companyId:string,archiveId:string){const book=await capturedArchive(companyId);if(book){const item=book.items.find(x=>x.e.archiveId===archiveId);if(!item)throw new CommandError(404,'Không tìm thấy Invoice lịch sử.');return {c:book.c,a:book.a,...item};}const c=tenant(companyId);if(!c)throw new CommandError(404,'Chưa kết nối kho Invoice lịch sử.');const a=await index(c),e=a.entries.find(e=>e.archiveId===archiveId);if(!e)throw new CommandError(404,'Không tìm thấy Invoice lịch sử.');return {c,a,e,p:await payload(c,e)};}
  app.get('/api/v1/invoice-history/:id',{preHandler:access},async req=>{const archiveId=id(req.params);return read(async()=>{
-  const {a,e,p}=await selected(req.auth!.companyId,archiveId),fields=['Invoice_Date','Due_Date','Revenue_Month','Currency','Partner_ID','Total_Revenue_USD','Total_WHT_USD','Total_Payable_USD','Paid_Amount_USD','Outstanding_Amount_USD'];
+  const {a,e,p}=await selected(req.auth!.companyId,archiveId),fields=['Invoice_Date','Payment_Due_Date','Revenue_Month','Currency','Partner_ID','Total_Revenue_USD','Total_WHT_USD','Total_Payable_USD','Paid_Amount_USD','Outstanding_Amount_USD'];
   return {readOnly:true,postingAllowed:false,archiveHash:a.archiveHash,item:summary(e,p),header:Object.fromEntries(fields.map(f=>[f,value(p.capturedHeader.values[f])])),details:p.capturedDetails.map((r:any)=>({sourceRow:r.sourceRow,legacyId:r.legacyId,serviceId:value(r.values.Service_ID),description:value(r.values.Description),revenue:value(r.values.Revenue_USD),wht:value(r.values.WHT_USD),payable:value(r.values.Payable_USD)})),issues:(p.issues??[]).map((i:any)=>({code:value(i.code),field:value(i.field)})),revisionLinks:(p.revisionLinks??[]).map((l:any)=>({field:value(l.field),legacyId:value(l.legacyId),resolved:!!l.target})),pdfUrl:'/api/v1/invoice-history/'+e.archiveId+'/pdf'};
  });});
  app.get('/api/v1/invoice-history/:id/pdf',{preHandler:access},async(req,reply)=>{const archiveId=id(req.params);return read(async()=>{

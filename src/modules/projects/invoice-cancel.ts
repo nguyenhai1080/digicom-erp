@@ -12,7 +12,7 @@ const ids=z.object({id:z.uuid()}).strict();
 // SOA/package creators must register the complete invoice set in one call.
 // Lock every period before the company and invoice rows, matching cancel/issue;
 // acquiring a second period after holding the company could deadlock.
-export async function linkInvoiceDocuments(tx:Prisma.TransactionClient,companyId:string,invoiceIds:string[],documentId:string,kind:'SOA'|'APPROVAL_PACKAGE'){
+export async function linkInvoiceDocuments(tx:Prisma.TransactionClient,companyId:string,invoiceIds:string[],documentId:string,kind:'SOA'|'APPROVAL_PACKAGE',captured?:{capturedBookHash:string}){
  const selected=parse(z.array(z.uuid()).min(1).max(2000),invoiceIds),ids=[...new Set(selected)].sort();
  const initial=await tx.invoice.findMany({where:{companyId,id:{in:ids}},select:{id:true,partnerId:true,period:true}});
  if(initial.length!==ids.length)throw new CommandError(404,'Không tìm thấy đủ Invoice của công ty.');
@@ -21,8 +21,16 @@ export async function linkInvoiceDocuments(tx:Prisma.TransactionClient,companyId
  await tx.$queryRaw`SELECT id FROM companies WHERE id=${companyId}::uuid FOR UPDATE`;
  await tx.$queryRaw`SELECT id FROM invoices WHERE company_id=${companyId}::uuid AND id IN (${Prisma.join(ids.map(id=>Prisma.sql`${id}::uuid`))}) ORDER BY id FOR UPDATE`;
  const invoices=await tx.invoice.findMany({where:{companyId,id:{in:ids}},orderBy:{id:'asc'}}),document=await tx.document.findFirst({where:{companyId,id:documentId}});
- if(invoices.length!==ids.length||invoices.some(i=>!i.isCurrent||!['ISSUED','OVERDUE','PARTIALLY_PAID','PAID'].includes(i.status)))fail('Invoice không còn hiệu lực để ghi vào tài liệu.');
- if(!document||document.status!=='ACTIVE'||document.documentType!==kind)fail('Không tìm thấy tài liệu SOA/gói phê duyệt hợp lệ của công ty.');
+ if(captured){
+  // The migration caller registers the complete captured set, including Draft
+  // references. Old source validity does not decide cancellation protection.
+  if(!/^[a-f0-9]{64}$/.test(captured.capturedBookHash)||invoices.length!==ids.length||invoices.some(i=>(i.snapshot as any)?.sourceKind!=='DGC_CAPTURED_BOOK_V1'))fail('Không khớp tập Invoice chuyển nguyên trạng.');
+  for(const i of invoices)if(!await tx.dgcImportLink.findFirst({where:{companyId,targetModel:'invoice',targetId:i.id,snapshotHash:(i.snapshot as any).snapshotHash,rowHash:(i.snapshot as any).source.rowHash}}))fail('Invoice chuyển chưa có liên kết nguồn.');
+  if(!document||document.entityType!=='DGC_SOURCE_REFERENCE'||!['ACTIVE','DRAFT'].includes(document.status)||document.documentType!==kind)fail('Không khớp hồ sơ nguồn cần giữ.');
+ }else{
+  if(invoices.length!==ids.length||invoices.some(i=>!i.isCurrent||!['ISSUED','OVERDUE','PARTIALLY_PAID','PAID'].includes(i.status)))fail('Invoice không còn hiệu lực để ghi vào tài liệu.');
+  if(!document||document.status!=='ACTIVE'||document.documentType!==kind)fail('Không tìm thấy tài liệu SOA/gói phê duyệt hợp lệ của công ty.');
+ }
  const links=[];
  for(const invoiceId of ids)links.push(await tx.invoiceDocumentLink.upsert({where:{companyId_invoiceId_documentId:{companyId,invoiceId,documentId}},create:{companyId,invoiceId,documentId,kind},update:{}}));
  return links;
@@ -52,14 +60,17 @@ async function cancelPlan(tx:Prisma.TransactionClient,companyId:string,id:string
  const ar=item.receivable,draft=item.status==='DRAFT';
  if(draft?(!!ar||!!item.issuedAt):(!ar||!item.issuedAt||!ar.paidAmount.isZero()||!ar.originalAmount.eq(item.payableAmount)||!ar.outstandingAmount.eq(item.payableAmount)||!['OPEN','OVERDUE'].includes(ar.status)))fail('Công nợ hoặc thông tin phát hành không nhất quán; cần đối chiếu trước khi hủy.');
  const sourceIds=item.scopes.flatMap(s=>s.items.map(v=>v.revenueId)),snapshot=item.snapshot as any;
+ const capturedDraft=draft&&snapshot?.sourceKind==='DGC_CAPTURED_BOOK_V1';
  if(!sourceIds.length||new Set(sourceIds).size!==sourceIds.length||!Array.isArray(snapshot?.sourceRevenueIds)||JSON.stringify([...sourceIds].sort())!==JSON.stringify([...snapshot.sourceRevenueIds].sort()))fail('Nguồn Invoice không khớp phạm vi doanh thu.');
- if(item.scopes.some(s=>!s.isCurrent||s.companyId!==companyId||s.partnerId!==item.partnerId||s.currency!==item.currency||s.status!==(draft?'INVOICE_READY':'INVOICED')||!s.items.length||s.items.some(v=>!v.isCurrent||v.companyId!==companyId||v.revenue.companyId!==companyId||!v.revenue.isCurrent||v.revenue.status!==(draft?'INVOICE_READY':'INVOICED'))))fail('Nguồn hoặc phạm vi Invoice đã thay đổi; cần đối chiếu trước khi hủy.');
- if(await tx.invoiceScopeItem.count({where:{companyId,revenueId:{in:sourceIds},isCurrent:true,scope:{isCurrent:true,invoiceId:{not:id}}}}))fail('Nguồn doanh thu còn được Invoice khác sử dụng.');
+ if(item.scopes.some(s=>!s.isCurrent||s.companyId!==companyId||s.partnerId!==item.partnerId||s.currency!==item.currency||s.status!==(draft?'INVOICE_READY':'INVOICED')||!s.items.length||s.items.some(v=>!v.isCurrent||v.companyId!==companyId||v.revenue.companyId!==companyId||!v.revenue.isCurrent||(capturedDraft?!['INVOICE_READY','INVOICED','PARTIALLY_PAID','PAID'].includes(v.revenue.status):v.revenue.status!==(draft?'INVOICE_READY':'INVOICED')))))fail('Nguồn hoặc phạm vi Invoice đã thay đổi; cần đối chiếu trước khi hủy.');
+ const otherScopes=await tx.invoiceScopeItem.findMany({where:{companyId,revenueId:{in:sourceIds},isCurrent:true,scope:{isCurrent:true,invoiceId:{not:id}}},select:{revenueId:true}});
+ if(otherScopes.length&&!capturedDraft)fail('Nguồn doanh thu còn được Invoice khác sử dụng.');
+ const releaseIds=sourceIds.filter(r=>!otherScopes.some(s=>s.revenueId===r));
  const document=await tx.document.findFirst({where:{companyId,id:item.documentId,entityType:'Invoice',entityId:id,documentType:'INVOICE',status:'ACTIVE'},include:{attachment:true}});
  if(!document)fail('Không tìm thấy PDF Invoice hiện hành.');
  await derivedBytes(tx,companyId,document.id,'INVOICE');
  const digest=sha(JSON.stringify({item,document:{id:document.id,updatedAt:document.updatedAt,attachmentId:document.attachmentId,checksum:document.attachment.checksumSha256,fileSize:document.attachment.fileSize?.toString()??null},payments,links,approvals}));
- return {item,ar,sourceIds,digest};
+ return {item,ar,sourceIds,releaseIds,digest};
 }
 
 export async function invoiceCancelRoutes(app:FastifyInstance,config:AuthConfig){
@@ -80,7 +91,7 @@ export async function invoiceCancelRoutes(app:FastifyInstance,config:AuthConfig)
    // Preserve balanced historical AR amounts. It is excluded from current AR
    // by both its CANCELLED status and the cancelled, non-current invoice.
    if(p.ar)await tx.accountReceivable.update({where:{id:p.ar.id},data:{status:'CANCELLED'}});
-   await tx.revenue.updateMany({where:{companyId:user.companyId,id:{in:p.sourceIds},status:'INVOICED'},data:{status:'INVOICE_READY'}});
+   await tx.revenue.updateMany({where:{companyId:user.companyId,id:{in:p.releaseIds},status:'INVOICED'},data:{status:'INVOICE_READY'}});
    await tx.document.updateMany({where:{companyId:user.companyId,entityType:'Invoice',entityId:id},data:{status:'CANCELLED'}});
    await tx.invoice.update({where:{id},data:{status:'CANCELLED',isCurrent:false}});
    await audit(tx,user,'INVOICE_CANCEL_UNPAID','Invoice',id,{invoiceNumber:p.item.invoiceNumber,status:p.item.status,receivable:p.ar?{id:p.ar.id,status:p.ar.status,original:p.ar.originalAmount.toFixed(),paid:p.ar.paidAmount.toFixed(),outstanding:p.ar.outstandingAmount.toFixed()}:null},{status:'CANCELLED',isCurrent:false,sourceRevenueIds:p.sourceIds,receivableStatus:p.ar?'CANCELLED':null,filesRetained:true},body.reason);

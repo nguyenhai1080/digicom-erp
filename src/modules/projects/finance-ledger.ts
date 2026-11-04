@@ -7,6 +7,8 @@ import {audit,CommandError,date,parse,writeGuard} from './commands.js';
 import {financialPeriodLock} from './recon-finalize.js';
 import {derivedBytes,sha} from './financial-documents.js';
 import {assertManualRevenue} from './manual-revenue.js';
+import {assertCapturedRevenue} from './captured-book-source.js';
+import {capturedDraftOptions} from './captured-draft-options.js';
 import {revenueAmounts,equivalents,reportingRates,nativeAmount,reportingRate} from './revenue-money.js';
 import {dashboardSummary} from './dashboard-summary.js';
 
@@ -32,7 +34,7 @@ async function issuePlan(tx:Prisma.TransactionClient,companyId:string,id:string)
  const all=await tx.invoice.findMany({where:{companyId,partnerId:selected.partnerId,period:selected.period,currency:selected.currency,isCurrent:true},include:{partner:true,receivable:true,scopes:{include:{items:true}}},orderBy:{invoiceNumber:'asc'},take:101});
  if(all.length>500)fail('Kỳ vượt giới hạn 500 Invoice.');
  if(all.some(i=>sent.includes(i.status)&&i.invoiceMode!==selected.invoiceMode))fail('Kỳ này đã phát hành Invoice ở phương án khác; không ghi công nợ trùng.');
- const candidates=selected.invoiceMode==='CONSOLIDATED'?all.filter(i=>i.id===id):all.filter(i=>i.invoiceMode==='PER_SERVICE'&&i.status==='DRAFT');
+ const candidates=selected.invoiceMode==='CONSOLIDATED'?all.filter(i=>i.id===id):capturedDraftOptions(all.filter(i=>i.invoiceMode==='PER_SERVICE'&&i.status==='DRAFT'),id);
  if(!candidates.some(i=>i.id===id))fail('Invoice không còn là bản nháp mới nhất.');
  const provenance:unknown[]=[];const billed=new Set<string>();
  for(const i of candidates){
@@ -42,6 +44,7 @@ async function issuePlan(tx:Prisma.TransactionClient,companyId:string,id:string)
   if(!Array.isArray(lines)||!lines.length||lines.length>2000||!Array.isArray(snap.sourceRevenueIds)||!snap.sourceRevenueIds.length)fail('Invoice thiếu dòng chi tiết hoặc nguồn doanh thu.');
   if(!i.scopes.length||i.scopes.some(s=>!s.isCurrent||s.companyId!==companyId||s.partnerId!==i.partnerId||s.currency!==i.currency||s.status!=='INVOICE_READY'||s.items.some(v=>!v.isCurrent||v.companyId!==companyId)))fail('Phạm vi nguồn Invoice không còn hiệu lực.');
   const ids=i.scopes.flatMap(s=>s.items.map(v=>v.revenueId));
+  if(await tx.invoiceScopeItem.count({where:{companyId,revenueId:{in:ids},isCurrent:true,scope:{isCurrent:true,invoiceId:{notIn:candidates.map(c=>c.id)},invoice:{isCurrent:true,status:{in:sent}}}}}))fail('Nguồn đã được một Invoice khác phát hành; không tạo công nợ lần hai.');
   if(new Set(ids).size!==ids.length||JSON.stringify([...ids].sort())!==JSON.stringify([...snap.sourceRevenueIds].sort()))fail('Nguồn Invoice không khớp phạm vi doanh thu.');
   for(const rid of ids){if(billed.has(rid))fail('Hai Invoice trong phương án cùng tính một nguồn doanh thu.');billed.add(rid);}
   const sourceIds=[...new Set([...ids,...lines.map((l:any)=>l.revenueId)])];
@@ -54,7 +57,8 @@ async function issuePlan(tx:Prisma.TransactionClient,companyId:string,id:string)
   }
   for(const rv of rows){
    const j=rv.calculationJson as any,recon=rv.reconciliation;
-   if(!rv.isCurrent||!['INVOICE_READY','INVOICED'].includes(rv.status)||!j?.dgc||!j.approvedById||!recon.isCurrent||recon.status!=='APPROVED'||recon.companyId!==companyId||rv.service.companyId!==companyId||rv.contract.companyId!==companyId||rv.partnerId!==i.partnerId||rv.currency!==i.currency||rv.periodStart.toISOString().slice(0,7)!==i.period)fail('Doanh thu/đối soát nguồn chưa duyệt, đã thay thế hoặc sai liên kết.');
+   if(!rv.isCurrent||!['INVOICE_READY','INVOICED'].includes(rv.status)||!j?.dgc||(!j.approvedById&&j.sourceKind!=='DGC_CAPTURED_BOOK_V1')||!recon.isCurrent||recon.status!=='APPROVED'||recon.companyId!==companyId||rv.service.companyId!==companyId||rv.contract.companyId!==companyId||rv.partnerId!==i.partnerId||rv.currency!==i.currency||rv.periodStart.toISOString().slice(0,7)!==i.period)fail('Doanh thu/đối soát nguồn chưa duyệt, đã thay thế hoặc sai liên kết.');
+   if(j.sourceKind==='DGC_CAPTURED_BOOK_V1'){provenance.push(await assertCapturedRevenue(tx,companyId,rv));continue;}
    if(j.sourceKind==='MANUAL_PERIOD'){provenance.push(await assertManualRevenue(tx,companyId,rv));continue;}
    const u=await tx.outputReconUpload.findFirst({where:{companyId,id:j.uploadId,status:'APPROVED'},include:{attachment:true}}),f=(u?.extractionData as any)?.finalization;
    if(!u||!f?.documentId||f.reconciliationId!==recon.id||u.attachment.checksumSha256!==j.sourceChecksum||(recon.approvedSnapshot as any)?.sourceChecksum!==j.sourceChecksum)fail('Nguồn PDF đã chốt không khớp doanh thu.');

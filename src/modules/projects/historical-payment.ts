@@ -10,6 +10,7 @@ export const historicalPaymentSchema=z.object({
  sourceReference:z.string().trim().min(10).max(1000),dateBasis:z.enum(['SOURCE','PERIOD_END_PLUS_60']),
  bankAccount:z.string().trim().max(200).default(''),note:z.string().trim().max(2000).default(''),confirmed:z.literal(true),
 }).strict();
+export const ledgerOnlyPaymentSchema=historicalPaymentSchema.omit({mode:true,sourceReference:true,dateBasis:true}).extend({mode:z.literal('LEDGER_ONLY'),sourceReference:z.string().trim().max(1000).default('Ghi nhận thu tiền vào sổ công nợ'),dateBasis:z.literal('SOURCE').default('SOURCE')}).strict();
 const D=(v:string)=>new Prisma.Decimal(v);
 export function historicalPaymentDate(period:string,paymentDate:string,basis:string){
  if(basis==='PERIOD_END_PLUS_60'){

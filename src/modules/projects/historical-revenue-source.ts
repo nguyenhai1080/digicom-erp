@@ -6,6 +6,8 @@ import {requirePermission,type AuthConfig} from '../auth/access.js';
 import {CommandError,parse} from './commands.js';
 import {historicalReconPdfConfiguration,readHistoricalReconPdf} from './historical-recon-files.js';
 import {historicalLegacySourceReview} from './historical-legacy-source.js';
+import {historicalPhysicalRevenueIdentity} from './historical-physical-revenue.js';
+import {historicalCapturedDetailReview,historicalCapturedDetailArithmetic} from './historical-detail-variance.js';
 
 const sourceId='1xDrNhKbLTSSidbX6R1Ajo-7AkX2QY2AcSPBDefeaF6A',hex=/^[a-f0-9]{64}$/;
 const sorted=(v:any):any=>Array.isArray(v)?v.map(sorted):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sorted(v[k])])):v;
@@ -46,7 +48,13 @@ export async function readHistoricalRevenueSource(tx:Prisma.TransactionClient,co
  if(j?.sourceKind!=='DGC_REHEARSAL_ONLY'||j.dgc!==true||j.noApprovalOrPosting!==true||j.filesVerified!==false||j.snapshotHash!==expectedSnapshotHash||rv.status!=='BLOCKED'||rv.isCurrent||r.companyId!==companyId||r.sourceType!=='SYSTEM_IMPORT'||r.status!=='BLOCKED'||r.isCurrent||r.createdById!==null||r.approvedById!==null||r.approvedAt!==null||r.validatedById!==null||r.validatedAt!==null||r.sourceAttachmentId!==null||r.sourceChecksum!==null||j.approvedById||j.uploadId||rv.partner.companyId!==companyId||rv.service.companyId!==companyId||rv.contract.companyId!==companyId)invalid();
  const parsedAddress=address.safeParse(j.source);if(!parsedAddress.success)invalid();
  const source=parsedAddress.data,raw=captured(j.capturedRevenueJson),payload=staged.payload as any;
- if(rawHash(raw)!==link.rowHash||rawHash(payload)!==link.rowHash||source?.sheet!=='40_MONTHLY_REVENUE'||source.sheetId!==link.sheetId||source.sourceRow!==link.sourceRow||source.legacyId!==link.legacyId||source.rowHash!==link.rowHash||staged.sheetId!==link.sheetId||staged.sourceRow!==link.sourceRow||staged.legacyId!==link.legacyId||staged.rowHash!==link.rowHash||raw.sourceRow!==link.sourceRow||raw.legacyId!==link.legacyId||payload.sourceRow!==link.sourceRow||payload.legacyId!==link.legacyId||rv.revenueCode!==link.legacyId||link.targetHash!==historicalTrialTargetHash(rv)||j.sourceStatus!==raw.values.Status)invalid();
+ if(rawHash(raw)!==link.rowHash||rawHash(payload)!==link.rowHash||source?.sheet!=='40_MONTHLY_REVENUE'||source.sheetId!==link.sheetId||source.sourceRow!==link.sourceRow||source.legacyId!==link.legacyId||source.rowHash!==link.rowHash||staged.sheetId!==link.sheetId||staged.sourceRow!==link.sourceRow||staged.legacyId!==link.legacyId||staged.rowHash!==link.rowHash||raw.sourceRow!==link.sourceRow||raw.legacyId!==link.legacyId||payload.sourceRow!==link.sourceRow||payload.legacyId!==link.legacyId||link.targetHash!==historicalTrialTargetHash(rv)||j.sourceStatus!==raw.values.Status)invalid();
+ let physicalIdentity:any=null;
+ if(j.physicalRevenueIdentity!==undefined){
+  const rows=async(sheetName:string)=>tx.dgcImportRow.findMany({where:{companyId,snapshotHash:expectedSnapshotHash,sheetName,payload:{path:['values','Revenue_ID'],equals:source.legacyId}},orderBy:{sourceRow:'asc'}});
+  physicalIdentity=historicalPhysicalRevenueIdentity(j.physicalRevenueIdentity,expectedSnapshotHash,source,await rows('40_MONTHLY_REVENUE'),await rows('41_RECONCILIATION'));
+  if(rv.revenueCode!==physicalIdentity.targetCode||rv.partner.partnerKey!==raw.values.Partner_ID||rv.service.serviceKey!==raw.values.Service_ID||rv.contract.contractCode!==raw.values.Contract_ID)invalid();
+ }else if(rv.revenueCode!==link.legacyId)invalid();
  // This version reads the rehearsal's explicit YYYY-MM calendar period only;
  // it does not convert legacy approval timestamps or choose a reporting zone.
  const period=[raw.values.Revenue_Month,raw.cells.Revenue_Month?.formattedValue].find(v=>typeof v==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(v));
@@ -55,7 +63,7 @@ export async function readHistoricalRevenueSource(tx:Prisma.TransactionClient,co
  const states=meta.sourceLifecycles.filter((s:any)=>canonical(s.source)===canonical(source));
  if(states.length!==1||states[0].status!==raw.values.Status||states[0].legacyReconciliationsJson!==j.legacyReconciliationsJson)invalid();
  const document=meta.legacySourceFileReviewJson===undefined?captured(meta.documentJson):null;
- const legacy=captured(j.legacyReconciliationsJson);if(!Array.isArray(legacy)||legacy.length!==1)invalid();for(const row of legacy)rawHash(row);
+ const legacy=captured(j.legacyReconciliationsJson);if(!Array.isArray(legacy)||(physicalIdentity?canonical(legacy.map((r:any)=>r.source))!==canonical(physicalIdentity.matchingLegacySources):legacy.length!==1))invalid();for(const row of legacy)rawHash(row);
  async function boundRow(row:any,sheetName:string){const a=row.source??row;if(!Number.isSafeInteger(a.sheetId)||!Number.isSafeInteger(a.sourceRow)||row.sourceRow!==a.sourceRow)invalid();const stored=await tx.dgcImportRow.findUnique({where:{companyId_snapshotHash_sheetId_sourceRow:{companyId,snapshotHash:expectedSnapshotHash,sheetId:a.sheetId,sourceRow:a.sourceRow}}});if(!stored||stored.companyId!==companyId||stored.snapshotHash!==expectedSnapshotHash||stored.sheetName!==sheetName||stored.sheetId!==a.sheetId||stored.sourceRow!==a.sourceRow||stored.legacyId!==row.legacyId||stored.rowHash!==row.rowHash||rawHash(stored.payload)!==row.rowHash)invalid();return stored;}
  let documentSource:any=null,fileIds:string[]=[],legacyFileEvidence:any=null;
  if(meta.legacySourceFileReviewJson!==undefined){
@@ -86,7 +94,15 @@ export async function readHistoricalRevenueSource(tx:Prisma.TransactionClient,co
  const capturedIdentityDelta=new Prisma.Decimal(j.invoicePayableUsd).minus(new Prisma.Decimal(j.invoiceRevenueUsd).minus(j.invoiceWhtUsd));
  if(!capturedIdentityDelta.isZero()&&j.roundingException===undefined)invalid();
  if(meta.roundingReviewHash!==undefined&&!hex.test(meta.roundingReviewHash))invalid();
- if(j.roundingException!==undefined){
+ if(meta.sourceDetailVarianceReviewJson!==undefined&&j.roundingException?.format!=='DGC_CAPTURED_REVENUE_DETAIL_VARIANCE_V3')invalid();
+ if(j.roundingException?.format==='DGC_CAPTURED_REVENUE_DETAIL_VARIANCE_V3'){
+  const x=j.roundingException,parsed=address.extend({sheet:z.literal('44_RECON_PDF_DETAIL')}).safeParse(x.sourceDetail);if(!parsed.success||x.characterizationReviewHash!==meta.roundingReviewHash||!hex.test(meta.roundingReviewHash??''))invalid();
+  const detailSource=parsed.data,stored=await boundRow({source:detailSource,sourceRow:detailSource.sourceRow,legacyId:detailSource.legacyId,rowHash:detailSource.rowHash},'44_RECON_PDF_DETAIL'),detail=stored.payload as any;
+  if(detail.values.Recon_Doc_ID!==raw.values.Source_Recon_Doc_ID||detail.values.Recon_Detail_ID!==raw.values.Source_Recon_Detail_ID||document.values.Recon_Doc_ID!==raw.values.Source_Recon_Doc_ID)invalid();
+  const review=historicalCapturedDetailReview(meta.sourceDetailVarianceReviewJson,expectedSnapshotHash,source,documentSource,detailSource,meta.planHash,meta.sourceFileId),a=review.sourceInvoice,invoice=await boundRow({source:a,sourceRow:a.sourceRow,legacyId:a.legacyId,rowHash:a.rowHash},'48_INVOICE_HEADER'),header=invoice.payload as any;
+  const allLines=await tx.dgcImportRow.findMany({where:{companyId,snapshotHash:expectedSnapshotHash,sheetName:'49_INVOICE_DETAIL',payload:{path:['values','Invoice_ID'],equals:header.legacyId}}}),lines=allLines.filter(r=>(r.payload as any).values.Service_ID==='CRBT');for(const r of lines)if(rawHash(r.payload)!==r.rowHash)invalid();
+  historicalArithmetic=historicalCapturedDetailArithmetic({exception:x,review,monthly:raw,detail,legacy,invoiceHeader:header,invoiceLines:lines.map(r=>r.payload),roundingPin:meta.roundingReviewHash});
+ }else if(j.roundingException!==undefined){
   const x=j.roundingException,da=address.extend({sheet:z.literal('44_RECON_PDF_DETAIL')}).safeParse(x?.sourceDetail);if(!da.success||!hex.test(x?.characterizationReviewHash??'')||x.characterizationReviewHash!==meta.roundingReviewHash)invalid();
   const a=da.data,stored=await boundRow({source:a,sourceRow:a.sourceRow,legacyId:a.legacyId,rowHash:a.rowHash},'44_RECON_PDF_DETAIL'),detail=(stored.payload as any).values;
   if(detail.Recon_Doc_ID!==raw.values.Source_Recon_Doc_ID||detail.Recon_Detail_ID!==raw.values.Source_Recon_Detail_ID||detail.Recon_Doc_ID!==document.values.Recon_Doc_ID)invalid();
@@ -108,7 +124,7 @@ export async function readHistoricalRevenueSource(tx:Prisma.TransactionClient,co
   const versionedExpected=nativeDifference?{...expected,format:'DGC_CAPTURED_NATIVE_IDENTITY_DIFFERENCE_V2',nativeIdentityDelta:nativeDelta.toFixed(),nativeIdentityAccepted:false}:expected;
   if(canonical(x)!==canonical(versionedExpected))invalid();historicalArithmetic={...versionedExpected,sourceArithmeticReplayed:true,originalPdfVerified:false,operationalUseAllowed:false};
  }
- return {...(legacyFileEvidence?{legacyFileEvidence}:{}),historicalArithmetic,readOnly:true,operationalUseAllowed:false,acceptance:false,postingAllowed:false,historicalCashPosting:false,verificationScope:'PINNED_REHEARSAL_ROW_AND_TARGET_NOT_FINANCIAL_ACCEPTANCE',source:{spreadsheetId:sourceId,snapshotHash:expectedSnapshotHash,...source,status:raw.values.Status,rowType:j.rowType,includeInMonthlyTotal:j.includeInMonthlyTotal,document:documentSource,fileId:fileIds[0],documentStatus:document?.values.Status??null,legacyReconciliationCount:legacy.length},approvalEvidence:{sourceApprovedBy:raw.values.Approved_By??null,sourceApprovedAt:dateEvidence(raw,'Approved_At'),sourceCreatedAt:dateEvidence(raw,'Created_At'),localApprovedById:null,localApprovedAt:null,localApprovalCreated:false},migrationProvenance:{recordedAt:link.createdAt.toISOString(),targetHash:link.targetHash,sourceRowHashVerified:true,targetHashVerified:true,originalPdfVerified:false},capturedAmounts:{currency:rv.currency,management:{gross:value(rv.grossAmount),partnerShare:value(rv.partnerShareAmount),companyShare:value(rv.companyShareAmount),tax:value(rv.taxAmount),sourceNet:j.capturedManagement.Net_Revenue,targetNet:value(rv.netAmount)},invoiceUsd:{revenue:j.invoiceRevenueUsd,wht:j.invoiceWhtUsd,payable:j.invoicePayableUsd}},localState:{status:rv.status,isCurrent:rv.isCurrent}};
+ return {...(physicalIdentity?{physicalIdentity}:{}),...(legacyFileEvidence?{legacyFileEvidence}:{}),historicalArithmetic,readOnly:true,operationalUseAllowed:false,acceptance:false,postingAllowed:false,historicalCashPosting:false,verificationScope:'PINNED_REHEARSAL_ROW_AND_TARGET_NOT_FINANCIAL_ACCEPTANCE',source:{spreadsheetId:sourceId,snapshotHash:expectedSnapshotHash,...source,status:raw.values.Status,rowType:j.rowType,includeInMonthlyTotal:j.includeInMonthlyTotal,document:documentSource,fileId:fileIds[0],documentStatus:document?.values.Status??null,legacyReconciliationCount:legacy.length},approvalEvidence:{sourceApprovedBy:raw.values.Approved_By??null,sourceApprovedAt:dateEvidence(raw,'Approved_At'),sourceCreatedAt:dateEvidence(raw,'Created_At'),localApprovedById:null,localApprovedAt:null,localApprovalCreated:false},migrationProvenance:{recordedAt:link.createdAt.toISOString(),targetHash:link.targetHash,sourceRowHashVerified:true,targetHashVerified:true,originalPdfVerified:false},capturedAmounts:{currency:rv.currency,management:{gross:value(rv.grossAmount),partnerShare:value(rv.partnerShareAmount),companyShare:value(rv.companyShareAmount),tax:value(rv.taxAmount),sourceNet:j.capturedManagement.Net_Revenue,targetNet:value(rv.netAmount)},invoiceUsd:{revenue:j.invoiceRevenueUsd,wht:j.invoiceWhtUsd,payable:j.invoicePayableUsd}},localState:{status:rv.status,isCurrent:rv.isCurrent}};
 }
 
 export async function historicalRevenueSourceRoutes(app:FastifyInstance,_config:AuthConfig){
