@@ -6,6 +6,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./dgc-captured-book": {
+      "types": "./prisma/dgc-captured-book.d.mts",
+      "import": "./prisma/dgc-captured-book.mjs"
+    },
     "./dgc-evidence-transfer": {
       "types": "./prisma/dgc-evidence-transfer.d.mts",
       "import": "./prisma/dgc-evidence-transfer.mjs"

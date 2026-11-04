@@ -22,3 +22,13 @@ export function sourcePhysicalIdentityPlan(snapshot){
  });
  const body={format:'dgc-source-physical-identity-plan-v1',snapshotHash:snapshot.snapshotHash,revenueCollisions,invoiceNumberCollisions,counts:{collidingRevenueIds:revenueCollisions.length,revenueRows:revenueCollisions.reduce((n,g)=>n+g.entries.length,0),collidingInvoiceNumbers:invoiceNumberCollisions.length},sourceValuesChanged:false,moneyChanged:false,otherHoldsUnchanged:true,readyToImport:false,commitAllowed:false,acceptance:false};return {...body,planHash:digest(body)};
 }
+
+// Projection for a separate blocked trial. Legacy labels remain provenance;
+// local unique codes must not merge the two physical source rows.
+export function physicalRevenueEvidence(snapshot,source,expectedPlanHash){
+ const plan=sourcePhysicalIdentityPlan(snapshot);if(plan.planHash!==expectedPlanHash)throw Error('Physical identity plan pin differs');
+ const collision=plan.revenueCollisions.find(c=>c.entries.some(e=>canonical(e.source)===canonical(source))),entry=collision?.entries.find(e=>canonical(e.source)===canonical(source));
+ if(!entry||entry.localCodeConflict||entry.matchingLegacyRows.length>1)throw Error('Unresolved physical revenue identity');
+ const body={format:'DGC_PHYSICAL_REVENUE_IDENTITY_V1',snapshotHash:snapshot.snapshotHash,physicalIdentityPlanHash:plan.planHash,source,displayLegacyId:entry.displayLegacyId,targetCode:entry.proposedLocalCode,collisionSources:collision.entries.map(e=>e.source),legacyCandidateSources:[...entry.matchingLegacyRows,...entry.otherSameIdLegacyRows].sort((a,b)=>a.sourceRow-b.sourceRow),matchingLegacySources:entry.matchingLegacyRows,legacyRelationState:entry.legacyRelationState,sourceIdChanged:false,legacyRelationInvented:false,originalGatesUnchanged:true,operationalUseAllowed:false,acceptance:false};
+ return {...body,identityHash:digest(body)};
+}

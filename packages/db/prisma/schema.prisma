@@ -1997,6 +1997,7 @@ model InvoiceScopeItem {
   lineNo    Int      @map("line_no")
   amount    Decimal  @db.Decimal(20, 4)
   isCurrent Boolean  @default(true) @map("is_current")
+  capturedSource Boolean @default(false) @map("captured_source")
   createdAt DateTime @default(now()) @map("created_at")
 
   company Company      @relation(fields: [companyId], references: [id])

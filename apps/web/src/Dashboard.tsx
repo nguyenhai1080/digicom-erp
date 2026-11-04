@@ -1,13 +1,13 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {compareRevenue} from './revenue-comparison';
-type Props={request:(path:string)=>Promise<any>;permissions:string[]};
+type Props={request:(path:string)=>Promise<any>;permissions:string[];cashEnabled?:boolean};
 type Series={period:string;serviceId:string;total:boolean;revenue:string;wht:string;payable:string;revenueVnd:string|null;whtVnd:string|null;payableVnd:string|null;missingUsd:number;missingVnd:number};
 type Data={totals:{usd:string|null;vnd:string|null;missingUsd:number;missingVnd:number};totalPayableUsd:string;services:{id:string;name:string}[];series:Series[]};
 const money=(v:string|number,c='USD')=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:c==='VND'?0:2,maximumFractionDigits:c==='VND'?0:2}).format(Number(v));
 const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-export function Dashboard({request,permissions}:Props){
+export function Dashboard({request,permissions,cashEnabled=true}:Props){
  const [cashFlow,setCashFlow]=useState<{incoming:string;outgoing:string}|null>(null),[cashFlowError,setCashFlowError]=useState('');
- const canCash=permissions.includes('PAYMENT_VIEW'),[cash,setCash]=useState<{bank:string|null;cash:string|null}|null>(null),[cashLoaded,setCashLoaded]=useState(false),[cashError,setCashError]=useState('');
+ const canCash=cashEnabled&&permissions.includes('PAYMENT_VIEW'),[cash,setCash]=useState<{bank:string|null;cash:string|null}|null>(null),[cashLoaded,setCashLoaded]=useState(false),[cashError,setCashError]=useState('');
  const canRevenue=permissions.includes('REVENUE_VIEW'),canAR=permissions.includes('AR_VIEW');
  const [data,setData]=useState<Data|null>(null),[ar,setAr]=useState<any[]|null>(null),[error,setError]=useState(''),[arError,setArError]=useState(''),[busy,setBusy]=useState(false);
  const [year,setYear]=useState(String(new Date().getFullYear())),[service,setService]=useState('all');
@@ -32,8 +32,8 @@ export function Dashboard({request,permissions}:Props){
  return <div className="dashboard"><section className="cards dashboard-kpis">
   <article><h3>Doanh thu lũy kế</h3>{(['USD','VND'] as const).map(c=><div className="dashboard-currency" key={c}><span>{c}</span><p className="dashboard-kpi" role="status">{!canRevenue?'Không có quyền':error?'Không tải được':!data?'Đang tải…':data.totals[c==='USD'?'usd':'vnd']===null?'Thiếu tỷ giá':money(data.totals[c==='USD'?'usd':'vnd']!,c)}</p></div>)}</article>
   <article><h3>Phải thu</h3>{(['USD','VND'] as const).map(c=><div className="dashboard-currency" key={c}><span>{c}</span><p className="dashboard-kpi" role="status">{!canAR?'Không có quyền':arError?'Không tải được':ar?money(ar.find(v=>v.currency===c)?.outstanding??'0',c):'Đang tải…'}</p></div>)}</article>
-  <article><h3>Dòng tiền trong năm (VND)</h3>{(['incoming','outgoing'] as const).map(kind=><div className="dashboard-currency" key={kind}><span>{kind==='incoming'?'Tổng thu':'Tổng chi'}</span><p className="dashboard-kpi" role="status">{!canCash?'Không có quyền':cashFlowError?'Không tải được':!cashFlow?'Đang tải…':money(cashFlow[kind],'VND')}</p></div>)}</article>
-  <article><h3>Cash balance (VND)</h3>{(['bank','cash'] as const).map(kind=><div className="dashboard-currency" key={kind}><span>{kind==='bank'?'Tài khoản ngân hàng':'Quỹ tiền mặt'}</span><p className="dashboard-kpi" role="status">{!canCash?'Không có quyền':cashError?'Không tải được':!cashLoaded?'Đang tải…':cash?.[kind]==null?'Chưa khai báo':money(cash[kind]!,'VND')}</p></div>)}</article>
+  {cashEnabled&&<article><h3>Dòng tiền trong năm (VND)</h3>{(['incoming','outgoing'] as const).map(kind=><div className="dashboard-currency" key={kind}><span>{kind==='incoming'?'Tổng thu':'Tổng chi'}</span><p className="dashboard-kpi" role="status">{!canCash?'Không có quyền':cashFlowError?'Không tải được':!cashFlow?'Đang tải…':money(cashFlow[kind],'VND')}</p></div>)}</article>}
+  {cashEnabled&&<article><h3>Cash balance (VND)</h3>{(['bank','cash'] as const).map(kind=><div className="dashboard-currency" key={kind}><span>{kind==='bank'?'Tài khoản ngân hàng':'Quỹ tiền mặt'}</span><p className="dashboard-kpi" role="status">{!canCash?'Không có quyền':cashError?'Không tải được':!cashLoaded?'Đang tải…':cash?.[kind]==null?'Chưa khai báo':money(cash[kind]!,'VND')}</p></div>)}</article>}
  </section>
  <section className="panel"><h2>Biểu đồ doanh thu dịch vụ theo tháng</h2>
  <div className="dashboard-filters"><label><span className="sr-only">Năm doanh thu</span><select aria-label="Năm doanh thu" value={year} onChange={e=>setYear(e.target.value)}>{years.map(v=><option key={v}>{v}</option>)}</select></label>

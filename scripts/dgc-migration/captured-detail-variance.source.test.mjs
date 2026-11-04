@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {canonical,digest} from './core.mjs';
+import {withSourcePlanningCache} from './planning-context.mjs';
+import {capturedDetailSourceInputs,reviewCapturedDetailVariance} from './captured-detail-variance.mjs';
+const b='artifacts/dgc-migration/',json=async p=>JSON.parse(await readFile(b+p,'utf8'));let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+await withSourcePlanningCache(async()=>{
+ const p='20261023/owner-financial-decisions/refreshed/',o={invoiceOptions:{snapshot:await json('20261019/prepared/snapshot.json'),targetPlan:await json(p+'revenue-target-plan.json'),combined:await json(p+'combined-review.json'),decisions:await json('20261023/owner-financial-decisions/owner-decisions.json'),manifest:await json('20261020/source-invoices/all-invoices-manifest.json'),root:resolve(b+'20261020/source-invoices')},reconManifest:await json('20261021/source-recons/recon-files-manifest.json'),reconRoot:resolve(b+'20261021/source-recons')},before=canonical(o),inputs=await capturedDetailSourceInputs(o),r=await reviewCapturedDetailVariance(inputs.sourceOptions);
+ eq(r.reviewHash,inputs.reviewPin);eq(r.source.sourceRow,360);eq(r.sourceInvoice.sourceRow,43);eq(r.capturedUsd,{revenue:'2.78',wht:'0.28',payable:'2.51'});eq(r.printedUsd,r.capturedUsd);eq(r.capturedDetailUsd,{revenue:'3.23',wht:'0.32',payable:'2.91'});eq(r.nativeDifferences.some(d=>!d.equal),true);eq(r.legacyNativeEvidencePreserved,true);eq(r.detailUsdAccepted,false);eq(r.nativeIdentityAccepted,false);eq(r.nativeArithmeticReplayed,false);eq(r.operationalFxDerived,false);eq(r.sourceValuesChanged,false);eq(r.amountAdjustment,false);eq(r.acceptance,false);eq(r.files.length,2);eq(canonical(o),before);
+ const forged=structuredClone(inputs.sourceOptions);forged.observations.printedInvoiceLine.payable='2.91';const {observationHash,...body}=forged.observations;forged.observations.observationHash=digest(body);await assert.rejects(()=>reviewCapturedDetailVariance(forged),/Trusted captured-detail/);n++;
+ await mkdir(b+'20261104/captured-exceptions',{recursive:true});await writeFile(b+'20261104/captured-exceptions/detail-review.json',JSON.stringify(r,null,2)+'\n',{mode:0o600});await writeFile(b+'20261104/captured-exceptions/detail-source-proof.json',JSON.stringify({assertions:n,reviewHash:r.reviewHash,sourceRevenue:360,sourceInvoice:43,financialAdmission:false},null,2)+'\n',{mode:0o600});console.log(`Captured-detail variance source: ${n} assertions passed; ledger and two originals agree, stale detail/native values preserved unaccepted`);
+});

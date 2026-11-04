@@ -7,7 +7,7 @@ import {requirePermission,type AuthConfig} from '../auth/access.js';
 import {audit,code,CommandError,date,parse,timestamp,unchanged,writeGuard} from './commands.js';
 import {checkedFile,persistPdf,persistPaymentImage,rollbackFiles,sha} from './financial-documents.js';
 import {financialPeriodLock} from './recon-finalize.js';
-import {historicalPaymentSchema,historicalPaymentAmounts,historicalPaymentDate} from './historical-payment.js';
+import {historicalPaymentSchema,ledgerOnlyPaymentSchema,historicalPaymentAmounts,historicalPaymentDate} from './historical-payment.js';
 import {invoicePaymentReadPermission,canPostInvoicePayment} from './invoice-payment-access.js';
 import {isSourceReceipt,sourceReceiptView} from './source-receipt.js';
 
@@ -29,16 +29,19 @@ export function paymentAmounts(original:string,alreadyPaid:string,usd:string,vnd
 }
 export function nativeVndPayment(original:string,paid:string,next:string){const total=D(original),old=D(paid),cash=D(next);if(!total.isInteger()||!old.isInteger()||!cash.isInteger()||!cash.gt(0)||old.lt(0)||cash.gt(total.minus(old)))fail('Tiền thu VND vượt số dư hoặc không hợp lệ.');const paidAfter=old.plus(cash),outstanding=total.minus(paidAfter);return {paidAfter,outstanding,rate:D('1'),status:outstanding.isZero()?'PAID' as const:'PARTIALLY_PAID' as const};}
 export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig){
+ const cashEnabled=(companyCode:string)=>companyCode!=='DGC'||process.env.DGC_CASH_ENABLED==='true';
  app.get('/api/v1/invoices/:id/payments',{preHandler:requirePermission(invoicePaymentReadPermission)},async request=>{
   const invoice=await prisma.invoice.findFirst({where:{companyId:request.auth!.companyId,id:id(request.params)},include:{receivable:true}});
   if(!invoice)throw new CommandError(404,'Không tìm thấy Invoice.');
   const items=await prisma.invoicePayment.findMany({where:{companyId:invoice.companyId,invoiceId:invoice.id},orderBy:[{paymentDate:'desc'},{createdAt:'desc'}]});
   const canPost=canPostInvoicePayment(request.auth!);
-  const accounts=request.auth!.companyCode==='DGC'&&!canPost?[]:await prisma.cashAccount.findMany({where:{companyId:invoice.companyId,status:'ACTIVE',currency:'VND'},select:{id:true,accountCode:true,name:true,kind:true,currency:true,bankName:true,accountNumber:true},orderBy:{accountCode:'asc'},take:1000});
-  return {canPost,accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items:items.map(p=>({...p,historicalSource:sourceReceiptView(p.historicalSource)}))};
+  const accounts=!cashEnabled(request.auth!.companyCode)||request.auth!.companyCode==='DGC'&&!canPost?[]:await prisma.cashAccount.findMany({where:{companyId:invoice.companyId,status:'ACTIVE',currency:'VND'},select:{id:true,accountCode:true,name:true,kind:true,currency:true,bankName:true,accountNumber:true},orderBy:{accountCode:'asc'},take:1000});
+  return {canPost,cashEnabled:cashEnabled(request.auth!.companyCode),accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items:items.map(p=>({...p,historicalSource:sourceReceiptView(p.historicalSource)}))};
  });
  app.post('/api/v1/invoices/:id/payments',{bodyLimit:8*1024*1024,onRequest:writeGuard('PAYMENT_POST',config)},async request=>{
-  const user=request.auth!,invoiceId=id(request.params),body=parse(z.union([bodySchema,historicalPaymentSchema]),request.body),historical='mode' in body,digest=sha(JSON.stringify({invoiceId,...body}));
+  const user=request.auth!,invoiceId=id(request.params),body=parse(z.union([bodySchema,historicalPaymentSchema,ledgerOnlyPaymentSchema]),request.body),historical='mode' in body,digest=sha(JSON.stringify({invoiceId,...body}));
+  if(historical&&body.mode==='LEDGER_ONLY'&&user.companyCode!=='DGC')throw new CommandError(404,'Chức năng dành cho DGC.');
+  if(!historical&&!cashEnabled(user.companyCode))fail('Quỹ/ngân hàng chưa áp dụng. Chọn ghi nhận thu vào công nợ.');
   if(!['PAYMENT_CREATE','PAYMENT_APPROVE'].every(p=>user.permissions.includes(p)))throw new CommandError(403,'Cần quyền tạo và duyệt thanh toán.');
   let bytes:Buffer|undefined,ext:'pdf'|'png'|'jpg'='pdf';
   if(!historical&&body.swiftFile){
@@ -79,7 +82,7 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
     if(cashAccount.openingDate>new Date(body.paymentDate))fail('Ngày nhận tiền phải từ ngày bắt đầu theo dõi số dư tài khoản.');
     if(body.paymentMethod==='Bank Transfer'&&cashAccount.kind!=='BANK'||body.paymentMethod==='Cash'&&cashAccount.kind!=='CASH')fail('Phương thức thanh toán không khớp loại tài khoản/quỹ.');
    }
-   const history=historical?{reference:body.sourceReference,dateBasis:body.dateBasis,accountKnown:!!body.bankAccount,rateKind:inv.currency===body.cashCurrency?'NONE':'REPORTING_CONVERSION'}:undefined;
+   const history=historical?{...(body.mode==='LEDGER_ONLY'?{sourceKind:'DGC_LEDGER_ONLY_RECEIPT_V1'}:{}),reference:body.sourceReference,dateBasis:body.dateBasis,accountKnown:!!body.bankAccount,rateKind:inv.currency===body.cashCurrency?'NONE':'REPORTING_CONVERSION'}:undefined;
    const payment=await tx.invoicePayment.create({data:{companyId:user.companyId,invoiceId,allocationCurrency:inv.currency,allocationAmount,cashCurrency,cashAmount,historicalSource:history,paymentCode:await code(tx,user.companyId,'INVOICE_PAYMENT','PAY'),requestId:body.requestId,requestDigest:digest,paymentDate:new Date(body.paymentDate),paidUsd:historical?(inv.currency==='USD'?allocationAmount:D('0')):D(body.paidUsd),paidVnd:historical?(cashCurrency==='VND'?cashAmount:null):D(body.paidVnd),fxRate:a.rate,swiftNo:historical?'':body.swiftNo,cashAccountId:cashAccount?.id,bankAccount:cashAccount?[cashAccount.accountCode,cashAccount.bankName,cashAccount.accountNumber,cashAccount.name].filter(Boolean).join(' · '):body.bankAccount,paymentMethod:historical?'Other':body.paymentMethod,note:body.note,approvedById:user.userId}});
    if(cashAccount){
     const updated=await tx.cashAccount.update({where:{id:cashAccount.id},data:{balance:{increment:cashAmount}}});
@@ -94,6 +97,7 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
   },{timeout:30000});}catch(e){await rollbackFiles(files);throw e;}
  });
  app.post('/api/v1/invoice-payments/:id/post-cash',{onRequest:writeGuard('PAYMENT_POST',config)},async request=>{
+  if(!cashEnabled(request.auth!.companyCode))fail('Quỹ/ngân hàng chưa áp dụng.');
   const user=request.auth!,paymentId=id(request.params),b=parse(z.object({cashAccountId:z.uuid(),reason:z.string().trim().min(10).max(2000),confirmed:z.literal(true)}).strict(),request.body);
   if(!['PAYMENT_CREATE','PAYMENT_APPROVE'].every(p=>user.permissions.includes(p)))throw new CommandError(403,'Cần quyền tạo và duyệt thanh toán.');
   return prisma.$transaction(async tx=>{

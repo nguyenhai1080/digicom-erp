@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {canonical} from './core.mjs';
+import {usdReferenceInvoiceProposal,physicalSourceInvoicePlan} from './usd-reference-invoice.mjs';
+import {usdReferenceSourceInputs} from './usd-reference-source-inputs.mjs';
+import {physicalSourceInputs} from './physical-source-inputs.mjs';
+import {archiveNumberSourceReview} from './archive-number-source.mjs';
+import {reviewVisualUsdSource} from './visual-usd-source.mjs';
+import {withSourcePlanningCache} from './planning-context.mjs';
+const b='artifacts/dgc-migration/',json=async p=>JSON.parse(await readFile(b+p,'utf8'));let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+await withSourcePlanningCache(async()=>{
+ const p='20261023/owner-financial-decisions/refreshed/',snapshot=await json('20261019/prepared/snapshot.json'),combined=await json(p+'combined-review.json'),manifest=await json('20261020/source-invoices/all-invoices-manifest.json'),review=await json('20261025/usd-reference/review.json');
+ const o={invoiceOptions:{snapshot,targetPlan:await json(p+'revenue-target-plan.json'),combined,reviewPin:combined.reviewHash,manifest,manifestPin:manifest.manifestHash,root:resolve(b+'20261020/source-invoices'),restorePlan:await json(p+'invoice-restore-plan.json'),decisions:await json('20261023/owner-financial-decisions/owner-decisions.json')},rounding:await json(p+'donor-rounding-review.json'),exceptionPlan:await json(p+'rounding-exceptions.json'),usdReferenceOptions:await usdReferenceSourceInputs(),physicalSourceOptions:{identityPlanPin:(await json('20261029/source-identity/plan.json')).planHash}};
+ o.physicalSourceOptions=await physicalSourceInputs(o.invoiceOptions);o.roundingPin=o.rounding.reviewHash;o.usdReferenceOptions.reviewPin=review.reviewHash;const before=canonical(o),old=usdReferenceInvoiceProposal(o,review),archive=archiveNumberSourceReview(o.invoiceOptions),plan=usdReferenceInvoiceProposal(o,review,{...o.physicalSourceOptions,visualReview:await reviewVisualUsdSource(o.physicalSourceOptions.visualUsdOptions),archiveNumberReview:archive,archiveReviewPin:archive.reviewHash}),candidate=plan.entries.filter(e=>e.state==='USD_REFERENCE_INVOICE_CANDIDATE'&&e.archiveNumberSourceEvidence),e=candidate[0];
+ await writeFile(b+'20261104/physical-revenue/archive-number-diagnostic.json',JSON.stringify(plan,null,2)+'\n',{mode:0o600});
+ if(!e)console.error(JSON.stringify(plan.entries.find(e=>e.source.sourceRow===57)?.reasons));
+ eq(old.planHash,(await json('20261025/usd-reference/invoice-diagnostic-plan.json')).planHash);eq(candidate.map(e=>e.source.sourceRow),[57]);eq(e.reasons,[]);eq(e.arithmeticProfile,'V4');eq(e.invoiceRounding.identityDelta,'0');eq(e.archiveNumberSourceEvidence.successorRelationshipInferred,false);eq(e.archiveNumberSourceEvidence.archivePointerResolved,false);eq(e.archiveNumberSourceEvidence.archivePromoted,false);eq(e.archiveNumberSourceEvidence.legalInvoiceNumberChanged,false);eq(e.archiveNumberSourceEvidence.source.sourceRow,57);eq(e.archiveNumberSourceEvidence.archiveSource.sourceRow,56);eq(e.archiveNumberSourceEvidence.groups[0].missingArchivePointer.legacyId,'INV0064');eq(e.archiveNumberSourceEvidence.files.length,2);eq(e.receivable.outstandingAmount,'0');eq(plan.acceptance,false);eq(plan.commitAllowed,false);eq(canonical(o),before);
+ await mkdir(b+'20261104/physical-revenue',{recursive:true});await writeFile(b+'20261104/physical-revenue/archive-number-invoice-plan.json',JSON.stringify(plan,null,2)+'\n',{mode:0o600});await writeFile(b+'20261104/physical-revenue/archive-number-review.json',JSON.stringify(archive,null,2)+'\n',{mode:0o600});await writeFile(b+'20261104/physical-revenue/archive-number-source-proof.json',JSON.stringify({assertions:n,planHash:plan.planHash,candidateSourceRows:[57],sourceProposalOnly:true,financialAcceptance:false,oldUsdInvoiceHashUnchanged:true},null,2)+'\n',{mode:0o600});console.log(`Archive-number Invoice proposal: ${n} assertions passed; Invoice57 current/56 archive kept separate, missing pointer preserved, old USD hash unchanged`);
+});

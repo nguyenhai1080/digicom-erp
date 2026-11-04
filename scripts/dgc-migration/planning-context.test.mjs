@@ -3,6 +3,7 @@ import {withSourcePlanningCache} from './planning-context.mjs';
 import {invoiceRoundingInputs} from './invoice-rounding.fixtures.mjs';
 import {invoiceRoundingPlan} from './invoice-rounding.mjs';
 import {canonical,digest} from './core.mjs';
+import {referenceGraph} from './graph.mjs';
 let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;},fails=f=>{assert.throws(f);n++;};
 const o=invoiceRoundingInputs(),baseline=invoiceRoundingPlan(o),before=canonical(o);
 await withSourcePlanningCache(async()=>{
@@ -15,4 +16,11 @@ await withSourcePlanningCache(async()=>{
  await Promise.resolve();eq(invoiceRoundingPlan(o),baseline);
 });
 eq(invoiceRoundingPlan(o),baseline);eq(canonical(o),before);
+const graph=referenceGraph(o.invoiceOptions.snapshot,o.invoiceOptions.decisions);
+await withSourcePlanningCache(async()=>{
+ const first=referenceGraph(o.invoiceOptions.snapshot,o.invoiceOptions.decisions);eq(first,graph);first.nodes[0].status='POISONED';first.unresolved=999;eq(referenceGraph(o.invoiceOptions.snapshot,o.invoiceOptions.decisions),graph);
+ const row=o.invoiceOptions.snapshot.tables['48_INVOICE_HEADER'].rows[0],amount=row.values.Total_Payable_USD;row.values.Total_Payable_USD=999;fails(()=>referenceGraph(o.invoiceOptions.snapshot,o.invoiceOptions.decisions));row.values.Total_Payable_USD=amount;eq(referenceGraph(o.invoiceOptions.snapshot,o.invoiceOptions.decisions),graph);
+ const decisions=o.invoiceOptions.decisions;o.invoiceOptions.decisions={...decisions,format:'UNTRUSTED'};fails(()=>referenceGraph(o.invoiceOptions.snapshot,o.invoiceOptions.decisions));o.invoiceOptions.decisions=decisions;await Promise.resolve();eq(referenceGraph(o.invoiceOptions.snapshot,decisions),graph);
+});
+eq(referenceGraph(o.invoiceOptions.snapshot,o.invoiceOptions.decisions),graph);eq(canonical(o),before);
 console.log(`Scoped source planning: ${n} assertions passed; stale pins, input mutation and output isolation`);

@@ -1,5 +1,6 @@
 import {verifySnapshot,masterPlan,digest,sourceDate} from './core.mjs';
 import {financialLinkOverrides} from './financial-link-decisions.mjs';
+import {memoSourcePlan} from './planning-context.mjs';
 const specs={
  '30_CONTRACTS':{Partner_ID:'21_DM_PARTNER'},
  '31_CONTRACT_SERVICES':{Contract_ID:'30_CONTRACTS',Service_ID:'20_DM_SERVICE'},
@@ -29,6 +30,9 @@ function fileId(v){const s=text(v);if(/^[A-Za-z0-9_-]{20,}$/.test(s))return s;re
 // Review evidence only. All physical rows survive; this does not import, dedupe,
 // repair a source ID, or establish that a financial amount is accepted.
 export function referenceGraph(snapshot,resolutions){
+ return memoSourcePlan(snapshot,'reference-graph',[snapshot,resolutions],()=>buildReferenceGraph(snapshot,resolutions));
+}
+function buildReferenceGraph(snapshot,resolutions){
  verifySnapshot(snapshot);
  if(resolutions)masterPlan(snapshot,resolutions); // exact snapshot/row/owner decision validation
  const approvedLinks=financialLinkOverrides(snapshot,resolutions?.financialLinkDecisions);

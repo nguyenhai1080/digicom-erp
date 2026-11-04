@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {canonical} from './core.mjs';
+import {usdReferenceInvoiceProposal,physicalSourceInvoicePlan} from './usd-reference-invoice.mjs';
+import {usdReferenceSourceInputs} from './usd-reference-source-inputs.mjs';
+import {physicalSourceInputs} from './physical-source-inputs.mjs';
+import {ownerLinkedSourceReview} from './owner-link-source.mjs';
+import {reviewVisualUsdSource} from './visual-usd-source.mjs';
+import {withSourcePlanningCache} from './planning-context.mjs';
+const b='artifacts/dgc-migration/',json=async p=>JSON.parse(await readFile(b+p,'utf8'));let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+await withSourcePlanningCache(async()=>{
+ const p='20261023/owner-financial-decisions/refreshed/',snapshot=await json('20261019/prepared/snapshot.json'),combined=await json(p+'combined-review.json'),manifest=await json('20261020/source-invoices/all-invoices-manifest.json'),review=await json('20261025/usd-reference/review.json');
+ const o={invoiceOptions:{snapshot,targetPlan:await json(p+'revenue-target-plan.json'),combined,reviewPin:combined.reviewHash,manifest,manifestPin:manifest.manifestHash,root:resolve(b+'20261020/source-invoices'),restorePlan:await json(p+'invoice-restore-plan.json'),decisions:await json('20261023/owner-financial-decisions/owner-decisions.json')},rounding:await json(p+'donor-rounding-review.json'),exceptionPlan:await json(p+'rounding-exceptions.json'),usdReferenceOptions:await usdReferenceSourceInputs(),physicalSourceOptions:{identityPlanPin:(await json('20261029/source-identity/plan.json')).planHash}};
+ o.physicalSourceOptions=await physicalSourceInputs(o.invoiceOptions);o.roundingPin=o.rounding.reviewHash;o.usdReferenceOptions.reviewPin=review.reviewHash;const before=canonical(o),old=usdReferenceInvoiceProposal(o,review),owner=ownerLinkedSourceReview(o.invoiceOptions),plan=usdReferenceInvoiceProposal(o,review,{...o.physicalSourceOptions,visualReview:await reviewVisualUsdSource(o.physicalSourceOptions.visualUsdOptions),ownerLinkReview:owner,ownerReviewPin:owner.reviewHash}),candidate=plan.entries.filter(e=>e.state==='USD_REFERENCE_INVOICE_CANDIDATE'&&e.ownerLinkSourceEvidence),e=candidate[0];
+ eq(old.planHash,(await json('20261025/usd-reference/invoice-diagnostic-plan.json')).planHash);eq(candidate.map(e=>e.source.sourceRow),[17]);eq(e.reasons,[]);eq(e.arithmeticProfile,'V1');eq(e.invoiceRounding.identityDelta,'-0.01');eq(e.physicalSourceEvidence.groups[0].identities[0].source.sourceRow,123);eq(e.physicalSourceEvidence.groups[0].identities[0].matchingLegacySources,[]);eq(e.ownerLinkSourceEvidence.ownerApprovalHash,'a75b0238c43d73b8192fa1d26fdbb5bc99415266d75f4a3beb8c16833833d369');eq(e.ownerLinkSourceEvidence.sourceCellsChanged,false);eq(e.ownerLinkSourceEvidence.ownerDecisionGeneralized,false);eq(e.ownerLinkSourceEvidence.groups.length,2);eq(plan.acceptance,false);eq(plan.commitAllowed,false);eq(canonical(o),before);
+ const altered=structuredClone(o.invoiceOptions),env=altered.decisions.financialLinkDecisions;env.approvalHash='0'.repeat(64);assert.throws(()=>ownerLinkedSourceReview(altered),/Trusted owner/);n++;
+ await mkdir(b+'20261104/physical-revenue',{recursive:true});await writeFile(b+'20261104/physical-revenue/owner-link-invoice-plan.json',JSON.stringify(plan,null,2)+'\n',{mode:0o600});await writeFile(b+'20261104/physical-revenue/owner-link-review.json',JSON.stringify(owner,null,2)+'\n',{mode:0o600});await writeFile(b+'20261104/physical-revenue/owner-link-source-proof.json',JSON.stringify({assertions:n,planHash:plan.planHash,candidateSourceRows:[17],sourceProposalOnly:true,financialAcceptance:false,oldUsdInvoiceHashUnchanged:true},null,2)+'\n',{mode:0o600});console.log(`Owner-linked Invoice proposal: ${n} assertions passed; Invoice17 exact approved link, physical row123 kept separate, old USD hash unchanged`);
+});

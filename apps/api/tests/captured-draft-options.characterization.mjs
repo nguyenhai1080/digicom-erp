@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {capturedDraftOptions} from '../dist/modules/projects/captured-draft-options.js';
+const row=(id,n,roots,kind='DGC_CAPTURED_BOOK_V1')=>({id,snapshot:{sourceKind:kind,source:{sourceRow:n}},scopes:[{items:roots.map(revenueId=>({revenueId}))}]});
+const a=row('older',97,['revenue-a']),b=row('newer',102,['revenue-a']),c=row('other',98,['revenue-b']);
+assert.deepEqual(capturedDraftOptions([a,b,c],'older').map(i=>i.id),['older','other']);
+assert.deepEqual(capturedDraftOptions([a,b,c],'other').map(i=>i.id),['newer','other']);
+assert.deepEqual(capturedDraftOptions([a,b,c],'newer').map(i=>i.id),['newer','other']);
+assert.deepEqual(capturedDraftOptions([a,c],'older'),[a,c]);
+const live=row('live',0,['revenue-a'],'LIVE');assert.deepEqual(capturedDraftOptions([a,live,c],'live'),[a,live,c]);
+assert.deepEqual(capturedDraftOptions([a,live,c],'older'),[a,live,c]);
+const partial=row('partial',103,['revenue-a','revenue-b']);assert.equal(capturedDraftOptions([a,partial,c],'older').length,3);
+console.log(JSON.stringify({passed:7,sourceRowsUnchanged:true,selectedOptionHonored:true}));
