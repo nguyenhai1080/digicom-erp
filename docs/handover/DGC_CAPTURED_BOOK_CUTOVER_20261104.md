@@ -1,5 +1,7 @@
 # Cắt chuyển nguyên trạng sổ DGC — 04/11/2026
 
+**Cập nhật 05/11: [gói này đã nhập thật trên host DGC](DGC_HOST_BOOK_IMPORT_20261105.md).** Biên nhận imported=true, đủ các counts bên dưới, không historical cash posting. Những ghi chú chưa nhập/đang chuẩn bị sau đây là lịch sử trước khi apply; không chạy lại bộ nhập hoặc tiếp tục semantic audit.
+
 Owner xác nhận tiếp: quỹ/ngân hàng và số dư tiền để sau, chỉ triển khai khi owner yêu cầu. Không dùng thiết lập sổ tiền làm điều kiện cắt chuyển. Ưu tiên luồng nghiệp vụ tài chính dịch vụ chạy đúng; thu lịch sử giữ nguyên và không post vào tài khoản tiền.
 
 Owner đã đổi ưu tiên: không tiếp tục thẩm định tính hợp lệ nghiệp vụ của số liệu cũ. Chuyển đầy đủ sổ hiện có sang ERP, giữ nguyên tiền, ngày, trạng thái và chứng từ; dùng nền tảng chức năng đã xây dựng từ ERP GST. Các lệch nguồn/PDF đã biết được lưu thành cảnh báo, không chặn nhập lịch sử. Phạm vi toàn sổ vẫn giữ, không đổi sang số dư đầu kỳ hoặc backfill sau.

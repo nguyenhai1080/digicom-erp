@@ -1,5 +1,7 @@
 # Bắt đầu làm việc với DGC Finance
 
+**05/11/2026: [đã nhập chính thức toàn sổ lên host DGC](docs/handover/DGC_HOST_BOOK_IMPORT_20261105.md).** Biên nhận xác nhận 417 doanh thu, 66 Invoice hiện hành/nháp, 37 archive, 53 AR, 51 receipts, 3 Generated Input Recon, 451 PDF và 3.243 hàng nguồn. Các ghi chú “chưa financial import” bên dưới là lịch sử trước lần chuyển thật. Không nhập lại hoặc mở lại các vòng thẩm định số liệu cũ; quỹ/ngân hàng để sau. Đọc bàn giao mới để biết kết quả đóng bộ nhập/sao lưu và giới hạn kiểm tra vận hành.
+
 Cập nhật ngày 04/11/2026, giờ Việt Nam.
 
 **Ưu tiên mới của owner: [cắt chuyển nguyên trạng](docs/handover/DGC_CAPTURED_BOOK_CUTOVER_20261104.md), không thẩm định số liệu cũ; quỹ/ngân hàng để sau.** Đã đọc nguồn hiện tại, thêm 89 hàng vào phần nguồn riêng; gói đủ 417 revenues / 66 current-Draft Invoice / 37 archive / 53 AR / 51 receipts / 3 Generated Input Recon / 451 PDF. Linux 512 MB: 43 functional HTTP checks và tám issue checks đạt, chưa nhập tài chính host. Host v14 và backup trước chuyển đã xác nhận; đang triển khai đường nhập mới. Những mốc 47/45/44 bên dưới là lịch sử thử theo quy trình cũ, không phải điều kiện phải mở lại.
