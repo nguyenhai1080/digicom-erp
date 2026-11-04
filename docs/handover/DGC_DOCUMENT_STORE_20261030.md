@@ -8,6 +8,6 @@ Verifier độc lập đọc lại manifest và toàn bộ blob từ đúng pin,
 
 Đã chạy verifier trên Linux: đủ 429 file/414.169.145 bytes và cùng manifest hash, không phụ thuộc đường dẫn Windows. Proof private `artifacts/dgc-migration/20261030/document-store-linux-proof.json`.
 
-**Đây chưa phải kho đã chuyển lên host hoặc đầy đủ mọi chứng từ lịch sử.** Năm original Recon còn thiếu giữ nguyên trong manifest; không có reference file thiếu trong tập manifest hiện hành. Hai file legacy vừa tìm cho Invoice 4 giữ riêng ở hồ sơ đang review, chưa tự gán vào original Recon hay tự thêm graph bị mất. Các bản sao trong gói ký không được ghi là đã khôi phục original bytes.
+**Đây chưa phải kho đã chuyển lên host hoặc đầy đủ mọi chứng từ lịch sử.** Năm original Recon còn thiếu giữ nguyên trong manifest; không có reference file thiếu trong tập manifest hiện hành. CRBT source PDF của Invoice 4 chưa nằm trong kho; gói ký của Invoice này đã có trong reference manifest và bản tải lại khớp hash. Hồ sơ kiểm liên kết legacy giữ riêng, chưa tự gán file vào original Recon hay tự thêm graph bị mất. Các bản sao trong gói ký không được ghi là đã khôi phục original bytes.
 
 Kho tại `artifacts/dgc-migration/20261030/document-store/`, manifest hash `77b26cd95b1f364dc056ac2b47d7aa379910378261cf886b70b8c40a3f063850`. Nội dung private không đưa vào Git/release. `hostUploadAllowed=false`, `financialAdmission=false`, `financialCommitAllowed=false`; custody không chứng minh authenticity, signed status hoặc financial acceptance. Bước uploader/registry/download UAT/backup trên host còn pending.

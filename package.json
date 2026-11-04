@@ -114,6 +114,11 @@
     "test:migration:child-rounding-source": "node scripts/dgc-migration/child-rounding.source.test.mjs",
     "test:migration:child-rounding-source-staging": "node scripts/dgc-migration/child-rounding-source.integration.mjs",
     "test:migration:invoice-usd-authority-source": "node scripts/dgc-migration/invoice-usd-authority.source.test.mjs",
-    "test:migration:invoice-usd-authority-source-staging": "node scripts/dgc-migration/invoice-usd-authority-source.integration.mjs"
+    "test:migration:invoice-usd-authority-source-staging": "node scripts/dgc-migration/invoice-usd-authority-source.integration.mjs",
+    "test:migration:legacy-source-file": "node scripts/dgc-migration/legacy-source-file.source.test.mjs",
+    "test:migration:legacy-source-revenue": "node scripts/dgc-migration/legacy-source-file-source.integration.mjs",
+    "test:migration:invoice4-authority": "node scripts/dgc-migration/invoice4-authority.source.test.mjs",
+    "test:migration:legacy-source-invoice": "node scripts/dgc-migration/invoice-legacy-source-file.source.test.mjs",
+    "test:migration:legacy-source-unified": "node scripts/dgc-migration/invoice-legacy-source-file-source.integration.mjs"
   }
 }

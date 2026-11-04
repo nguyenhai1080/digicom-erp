@@ -1,3 +1,5 @@
+Kết quả cuối 30/10: retained-log clone/Linux trial đã exit 0, 894 assertions; [bàn giao unified 44](DGC_SIGNED_COPY_UNIFIED_20261030.md). Các lần lỗi/đang chạy bên dưới là lịch sử, không được tính là lượt thành công. Năm original Recon vẫn thiếu, signed-copy evidence không phải original recovery hoặc operational acceptance.
+
 # Kiểm chứng bản sao Recon trong gói ký — 30/10/2026
 
 Profile `SIGNED_PACKAGE_COPIES_V1` chỉ áp dụng Invoice nguồn hàng 44 / INV0050, gói APP0048. Năm bản sao giữ đầu trang 07/2026 và chân trang 06/2026 theo quyết định owner; năm file Recon gốc vẫn thiếu. Không gọi đây là khôi phục file gốc, chấp nhận native identity hoặc tỷ giá vận hành.

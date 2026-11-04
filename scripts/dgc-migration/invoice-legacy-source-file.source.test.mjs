@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {canonical,digest} from './core.mjs';
+import {withSourcePlanningCache} from './planning-context.mjs';
+import {legacyInvoiceSourceInputs} from './legacy-invoice-source-inputs.mjs';
+import {usdReferenceSourceInputs} from './usd-reference-source-inputs.mjs';
+import {invoiceLegacySourceFilePlan} from './invoice-legacy-source-file.mjs';
+import {reviewInvoice4Authority} from './invoice4-authority.mjs';
+const b='artifacts/dgc-migration/',json=async p=>JSON.parse(await readFile(b+p,'utf8'));let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+await withSourcePlanningCache(async()=>{
+ const p='20261023/owner-financial-decisions/refreshed/',snapshot=await json('20261019/prepared/snapshot.json'),combined=await json(p+'combined-review.json'),manifest=await json('20261020/source-invoices/all-invoices-manifest.json');
+ const o={invoiceOptions:{snapshot,targetPlan:await json(p+'revenue-target-plan.json'),combined,reviewPin:combined.reviewHash,manifest,manifestPin:manifest.manifestHash,restorePlan:await json(p+'invoice-restore-plan.json'),decisions:await json('20261023/owner-financial-decisions/owner-decisions.json'),root:resolve(b+'20261020/source-invoices')},rounding:await json(p+'donor-rounding-review.json'),exceptionPlan:await json(p+'rounding-exceptions.json'),usdReferenceOptions:await usdReferenceSourceInputs(),legacySourceFileOptions:await legacyInvoiceSourceInputs(snapshot)};o.roundingPin=o.rounding.reviewHash;
+ o.usdReferenceOptions.reviewPin=(await json('20261025/usd-reference/review.json')).reviewHash;
+ const before=canonical(o),plan=await invoiceLegacySourceFilePlan(o),e=plan.entries[0];
+ await writeFile(b+'20261030/legacy-source-file/diagnostic-invoice-plan.json',JSON.stringify(plan,null,2)+'\n',{mode:0o600});
+ if(e.reasons.length)console.error(JSON.stringify({sourceRow:e.source.sourceRow,state:e.state,reasons:e.reasons}));
+ eq(e.source.sourceRow,4);eq(e.state,'LEGACY_SOURCE_FILE_INVOICE_CANDIDATE');eq(e.reasons,[]);eq(e.invoice.revenueAmount,'18644.15');eq(e.invoice.payableAmount,'16779.74');eq(e.invoice.paidAmount,'16779.74');eq(e.receivable.outstandingAmount,'0');eq(e.invoice.invoiceDate,'2023-04-05');eq(e.invoice.dueDate,'2023-05-20');eq(e.invoiceRounding.format,'DGC_CAPTURED_INVOICE_ROUNDING_V1');eq(e.invoiceRounding.identityDelta,'0.01');eq(e.invoiceRounding.lines.length,5);eq(e.legacySourceFileEvidence.missingDependenciesPreserved.length,4);eq(e.legacySourceFileEvidence.dependencies.map(d=>d.state).sort(),['LEGACY_SOURCE_FILE_SHAPE','STRICT_SOURCE_SHAPE','STRICT_SOURCE_SHAPE','STRICT_SOURCE_SHAPE','USD_REFERENCE_SOURCE_SHAPE'].sort());eq(e.legacySourceFileEvidence.originalGraphReconstructed,false);eq(e.legacySourceFileEvidence.nativeIdentityAccepted,false);eq(e.legacySourceFileEvidence.ownerDecisionHash,'bd35720cbbf02a6af2aa515c4b3154385b94df3730ce2400d6f5c9289c2655cd');eq(plan.originalGatesUnchanged,true);eq(plan.commitAllowed,false);eq(plan.acceptance,false);eq(canonical(o),before);
+ const altered=structuredClone(o.legacySourceFileOptions.authorityOptions);altered.decision.proposal.ledger.revenue='18644.16';const {decisionHash,...body}=altered.decision;altered.decision.decisionHash=digest(body);await assert.rejects(()=>reviewInvoice4Authority(altered),/Unrecognized Invoice4 owner authority/);n++;
+ const out=b+'20261030/legacy-source-file/';await mkdir(out,{recursive:true});await writeFile(out+'invoice-plan.json',JSON.stringify(plan,null,2)+'\n',{mode:0o600});await writeFile(out+'invoice-source-proof.json',JSON.stringify({assertions:n,invoicePlanHash:plan.planHash,sourceRow:4,ownerDecisionHash:e.legacySourceFileEvidence.ownerDecisionHash,graphReconstructed:false,financialAcceptance:false,financialRowsCommitted:0,remoteChanged:false},null,2)+'\n',{mode:0o600});console.log(`Legacy-source Invoice proposal: ${n} assertions passed; owner ledger and exact missing graph closure, old gates unchanged, no financial admission`);
+});

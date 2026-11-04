@@ -1,3 +1,5 @@
+Cập nhật 04/11: adapter source-file riêng đã qua 23 kiểm tra nguồn và PostgreSQL Revenue-only 32 assertions (fresh bytes, reader, failure/replay/full rollback, 37 masters/no cash). Đây chỉ là một Revenue CRBT; không phải whole-Invoice admission. Owner giữ Invoice 4 theo sổ và hai PDF; toàn Invoice có 22 source assertions, chưa PostgreSQL acceptance. Header RPD0039/detail RDL0089 vẫn không tồn tại, Upload_ID vẫn trùng; không tạo graph giả.
+
 # Chứng từ CRBT tháng 03/2023 — 30/10/2026
 
 Đã đọc metadata và tải đúng hai file do nguồn dẫn chiếu cho Invoice hàng 4 / INV0009 / 01/04/2023/DGC-INV, revenue hàng 24 / REV0050 và legacy Recon REC0050. Không ghi Drive/Sheet hoặc sửa nguồn.
