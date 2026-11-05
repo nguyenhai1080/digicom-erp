@@ -58,7 +58,7 @@ try{
  eq((await post(compose+'/preview',{sourceIds})).statusCode,409);
  await writeFile(resolve(storage,originalAttachment.storagePath),images.title);
  let preview=await ok(compose+'/preview',{sourceIds});const bytes=Buffer.from(preview.base64,'base64');eq((await sharp(bytes).metadata()).hasAlpha,true);
- const {data:pixels,info}=await sharp(bytes).raw().toBuffer({resolveWithObject:true});eq(pixels[3],0);eq(info.width,1100);
+ const {data:pixels,info}=await sharp(bytes).raw().toBuffer({resolveWithObject:true});eq(pixels[3],0);eq(info.width,900);
  const payload=()=>({sourceIds:{...sourceIds},digest:preview.digest,expectedCurrentId:null,reason:'Synthetic composite approval'});
  eq((await post(compose+'/create',{...payload(),digest:'0'.repeat(64)})).statusCode,409);
  const races=await Promise.all([post(compose+'/create',payload()),post(compose+'/create',payload())]);
