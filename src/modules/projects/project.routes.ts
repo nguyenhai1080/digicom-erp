@@ -5,6 +5,7 @@ import {cashHistoryRoutes} from './cash-history.js';
 import type { FastifyInstance } from 'fastify';
 import {masterTransferRoutes} from './master-transfer.js';
 import {capturedBookTransferRoutes} from './captured-book-transfer.js';
+import {octoberRestartRoutes} from './october-restart.js';
 import {evidenceTransferRoutes} from './evidence-transfer.js';
 import { z } from 'zod';
 import { prisma, Prisma } from '@erp/db';
@@ -48,6 +49,7 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   });
   await app.register(masterTransferRoutes, config);
   await app.register(capturedBookTransferRoutes, config);
+  await app.register(octoberRestartRoutes, config);
   await app.register(evidenceTransferRoutes, config);
   await app.register(partnerRoutes, config);
   await app.register(serviceContractRoutes, config);
