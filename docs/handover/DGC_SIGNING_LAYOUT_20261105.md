@@ -15,3 +15,5 @@ No owner reconciliation was approved or restamped. Refresh the reconciliation pr
 ## Owner refinement: title close to seal
 
 Owner subsequently requested the title nearer the seal. V3_CLOSE_TITLE raises the combined title/name by 64px on the 900px canvas; seal/signature coordinates remain unchanged. With the authentic DGC sources this leaves roughly 11px between visible seal and title marks (about 5px at the 400px preview). The transparent source margins remain intact. API build and visual inspection passed; V2's integration results above are prior coverage, not a rerun for V3.
+
+V3 activated at 11:45:41 on 05/11/2026, SIGNING_COMPOSITE asset aa5f786f-93cb-4856-a58a-b60dd80d20fe. V20 online, deploy c571438e6e9f5b854c7241b07a0117618f482b11. Native host preview and downloaded active v3 both match locally/Linux-composed PNG, SHA256 2cb9819a0792adcd2c75a82fa1b0a9984babf9ab30b40d77e48550f852443a70. No document restamping or financial changes.
