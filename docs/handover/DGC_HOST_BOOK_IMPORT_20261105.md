@@ -37,3 +37,9 @@ Giữ 13 Invoice nguồn Draft là Draft; không tự phát hành. Ba Input Reco
 Không coi lần chuyển này là nghiệm thu toàn bộ parity, phân quyền nhân viên hay UAT có người dùng. Các kiểm tra ghi nghiệp vụ đã thực hiện trên Linux synthetic (43 HTTP và tám issue checks), không lặp lại trên sổ thật. Không tiếp tục ghi song song vào donor sau khi owner bắt đầu vận hành ERP; nếu có phát sinh ngoài snapshot thì xử lý riêng theo nguồn, không import lại hoặc ghi đè toàn sổ.
 
 Biên nhận và ảnh riêng tư ở `artifacts/dgc-migration/20261105/`; không đưa chúng, gói nguồn, PDF hoặc secrets vào Git/deployment.
+
+## Tiếp tục: sẵn sàng phân quyền nhân viên
+
+Đã kiểm lại mã nguồn hiện hành trên DB giả lập riêng, đủ 27 migrations: 234 DGC role/manual-revenue/FX/receipt assertions đạt; 24 user-management checks với delegates cô lập đạt. Bổ sung kiểm hồi quy cho cash deferral: khi không bật DGC_CASH_ENABLED, Manager vẫn có canPost cho thu sổ nhưng không nhận cash-account catalog; Kế toán chỉ đọc lịch sử, không canPost; GST giữ hành vi hiện hữu. Kiểm cả nhánh bật cash riêng rồi phục hồi biến môi trường. Không thay quyền trong runtime, không seed/gán role hoặc sửa sổ host.
+
+[Hướng dẫn vận hành](../DGC_OPERATING_START.md) liệt kê luồng nghiệp vụ và ma trận bốn vai trò theo mẫu hiện có. Đã hỏi owner họ tên/email/vai trò nhân viên để chuẩn bị bước tiếp theo; chưa có danh sách tại thời điểm ghi nhận. Không đòi mật khẩu trong chat. Lượt cập nhật này chỉ có test/tài liệu, không yêu cầu tạo release/deploy lại website hoặc mở bộ nhập.

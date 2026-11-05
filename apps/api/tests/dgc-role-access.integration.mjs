@@ -96,7 +96,19 @@ try{
  await expect(oldDgc,'GET',history,undefined,403);await expect(s,'GET','/api/v1/invoices/'+gi.id+'/payments',undefined,404);await expect(s,'GET','/api/v1/invoices/'+randomUUID()+'/payments',undefined,404);
  for(const url of ['/api/v1/cash-accounts','/api/v1/cash-balances','/api/v1/cash-entries','/api/v1/invoice-payments/'+h.items[0].id+'/document'])await expect(s,'GET',url,undefined,403);
  await expect(s,'POST',history,{},403);await expect(s,'POST','/api/v1/invoice-payments/'+h.items[0].id+'/post-cash',{},403);
- const mh=await expect(m,'GET',history);eq(mh.canPost,true);eq(mh.accounts.length,1);const gh=await expect(oldGst,'GET','/api/v1/invoices/'+gi.id+'/payments');eq(gh.canPost,false);eq(gh.accounts.length,1);eq(gh.items.length,14);eq(await readSnapshot(),readBefore);
+ // The owner deferred DGC cash. Even a Manager may read/post ledger receipts
+ // without receiving the cash-account catalog. GST keeps its existing behavior.
+ const previousCash=process.env.DGC_CASH_ENABLED;
+ try{
+  delete process.env.DGC_CASH_ENABLED;
+  const deferred=await expect(m,'GET',history);eq(deferred.canPost,true);eq(deferred.cashEnabled,false);eq(deferred.accounts,[]);
+  const accountingHistory=await expect(ac,'GET',history);eq(accountingHistory.canPost,false);eq(accountingHistory.accounts,[]);
+  const gh=await expect(oldGst,'GET','/api/v1/invoices/'+gi.id+'/payments');eq(gh.canPost,false);eq(gh.cashEnabled,true);eq(gh.accounts.length,1);eq(gh.items.length,14);
+  process.env.DGC_CASH_ENABLED='true';
+  const mh=await expect(m,'GET',history);eq(mh.canPost,true);eq(mh.cashEnabled,true);eq(mh.accounts.length,1);
+  eq((await expect(ac,'GET',history)).accounts,[]);
+ }finally{if(previousCash===undefined)delete process.env.DGC_CASH_ENABLED;else process.env.DGC_CASH_ENABLED=previousCash;}
+ eq(await readSnapshot(),readBefore);
  const readPermission=ps.find(p=>p.code==='INVOICE_PAYMENT_VIEW');await prisma.rolePermission.delete({where:{roleId_permissionId:{roleId:s.role.id,permissionId:readPermission.id}}});await expect(s,'GET',history,undefined,403);eq((await expect(s,'GET','/api/v1/invoices/references')).canViewPaymentHistory,false);
  console.log('PASS: '+checks+' DGC role/manual-revenue/FX assertions: separated capabilities, Manager FX without signing/config access, native amounts, atomic batch rollback, legacy GST, tenant/CSRF, proposed role grants and no cash.');
 }finally{await app.close();await prisma.$disconnect();}

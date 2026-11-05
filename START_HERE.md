@@ -1,5 +1,7 @@
 # Bắt đầu làm việc với DGC Finance
 
+**Tiếp tục vận hành 05/11:** đã kiểm lại quyền bằng DB giả lập riêng: 234 DGC role/manual/FX/receipt checks và 24 user-management checks đạt. [Hướng dẫn vận hành và phân công](docs/DGC_OPERATING_START.md) có ma trận Nhân viên/Kế toán/Quản lý/Ban giám đốc. Chưa gán quyền/tạo người dùng thật; đã hỏi owner danh sách họ tên/email/vai trò, không yêu cầu mật khẩu. Không cần redeploy cho lượt chỉ cập nhật test/tài liệu này; runtime host giữ v17, importers/cash vẫn tắt.
+
 **05/11/2026: [đã nhập chính thức toàn sổ lên host DGC](docs/handover/DGC_HOST_BOOK_IMPORT_20261105.md).** Biên nhận xác nhận 417 doanh thu, 66 Invoice hiện hành/nháp, 37 archive, 53 AR, 51 receipts, 3 Generated Input Recon, 451 PDF và 3.243 hàng nguồn. Các ghi chú “chưa financial import” bên dưới là lịch sử trước lần chuyển thật. Không nhập lại hoặc mở lại các vòng thẩm định số liệu cũ; quỹ/ngân hàng để sau. Đọc bàn giao mới để biết kết quả đóng bộ nhập/sao lưu và giới hạn kiểm tra vận hành.
 
 Cập nhật ngày 04/11/2026, giờ Việt Nam.
