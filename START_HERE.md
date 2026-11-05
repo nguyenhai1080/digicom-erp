@@ -1,5 +1,7 @@
 # Bắt đầu làm việc với DGC Finance
 
+**Tháng 10/2026 đã mở lại trên sổ thật — 05/11 lúc 10:46:** [biên nhận và kiểm host](docs/handover/DGC_OCTOBER_RESTART_20261105.md). V18 online; 8 Invoice/8 revenues/5 recon và 18 PDF cũ đã lưu lịch sử, tháng 10 hiện hành 0 Invoice/0 revenue. Cả năm dịch vụ ALLOW_INTAKE; backup DB trước/sau thành công, công nợ các kỳ khác giữ nguyên. Owner sẽ [tự nhập lại đối soát/tạo Invoice](docs/DGC_OCTOBER_REENTRY_GUIDE.md). Không chạy lại archive hoặc importer, không tự nhập/phát hành/ký thay owner. Ghi chú “chưa apply” bên dưới là lịch sử trước mốc này.
+
 **Yêu cầu mới: [owner tự làm lại tháng 10/2026 trên sổ thật](docs/handover/DGC_OCTOBER_RESTART_20261105.md), lưu hồ sơ cũ vào lịch sử trước.** Đã làm thao tác preview/apply một lần riêng, không mở importer. Clone/Windows đạt 545 checks: 8 Invoice + 8 revenue + 5 recon + 18 PDF được giữ lịch sử, 451 file/các kỳ khác không đổi, rollback/replay và upload lại nguồn đạt. Chưa đổi sổ host tại mốc này; tiếp tục Linux/release/backup/apply đúng phạm vi. Không phát hành hoặc ký hộ owner.
 
 **Chứng từ mới 05/11:** [Invoice profile v1 và đủ tài sản DGC đã lưu trên host](docs/handover/DGC_COMPANY_ASSETS_ACTIVATED_20261105.md): logo/dấu/chữ ký/chức danh gốc v1, SIGNING_COMPOSITE v1 cho đối soát. Bốn ảnh tải lại khớp SHA256 nguồn; không dùng tài sản GST, không ký/phát hành chứng từ thử hoặc tạo tài khoản tiền. Bộ nhập vẫn tắt, biên nhận sổ không đổi. Xem bàn giao mới về backup sau cấu hình và giới hạn UAT.
