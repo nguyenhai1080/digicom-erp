@@ -522,6 +522,7 @@ enum ValidationSeverity {
 }
 
 model Company {
+  statementsOfAccount StatementOfAccount[]
   inputReconciliations InputReconciliation[]
   accountPayables AccountPayable[]
   dgcImportSnapshots DgcImportSnapshot[]
@@ -813,6 +814,7 @@ model Attachment {
 }
 
 model Document {
+  statementOfAccount StatementOfAccount?
   invoiceLinks InvoiceDocumentLink[]
   inputReconciliations InputReconciliation[]
   @@unique([companyId,id])
@@ -868,6 +870,7 @@ model AuditLog {
 }
 
 model Partner {
+  statementsOfAccount StatementOfAccount[]
   inputReconciliations InputReconciliation[] @relation("InputReconPartner")
   outputInputReconciliations InputReconciliation[] @relation("InputReconOutputPartner")
   @@unique([companyId,id])
@@ -1959,6 +1962,30 @@ model Invoice {
 
 // SOA/approval PDF references prevent cancellation of an invoice in use.
 // Future creators must register links atomically through linkInvoiceDocument.
+model StatementOfAccount {
+  id String @id @default(uuid()) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  partnerId String @map("partner_id") @db.Uuid
+  documentId String @unique @map("document_id") @db.Uuid
+  statementNumber String @map("statement_number")
+  asOf DateTime @map("as_of") @db.Date
+  currency String @db.VarChar(3)
+  status String @default("DRAFT") @db.VarChar(20)
+  snapshot Json
+  requestId String @map("request_id") @db.Uuid
+  requestDigest String @map("request_digest")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  company Company @relation(fields:[companyId],references:[id])
+  partner Partner @relation(fields:[companyId,partnerId],references:[companyId,id])
+  document Document @relation(fields:[companyId,documentId],references:[companyId,id])
+  @@unique([companyId,documentId])
+  @@unique([companyId,statementNumber])
+  @@unique([companyId,requestId])
+  @@index([companyId,partnerId,createdAt])
+  @@map("statements_of_account")
+}
+
 model InvoiceDocumentLink {
   companyId String @map("company_id") @db.Uuid
   invoiceId String @map("invoice_id") @db.Uuid

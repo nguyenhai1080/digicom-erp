@@ -40,9 +40,9 @@ export async function stampPdf(source:Buffer,bytes:Buffer,mime:string|null,p:Pla
  for(const page of allPages?doc.getPages():[doc.getPage(p.page-1)])drawPlacement(page,picture,p);
  return Buffer.from(await doc.save({useObjectStreams:false}));
 }
-export async function persistPdf(tx:Prisma.TransactionClient,user:Identity,entityType:string,entityId:string,type:'RECON_SIGNED'|'INPUT_RECON'|'INVOICE'|'PAYMENT_SWIFT'|'EXPENSE_EVIDENCE',filename:string,bytes:Buffer,version:number,rollback:string[]){
+export async function persistPdf(tx:Prisma.TransactionClient,user:Identity,entityType:string,entityId:string,type:'RECON_SIGNED'|'INPUT_RECON'|'INVOICE'|'PAYMENT_SWIFT'|'EXPENSE_EVIDENCE'|'SOA',filename:string,bytes:Buffer,version:number,rollback:string[]){
  if(bytes.length>16*1024*1024)throw new CommandError(422,'PDF kết quả vượt giới hạn lưu trữ.');
- const id=randomUUID(),folder=type==='INPUT_RECON'?'input-recon':type==='RECON_SIGNED'?'signed-recon':type==='PAYMENT_SWIFT'?'payments':type==='EXPENSE_EVIDENCE'?'expenses':'invoices',relative=`${folder}/${user.companyId}/${id}.pdf`,path=resolve(storageRoot(),relative),temp=path+'.pending';
+ const id=randomUUID(),folder=type==='SOA'?'soa':type==='INPUT_RECON'?'input-recon':type==='RECON_SIGNED'?'signed-recon':type==='PAYMENT_SWIFT'?'payments':type==='EXPENSE_EVIDENCE'?'expenses':'invoices',relative=`${folder}/${user.companyId}/${id}.pdf`,path=resolve(storageRoot(),relative),temp=path+'.pending';
  await mkdir(resolve(storageRoot(),folder,user.companyId),{recursive:true,mode:0o700});rollback.push(temp);
  const handle=await open(temp,'wx',0o600);try{await handle.writeFile(bytes);await handle.sync();}finally{await handle.close();}await rename(temp,path);rollback.push(path);
  const attachment=await tx.attachment.create({data:{id,companyId:user.companyId,originalFilename:filename,storedFilename:id+'.pdf',storageProvider:'local',storagePath:relative,mimeType:'application/pdf',fileSize:BigInt(bytes.length),checksumSha256:sha(bytes),uploadedById:user.userId}});

@@ -48,7 +48,7 @@ export function dgcRolePresets(){
  const donorPresets=all.map(role=>({code:'DGC_'+role.toUpperCase(),name:role+' — DGC Finance',donorRole:role,proposalOnly:true,fullParity:false,
   permissionCodes:[...new Set(dgcRoleMappings.filter(m=>m.roles.includes(role)).flatMap(m=>m.permissions))].sort(),
   coverage:'IMPLEMENTED_SERVICE_FINANCE_ONLY',
-  reviewNotes:['No automatic assignment, seed or existing-role update.','Projects, SOA/package runtime, diagnostics/repair, complete read separation and FX revisions remain outside this template.'],
+  reviewNotes:['No automatic assignment, seed or existing-role update.','SOA draft creation/cancellation uses existing INVOICE_CREATE plus AR_VIEW, INVOICE_VIEW and INVOICE_PAYMENT_VIEW; no permission assignment changes.','Projects, approval-package runtime, diagnostics/repair, complete read separation and FX revisions remain outside this template.'],
   evidence:dgcRoleMappings.filter(m=>m.roles.includes(role))}));
  // Owner explicitly delegated FX entry and input/output preparation to accounting.
  // Keep this target role distinct from generic Staff and from final approvers.
