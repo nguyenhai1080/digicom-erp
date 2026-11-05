@@ -25,6 +25,7 @@ import { financeLedgerRoutes } from './finance-ledger.js';
 import {inputReconRoutes} from './input-recon.js';
 import {inputStatementRoutes} from './input-recon-statement.js';
 import {soaCutoffReviewRoutes} from './soa-cutoff-review.js';
+import {soaRoutes} from './soa.js';
 import {invoiceHistoryRoutes} from './invoice-history.js';
 import {historicalRevenueSourceRoutes} from './historical-revenue-source.js';
 const projectId = (input: unknown) => parse(z.object({ id: z.uuid() }), input).id;
@@ -68,6 +69,7 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   await app.register(inputReconRoutes, config);
   await app.register(inputStatementRoutes, config);
   await app.register(soaCutoffReviewRoutes, config);
+  await app.register(soaRoutes, config);
   await app.register(invoiceHistoryRoutes, config);
   await app.register(historicalRevenueSourceRoutes, config);
   app.get('/api/v1/projects', { preHandler: requirePermission('PROJECT_VIEW') }, async request => ({
