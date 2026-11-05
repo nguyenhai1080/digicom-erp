@@ -3,7 +3,7 @@ import {CommandError} from '../projects/commands.js';
 
 export const signingSourceKinds={stamp:'COMPANY_STAMP',signature:'SIGNATURE',title:'SIGNER_TITLE_NAME'} as const;
 export type SigningImages=Record<keyof typeof signingSourceKinds,Buffer>;
-export const signingCompositeLayout='DGC_COMPOSITE_V2_COMPACT';
+export const signingCompositeLayout='DGC_COMPOSITE_V3_CLOSE_TITLE';
 let composing=false;
 // Keep the uploaded originals. This creates a separate transparent derivative;
 // it does not erase backgrounds, redraw signatures or substitute text for an image.
@@ -23,7 +23,9 @@ async function compose(images:SigningImages){
  // Keep the signature through the seal, with the name centered immediately
  // below the whole mark. V1 separated all three into distant corners.
  const stampTop=12,signatureTop=Math.max(12,stampTop+Math.round((resized.stamp.height-resized.signature.height)/2));
- const titleTop=Math.max(stampTop+resized.stamp.height,signatureTop+resized.signature.height)+40;
+ // Source images already have transparent margins; bring their visible marks
+ // close together without changing or trimming any uploaded original.
+ const titleTop=Math.max(12,Math.max(stampTop+resized.stamp.height,signatureTop+resized.signature.height)-24);
  const height=titleTop+resized.title.height+12;
  if(height>3600)throw new CommandError(400,'Ảnh ghép vượt chiều cao cho phép.');
  const bytes=await sharp({create:{width:900,height,channels:4,background:{r:0,g:0,b:0,alpha:0}}}).composite([
