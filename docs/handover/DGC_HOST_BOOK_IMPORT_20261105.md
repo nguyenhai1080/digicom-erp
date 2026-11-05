@@ -43,3 +43,11 @@ Biên nhận và ảnh riêng tư ở `artifacts/dgc-migration/20261105/`; khôn
 Đã kiểm lại mã nguồn hiện hành trên DB giả lập riêng, đủ 27 migrations: 234 DGC role/manual-revenue/FX/receipt assertions đạt; 24 user-management checks với delegates cô lập đạt. Bổ sung kiểm hồi quy cho cash deferral: khi không bật DGC_CASH_ENABLED, Manager vẫn có canPost cho thu sổ nhưng không nhận cash-account catalog; Kế toán chỉ đọc lịch sử, không canPost; GST giữ hành vi hiện hữu. Kiểm cả nhánh bật cash riêng rồi phục hồi biến môi trường. Không thay quyền trong runtime, không seed/gán role hoặc sửa sổ host.
 
 [Hướng dẫn vận hành](../DGC_OPERATING_START.md) liệt kê luồng nghiệp vụ và ma trận bốn vai trò theo mẫu hiện có. Đã hỏi owner họ tên/email/vai trò nhân viên để chuẩn bị bước tiếp theo; chưa có danh sách tại thời điểm ghi nhận. Không đòi mật khẩu trong chat. Lượt cập nhật này chỉ có test/tài liệu, không yêu cầu tạo release/deploy lại website hoặc mở bộ nhập.
+
+## Đã xác minh tài khoản sau owner lưu
+
+Owner cung cấp ba người và đã tự hoàn tất mật khẩu/lưu trên ERP. Đã đọc lại danh sách: ba nhân viên cùng quản trị viên ban đầu đều Hoạt động; ba nhân viên mới đều Chưa đăng nhập. Không tạo tài khoản trùng, không reset mật khẩu hoặc thay cấu hình owner.
+
+Ba role mới khớp chính xác mẫu runtime theo API đọc `/api/v1/users/roles`: DGC_MANAGER 38 quyền, DGC_BOD 48 quyền, DGC_ACCOUNTANT 24 quyền. Cấu hình owner thực tế có thêm DGC_ACCOUNTANT cạnh DGC_MANAGER và ADMIN cạnh DGC_BOD. Đã thông báo chênh lệch và ý nghĩa toàn quyền của ADMIN, giữ nguyên lựa chọn owner vừa lưu. Không tự coi assignment này là mẫu mặc định cho người dùng khác.
+
+Đã đọc lại biên nhận book: imported=true/importEnabled=false, counts vẫn 417 revenues/66 native Invoice/37 archive/53 AR/51 receipts/3 Input Recon/451 documents và 3.243 source rows. Lượt xác minh tài khoản không ghi nghiệp vụ, không mở importers hoặc cash, không thử đăng nhập thay nhân viên. Hồ sơ/ảnh tài khoản có thông tin cá nhân chỉ lưu private `artifacts/dgc-migration/20261105/users/`. Không gửi thông báo/email cho nhân viên. Bước tiếp theo là nhân viên đăng nhập và nghiệm thu công việc thực tế; không gọi trạng thái tài khoản ACTIVE là bằng chứng đã đăng nhập/UAT đạt.
