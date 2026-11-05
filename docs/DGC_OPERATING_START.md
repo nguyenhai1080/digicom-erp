@@ -1,6 +1,6 @@
 # Bắt đầu vận hành DGC ERP
 
-Website: https://digicom-erp.n1.tinhgon.xyz/. Sổ đã chuyển theo nguồn chụp ngày 04/11/2026; không nhập lại các Invoice, doanh thu hoặc khoản thu đã có. Khi bắt đầu dùng ERP, dùng hệ thống cũ để tra cứu và dừng nhập song song. Phát sinh ngoài lượt chụp nguồn cần được xác định riêng trước khi nhập để tránh trùng.
+Website: https://erp.digicomjsc.com/. Sổ đã chuyển theo nguồn chụp ngày 04/11/2026; không nhập lại các Invoice, doanh thu hoặc khoản thu đã có. Khi bắt đầu dùng ERP, dùng hệ thống cũ để tra cứu và dừng nhập song song. Phát sinh ngoài lượt chụp nguồn cần được xác định riêng trước khi nhập để tránh trùng.
 
 ## Phân công công việc
 
@@ -36,3 +36,4 @@ Các mẫu này áp dụng phần Finance đã triển khai. Quyền thực tế
 Quỹ, ngân hàng và số dư tiền chưa áp dụng. Không cần tạo tài khoản tiền hoặc số dư đầu kỳ để tiếp tục các luồng trên. Các đường nhập lịch sử/master/evidence và bootstrap/seed đã tắt; không bật lại để bổ sung nghiệp vụ mới.
 
 Sau chuyển đã có backup PostgreSQL và website/kho chứng từ trên host. Kết quả kỹ thuật và giới hạn nghiệm thu được ghi tại [bàn giao chuyển sổ](handover/DGC_HOST_BOOK_IMPORT_20261105.md). Việc kiểm thử trên dữ liệu giả lập không thay cho nghiệm thu của người dùng thực tế.
+

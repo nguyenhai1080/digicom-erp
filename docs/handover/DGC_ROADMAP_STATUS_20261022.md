@@ -1,3 +1,5 @@
+**Roadmap hiện tại 05/11:** xem [bảng sau cắt chuyển](../DGC_ROADMAP.md). Website chính thức https://erp.digicomjsc.com/, v21. Các trạng thái thử nhập cũ bên dưới chỉ là lịch sử.
+
 **05/11 hiện tại:** [toàn sổ đã nhập trên host](DGC_HOST_BOOK_IMPORT_20261105.md), bộ nhập đã tắt; owner lưu ba tài khoản nhân viên, đã kiểm trạng thái hoạt động và đúng mẫu quyền. [Invoice profile/tài sản DGC](DGC_COMPANY_ASSETS_ACTIVATED_20261105.md) đã bổ sung cho chứng từ mới. Theo yêu cầu mới, [tháng 10 đã lưu lịch sử và mở lại trên sổ thật lúc 10:46](DGC_OCTOBER_RESTART_20261105.md): năm dịch vụ cho nhập PDF, owner tự nhập lại đối soát và tạo Invoice. Không tự ký/phát hành thay owner; đăng nhập từng nhân viên/UAT chưa xác nhận. Quỹ/ngân hàng để sau. Các mốc “chưa nhập” dưới đây là lịch sử.
 
 **Mốc tiếp tục 04/11: [47 Invoice / 958 assertions](DGC_SOURCE_EVIDENCE_UNIFIED_20261104.md)** đã trial/rollback trên clone/Linux: 346 revenues, 41 documents/59 links, 45 receipts trên 39 full parents, 37 masters/no cash. Còn sáu Paid (14/17/33/38/43/57), sáu receipts, năm dependencies/năm referenced docs; Draft/archive/full import/UAT/final snapshot/backup/cutover pending. Owner Invoice38 đã chốt riêng; các proposal mới chưa thành PostgreSQL acceptance. Chưa financial import host.
@@ -67,3 +69,4 @@ Mốc registry mới 23/10: [whole-document offsetting trial](DGC_REFERENCE_OFFS
 - Connector host hiện là GST Vietnam; môi trường DGC đã push/deploy qua browser đúng tài khoản owner. Không dùng connector hoặc dịch vụ GST thay thế. Staging tài chính từ xa vẫn chờ importer/đối chiếu, không nới guard localhost của tools hiện tại.
 
 Các phần độc lập vẫn tiếp tục được; không cần đợi các quyết định này để kiểm custody, mapping, rollback và tính đầy đủ của evidence. Thu lịch sử chỉ cập nhật Invoice/revenue/AR; không cộng số dư cash/bank. Chuyển động tiền mới chỉ vận hành sau historical imports và lập sổ tiền hiện tại.
+

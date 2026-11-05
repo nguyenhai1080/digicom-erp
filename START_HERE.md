@@ -1,5 +1,7 @@
 # Bắt đầu làm việc với DGC Finance
 
+**Tên miền chính thức:** [erp.digicomjsc.com](https://erp.digicomjsc.com/) — APP_URL đã đổi, v21 online và origin guard đã kiểm. Xem [bàn giao tên miền](docs/handover/DGC_OFFICIAL_DOMAIN_20261105.md) và [roadmap hiện tại](docs/DGC_ROADMAP.md). SOA mới đang làm ở working tree, chưa deploy; không lẫn với các bản ổn định đã chạy.
+
 **Ảnh ký đối soát đã chỉnh 05/11:** [bố cục theo mẫu owner](docs/handover/DGC_SIGNING_LAYOUT_20261105.md), v20 online và SIGNING_COMPOSITE v3 đang dùng. Chữ ký qua giữa dấu, chức danh/họ tên đã nâng gần sát mép dưới dấu theo yêu cầu mới; ảnh gốc và chứng từ cũ giữ nguyên. Không tự restamp đối soát của owner.
 
 **Tháng 10/2026 đã mở lại trên sổ thật — 05/11 lúc 10:46:** [biên nhận và kiểm host](docs/handover/DGC_OCTOBER_RESTART_20261105.md). V18 online; 8 Invoice/8 revenues/5 recon và 18 PDF cũ đã lưu lịch sử, tháng 10 hiện hành 0 Invoice/0 revenue. Cả năm dịch vụ ALLOW_INTAKE; backup DB trước/sau thành công, công nợ các kỳ khác giữ nguyên. Owner sẽ [tự nhập lại đối soát/tạo Invoice](docs/DGC_OCTOBER_REENTRY_GUIDE.md). Không chạy lại archive hoặc importer, không tự nhập/phát hành/ký thay owner. Ghi chú “chưa apply” bên dưới là lịch sử trước mốc này.
@@ -157,5 +159,6 @@ Mục tiêu là đưa DGC Finance lên Vibehost ở tài khoản cũ, tên miề
 > Đọc START_HERE.md và docs/handover/HANDOVER.md. Phân biệt code ERP Core dự kiến dùng cho DGC với Apps Script hiện hành. Kiểm tra nhánh feature/dgc-finance tại D:/Projects/DGC-FINANCE-WEB, so sánh với nền GST ổn định và đọc baseline nghiệp vụ DGC. Chuẩn bị code và repository DGC riêng trong project này; trước khi triển khai phải có kế hoạch môi trường DGC độc lập và rà soát tính năng còn thiếu. Chuyển dữ liệu phải thử trên staging, giữ nguồn gốc và đối soát trước khi đưa vào sử dụng.
 
 Các việc tạo repository, giải phóng host cũ, triển khai DGC và nhập dữ liệu chưa hoàn tất. Tài liệu bàn giao không thay thế bước kiểm tra này. Không đưa `.env`, token, bản sao dữ liệu thật hoặc kho PDF lên Git.
+
 
 
