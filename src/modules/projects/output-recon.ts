@@ -1,3 +1,4 @@
+import {outputReconHistoryRoutes} from './output-recon-history.js';
 import {assertReconDeletion} from './draft-deletion.js';
 import {createHash,randomUUID} from 'node:crypto';
 import {lstat,mkdir,open,readFile,unlink} from 'node:fs/promises';
@@ -67,6 +68,7 @@ export async function assessment(tx:Prisma.TransactionClient,item:{companyId:str
  return {identity,contracts,contractState:contracts.length===1?'MATCHED':contracts.length>1?'AMBIGUOUS':'UNMATCHED',financialBlocked:check.action==='BLOCK_FINANCIAL_DEPENDENCY',financialMessage:check.action==='BLOCK_FINANCIAL_DEPENDENCY'?check.message:null};
 }
 export async function outputReconRoutes(app:FastifyInstance,config:AuthConfig){
+ await app.register(outputReconHistoryRoutes);
  app.post('/api/v1/output-recon/inspect',{bodyLimit:7*1024*1024,onRequest:writeGuard('RECON_UPLOAD',config)},async request=>{
   if(!request.auth!.permissions.includes('RECON_VIEW'))throw new CommandError(403,'Cần quyền xem đối soát để đọc PDF.');
   const body=parse(pdfInput.extend({partnerId:z.uuid()}).strict(),request.body),companyId=request.auth!.companyId;
