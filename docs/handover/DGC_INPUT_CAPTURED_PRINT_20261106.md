@@ -15,7 +15,18 @@ Windows: 233 assertions tích hợp InputRecon/AP (gồm hồi quy luồng mới
 
 Giao diện thử trên DB giả lập riêng: xem chỉ đọc; tạo/lưu bản in phiên bản 2; trạng thái Approved và AP giữ nguyên. Fixture có tiền khác kết quả tính lại (39,99 USD; nội tệ 999.751,23; thuế 123,45; payable 999.627,78 VND), chứng minh bản in đọc giá trị đã lưu. Đã xem bố cục PDF một trang và 35 dòng/ba trang. Đây không phải dữ liệu thật hoặc UAT người dùng.
 
-Hồ sơ private: `artifacts/dgc-migration/20261106/input-recon/`; log Windows `artifacts/input-recon-captured-v3-test.log`. Linux/release/host sẽ được ghi khi hoàn thành.
+Linux 512 MB / heap 192 MB / 0,3 CPU: cùng 233 assertions đạt trên ảnh phát hành `dgc-erp-input-captured:20261106`; 28 migrations cũ áp dụng trên DB thử trống, không có migration mới. Hồ sơ private: `artifacts/dgc-migration/20261106/input-recon/`; log Windows `artifacts/input-recon-captured-v3-test.log`, Linux `linux/test.log`.
+
+## Đã triển khai và kiểm host
+
+- Source `fb80616bdde5a07e5309e0512fe04b3dbd150c9d`, release `eb063c5788083056efbff6530e5fbc3226c0a44d`, một ứng dụng/145 files, không có dữ liệu hoặc tài sản nguồn trong release.
+- Digicom-Erp **v24 online 06/11/2026**. Backup PostgreSQL trước triển khai thành công lúc 08:39 (2,4 MB). Không đổi biến môi trường hoặc tài nguyên.
+- Bundle UI tải từ tên miền chính thức khớp SHA256 bản Linux tested; health 200/DB connected. Phiên quản trị còn dùng được sau reload.
+- Đọc lại cả ba hồ sơ thấy đúng nhãn Đã chuyển (Generated), nút xem chỉ đọc và in riêng, không còn cập nhật nguồn. Các số phải trả 5.846.925 / 21.879.638 / 74.820.375 VND không đổi.
+- Preview ba hồ sơ cùng kỳ/hợp đồng và PDF xem trước thành công; tổng 102.546.938 VND, giữ các trường đã lưu. Đã xem ảnh render PDF, không dấu/chữ ký, không chồng chữ. Không bấm lưu bản in hoặc duyệt trên host.
+- AP sau kiểm vẫn 0 bản ghi. Ba hồ sơ vẫn Generated, không có PDF liên kết mới. Dashboard giữ đủ bốn card, AR đọc 25.328,54 USD.
+
+Bằng chứng private: `host-v24-online.png`, `host-public-proof.json`, `host-preview.txt/.png`, `host-captured-preview.pdf`, `host-pdf-preview.png`, `ap-after.txt`, `host-after.txt/.png`. Đây là kiểm triển khai/đọc dữ liệu, chưa thay thế UAT của nhân viên.
 
 ## Phạm vi host
 

@@ -1,5 +1,7 @@
 # Bắt đầu làm việc với DGC Finance
 
+**Đầu vào v24 đã kiểm 06/11:** [bàn giao bản in số liệu đã chuyển](docs/handover/DGC_INPUT_CAPTURED_PRINT_20261106.md). Hồ sơ captured xem chỉ đọc, chặn tính lại; bản in tra cứu giữ tiền/tỷ giá/trạng thái. Windows/Linux 233 checks đạt; host preview/PDF đúng ba hồ sơ, AP vẫn 0. Không lưu/duyệt hồ sơ thật hoặc thay tháng 10 của owner.
+
 **SOA v23 đã xác minh 06/11:** [bàn giao](docs/handover/DGC_SOA_RUNTIME_20261105.md), [hướng dẫn](docs/DGC_SOA_GUIDE.md). Preview/lưu/hủy PDF nháp đã test; host đọc 53 Invoice và dư ngày chốt 25.328,54 USD, 0 SOA mới. Không tạo/ký tài liệu thật; còn UAT người dùng. Các ghi chú SOA WIP trước đây đã được thay thế.
 
 **Dashboard v22:** [đã bổ sung Phải trả và Tài khoản](docs/handover/DGC_DASHBOARD_CARDS_20261105.md), dữ liệu chưa có hiện Chưa cập nhật. Không bật quỹ/ngân hàng hoặc tạo số dư; SOA đã bổ sung từ v23.

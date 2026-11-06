@@ -31,6 +31,8 @@ Các mẫu này áp dụng phần Finance đã triển khai. Quyền thực tế
 
 ## Tra cứu và bảo toàn lịch sử
 
+Trong **Đối soát đầu vào → Đối soát đã tạo**, hồ sơ chuyển sổ có **Xem số liệu đã chuyển** để đọc và **In số liệu đã chuyển** để xem trước/lưu bản tra cứu PDF. Bản tra cứu giữ số tiền và tỷ giá đã lưu, không phải PDF nguồn; lưu bản in không duyệt hồ sơ hoặc tạo phải trả. Chỉ người có quyền duyệt mới chủ động thực hiện bước duyệt riêng khi có nghiệp vụ thực tế.
+
 **Invoice lịch sử** chứa 37 bản hủy/thay thế, không cộng vào phải thu hiện hành. PDF gốc và cảnh báo sai lệch nguồn được giữ lại; không sửa lịch sử để làm mất cảnh báo. Các bảng hiển thị 10 dòng/trang.
 
 Quỹ, ngân hàng và số dư tiền chưa áp dụng. Không cần tạo tài khoản tiền hoặc số dư đầu kỳ để tiếp tục các luồng trên. Các đường nhập lịch sử/master/evidence và bootstrap/seed đã tắt; không bật lại để bổ sung nghiệp vụ mới.
