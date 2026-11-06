@@ -60,3 +60,5 @@ h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:20px;line-height:1
 
 .dgc-shell aside{padding:14px 10px;scrollbar-width:none}.dgc-shell .sidebar-subtitle{margin-bottom:12px}.dgc-shell .sidebar-nav{scrollbar-gutter:auto;scrollbar-width:none}.dgc-shell aside::-webkit-scrollbar,.dgc-shell .sidebar-nav::-webkit-scrollbar{display:none}.dgc-shell button.nav{padding:7px 11px;margin:1px 0}.dgc-shell .sidebar-footer{padding-top:12px}
 @media(min-width:651px) and (max-height:700px){.dgc-shell button.nav{padding:5px 10px;margin:0}.dgc-shell .sidebar-subtitle{margin-bottom:8px}.dgc-shell .sidebar-footer{padding-top:8px}}
+
+.dgc-shell aside h2{font-size:22px;letter-spacing:-.3px}@media(min-width:651px) and (max-height:700px){.dgc-shell aside h2{font-size:20px}}

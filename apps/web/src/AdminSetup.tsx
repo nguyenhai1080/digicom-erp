@@ -14,9 +14,9 @@ export function AdminSetup({companyCode,appName}:{companyCode:string;appName:str
   finally{for(const name of ['password','confirmPassword','setupToken']){const input=form.elements.namedItem(name);if(input instanceof HTMLInputElement)input.value='';}setBusy(false);}
  }
  return <main className="auth-screen"><section className="auth-card">
-  <div className="brand">{appName}</div><h1>Khởi tạo quản trị DGC</h1>
+  <div className="brand">{appName}</div><h1>Khởi tạo quản trị Digicom</h1>
   {done?<><p role="status">Đã tạo tài khoản quản trị. Anh có thể đăng nhập bằng tài khoản vừa tạo.</p><a href="/">Đến màn hình đăng nhập</a></>:<>
-   <p className="muted">Chỉ dùng cho quản trị đầu tiên, sau khi công ty DGC đã khởi tạo và thiết lập một lần được bật trên host.</p>
+   <p className="muted">Chỉ dùng cho quản trị đầu tiên, sau khi công ty Digicom đã khởi tạo và thiết lập một lần được bật trên host.</p>
    <form method="post" onSubmit={submit} autoComplete="off"><fieldset disabled={busy}>
     <label>Họ và tên<input name="fullName" required minLength={2} maxLength={150} autoComplete="name" /></label>
     <label>Email quản trị<input name="email" type="email" required maxLength={254} autoComplete="username" /></label>

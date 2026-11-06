@@ -1,0 +1,7 @@
+# Tên hiển thị Digicom — 06/11/2026
+
+Owner yêu cầu tiêu đề “Hệ thống quản trị tài chính Digicom” và đổi chữ DGC trên UI thành Digicom. UI v0.6.86 dùng Digicom ERP cho nhãn ứng dụng; tiêu đề tab trình duyệt, mô tả login/sidebar dùng đúng tiêu đề mới. Tên công ty hiển thị trên header là Digicom. Branding DGC được chuẩn hóa ở lớp hiển thị kể cả khi APP_NAME/APP_TITLE trên host còn giá trị cũ, không cần đổi env. GST giữ branding từ cấu hình của GST.
+
+Đổi nhãn cấu hình Invoice, mẫu quyền, setup, các trang chuyển sổ/kho/danh mục và liên kết quay lại. Tên vai trò được trình bày với Digicom; code/value gửi API giữ nguyên. Các thông báo API chung được đổi chữ thương hiệu trước khi hiển thị, không thay nội dung bản ghi hoặc mã có hậu tố như DGC-INV/DGC_MANAGER. Không thay tenant companyCode=DGC, phân quyền, endpoint, sourceKind, provenance, dữ liệu lịch sử, tên file và số Invoice/PDF gốc. Không đổi thương hiệu pháp nhân hoặc profile dùng in chứng từ. Không mở lại chức năng chuyển dữ liệu.
+
+Build TypeScript/Vite và 84 kiểm tra browser GET giả lập đạt: login/browser title/header/sidebar không còn nhãn DGC, cấu hình Invoice Digicom, tương thích cấu hình host cũ, menu gọn năm kích thước, các tab và quyền, mobile và branding GST không bị đổi. Đã xem ảnh login/dashboard. Private artifacts/sidebar-layout-check/digicom-branding*. Không thao tác trên host hoặc dữ liệu thật. Gói codex/dgc-deploy chờ owner triển khai, UI v0.6.86.
