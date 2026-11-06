@@ -8,6 +8,7 @@ import {prisma} from '@erp/db';
 import {buildApp} from '../dist/app.js';
 import {csrfToken,tokenHash} from '../dist/modules/auth/access.js';
 import {inputVndWords} from '../dist/modules/projects/input-recon-statement.js';
+import {inputDigest} from '../dist/modules/projects/input-recon.js';
 if(!new URL(process.env.DATABASE_URL).pathname.startsWith('/erp_execution_acceptance_input_recon_'))throw Error('Requires disposable input reconciliation acceptance DB');
 const storage=await mkdtemp(resolve(tmpdir(),'input-recon-fixture-'));process.env.STORAGE_ROOT=storage;
 const company=await prisma.company.upsert({where:{companyCode:'DGC'},create:{companyCode:'DGC',companyName:'Synthetic DGC',defaultCurrency:'USD'},update:{}}),marker=randomUUID();
@@ -20,7 +21,7 @@ const raw=randomBytes(32).toString('hex'),origin='https://input.example.test',co
 await prisma.authSession.create({data:{companyId:company.id,userId:user.id,tokenHash:tokenHash(raw),expiresAt:new Date(Date.now()+3600000)}});
 const app=await buildApp({auth:config,logger:false});let checks=0;
 const eq=(a,b)=>{assert.deepEqual(a,b);checks++;},request=(method,url,payload,extra={})=>app.inject({method,url,payload,headers:{origin,cookie:'erp_session='+raw,'x-csrf-token':csrfToken(raw,config.secret),...extra}}),post=(url,payload,extra)=>request('POST',url,payload,extra);
-const ok=async(url,payload,status=200)=>{const r=await post(url,payload);eq(r.statusCode,status);if(r.statusCode!==status)throw Error(r.body);return r.json();};
+const ok=async(url,payload,status=200)=>{const r=await post(url,payload);assert.equal(r.statusCode,status,r.body);checks++;return r.json();};
 async function capability(code,enabled){const permissionId=ps.find(p=>p.code===code).id;if(enabled)await prisma.rolePermission.create({data:{roleId:role.id,permissionId}});else await prisma.rolePermission.delete({where:{roleId_permissionId:{roleId:role.id,permissionId}}});}
 const output=await prisma.partner.create({data:{companyId:company.id,partnerCode:'SYN_OUT',partnerKey:'MOVITEL_FIXTURE',legalName:'Synthetic output partner',partnerType:'CUSTOMER',status:'ACTIVE'}}),input=await prisma.partner.create({data:{companyId:company.id,partnerCode:'SYN_IN',partnerKey:'INPUT_FIXTURE',legalName:'Đối tác đầu vào tổng hợp',partnerType:'SUPPLIER',status:'ACTIVE'}});
 async function contracts(service,currency='VND'){
@@ -96,5 +97,42 @@ try{
  for(const path of [url,'/api/v1/payables']){const first=(await request('GET',path+'?period=2026-03&page=1')).json(),second=(await request('GET',path+'?period=2026-03&page=2')).json();eq(first.total,11);eq(first.items.length,10);eq(second.items.length,1);eq(new Set([...first.items,...second.items].map(r=>r.id)).size,11);}
  const sums=(await request('GET','/api/v1/payables?period=2026-03')).json().totalsByCurrency;eq(sums,[{currency:'USD',originalAmount:'396',paidAmount:'0',outstandingAmount:'396'}]);
  if(process.env.FINANCE_PROOF_ROOT){await mkdir(process.env.FINANCE_PROOF_ROOT,{recursive:true});await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-input-recon.pdf'),pdf.rawPayload);}
- console.log('PASS: '+checks+' InputRecon/AP assertions for donor arithmetic, source/contract/FX guards, permissions/tenant, idempotency/races, PDF/rollback/history, approval/AP and no cash posting.');
+ // Captured drafts must print their exact stored values, without a current FX
+ // or source calculation. This fixture intentionally differs from recomputation.
+ const capService=await prisma.service.create({data:{companyId:company.id,serviceCode:'CAPTURED',serviceKey:'CAPTURED',serviceName:'Dịch vụ chuyển sổ',category:'OTHER'}}),capContracts=await contracts(capService),capRevenue=await source(capService,capContracts.out,'2026-05','100.00');
+ const capData={period:'2026-05',sourceRevenueId:capRevenue.id,serviceId:capService.id,outputPartnerId:output.id,outputContractId:capContracts.out.id,inputPartnerId:input.id,inputContractId:capContracts.inp.id,currency:'VND',baseUsd:'100.00',shareRate:'0.4',foreignAmount:'39.99',fxRate:'25000',localAmount:'999751.23',taxRate:'0.05',taxAmount:'123.45',whtAmount:'0',payableAmount:'999627.78'};
+ const capSource={sheetId:70,sourceRow:2,rowHash:'a'.repeat(64)},capSnapshot={sourceKind:'DGC_CAPTURED_BOOK_V1',snapshotHash:'b'.repeat(64),source:capSource,sourceStatus:'Generated',capturedRowJson:'Synthetic captured source only',data:capData},capHash=inputDigest(capSnapshot);
+ const cap=await prisma.inputReconciliation.create({data:{companyId:company.id,inputReconCode:'CAPTURED-ONLY',...capData,sourceDigest:capHash,sourceSnapshot:capSnapshot,status:'GENERATED',createdById:user.id}});
+ const capSelect={period:'2026-05',inputPartnerId:input.id,inputContractId:capContracts.inp.id,reconDate:'2026-06-01',includeApproved:true,sourceMode:'CAPTURED'};
+ const moneySnapshot=async()=>{const r=await prisma.inputReconciliation.findUniqueOrThrow({where:{id:cap.id}});return JSON.stringify({data:Object.fromEntries(Object.keys(capData).map(k=>[k,r[k]?.toFixed?.()??r[k]])),sourceSnapshot:r.sourceSnapshot,sourceDigest:r.sourceDigest});};
+ const preserved=await moneySnapshot(),apBefore=await prisma.accountPayable.count(),filesBefore=await readdir(resolve(storage,'input-recon',company.id)),docsBefore=await prisma.document.count();
+ eq((await request('GET',url+'?period=2026-05')).json().items[0].capturedHistory,true);
+ eq((await request('GET',url+'?period=2026-05')).json().items[0].sourceStatus,'Generated');
+ eq((await post(url+'/'+cap.id+'/refresh',{expectedUpdatedAt:cap.updatedAt.toISOString(),digest:capHash,confirmed:true})).statusCode,409);
+ eq(await moneySnapshot(),preserved);
+ eq((await post(url+'/statement-preview',{...capSelect,sourceMode:'CURRENT'})).statusCode,409);
+ eq((await post(url+'/statement-preview',capSelect)).statusCode,409);
+ await prisma.dgcImportSnapshot.create({data:{companyId:company.id,snapshotHash:capSnapshot.snapshotHash,sourceSpreadsheetId:'SYNTHETIC_ONLY',sourceMetadata:{synthetic:true},rowCount:1}});
+ await prisma.dgcImportRow.create({data:{companyId:company.id,snapshotHash:capSnapshot.snapshotHash,...capSource,sheetName:'Synthetic Input',legacyId:cap.inputReconCode,payload:{synthetic:true}}});
+ const capLinkData={companyId:company.id,sourceSpreadsheetId:'SYNTHETIC_ONLY',snapshotHash:capSnapshot.snapshotHash,...capSource,legacyId:cap.inputReconCode,targetModel:'inputReconciliation',targetId:cap.id,targetHash:'c'.repeat(64)};
+ await prisma.dgcImportLink.create({data:capLinkData});eq((await post(url+'/statement-preview',capSelect)).statusCode,409);
+ await prisma.auditLog.create({data:{companyId:company.id,userId:user.id,action:'DGC_CAPTURED_BOOK_TRANSFER',entityType:'SyntheticFixture',newValue:{synthetic:true}}});
+ // Even after the upstream status changes, the captured statement is a read
+ // of preserved input values, never a new calculation from that source.
+ await prisma.revenue.update({where:{id:capRevenue.id},data:{status:'CANCELLED'}});
+ let capPlan=await ok(url+'/statement-preview',capSelect);eq(capPlan.data.captured,true);eq(capPlan.data.lines.length,1);eq(capPlan.data.lines[0].foreignAmount,'39.99');eq(capPlan.data.lines[0].localAmount,'999751.23');eq(capPlan.data.lines[0].taxAmount,'123.45');eq(capPlan.data.lines[0].whtAmount,'0.00');eq(capPlan.data.lines[0].payableAmount,'999627.78');eq(capPlan.data.totals.payableAmount,'999627.78');
+ await capability('INPUT_RECON_GENERATE',false);eq((await post(url+'/statement-preview',capSelect)).statusCode,403);await capability('INPUT_RECON_GENERATE',true);
+ let capPayload={...capSelect,digest:capPlan.digest,confirmed:true};
+ eq((await post(url+'/statement-create',capPayload,{'x-csrf-token':'bad'})).statusCode,403);
+ const capPdf=await post(url+'/statement-pdf-preview',capPayload);eq(capPdf.statusCode,200);eq((await PDFDocument.load(capPdf.rawPayload)).getPageCount(),1);eq(await moneySnapshot(),preserved);eq(await prisma.accountPayable.count(),apBefore);
+ await prisma.inputReconciliation.update({where:{id:cap.id},data:{baseUsd:'99'}});eq((await post(url+'/statement-pdf-preview',capPayload)).statusCode,409);await prisma.inputReconciliation.update({where:{id:cap.id},data:{baseUsd:capData.baseUsd}});capPlan=await ok(url+'/statement-preview',capSelect);capPayload={...capSelect,digest:capPlan.digest,confirmed:true};
+ await prisma.dgcImportLink.updateMany({where:{companyId:company.id,targetId:cap.id},data:{rowHash:'d'.repeat(64)}});eq((await post(url+'/statement-preview',capSelect)).statusCode,409);await prisma.dgcImportLink.updateMany({where:{companyId:company.id,targetId:cap.id},data:{rowHash:capSource.rowHash}});
+ await prisma.$executeRawUnsafe("CREATE FUNCTION captured_input_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='INPUT_RECON_PDF' AND NEW.new_value->'data'->>'captured'='true' THEN RAISE EXCEPTION 'synthetic failure'; END IF; RETURN NEW; END $$");await prisma.$executeRawUnsafe('CREATE TRIGGER captured_input_failure BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION captured_input_failure()');
+ eq((await post(url+'/statement-create',capPayload)).statusCode,500);eq(await moneySnapshot(),preserved);eq((await readdir(resolve(storage,'input-recon',company.id))).sort(),filesBefore.sort());eq(await prisma.document.count(),docsBefore);
+ await prisma.$executeRawUnsafe('DROP TRIGGER captured_input_failure ON audit_logs');await prisma.$executeRawUnsafe('DROP FUNCTION captured_input_failure()');
+ const capSaved=await ok(url+'/statement-create',capPayload,201);eq(capSaved.version,1);eq(capSaved.filename.startsWith('Captured_Input_Recon_'),true);eq(await moneySnapshot(),preserved);eq(await prisma.accountPayable.count(),apBefore);eq((await prisma.inputReconciliation.findUniqueOrThrow({where:{id:cap.id}})).status,'GENERATED');
+ eq((await request('GET',url+'/'+cap.id+'/pdf')).statusCode,200);eq((await post(url+'/statement-create',capPayload)).statusCode,409);
+ const afterPrint=await prisma.inputReconciliation.findUniqueOrThrow({where:{id:cap.id}});const capApproved=await ok(url+'/'+cap.id+'/approve',{expectedUpdatedAt:afterPrint.updatedAt.toISOString(),confirmed:true});eq(capApproved.created,true);eq(capApproved.payable.originalAmount,'999627.78');eq(await moneySnapshot(),preserved);eq((await ok(url+'/'+cap.id+'/approve',{expectedUpdatedAt:afterPrint.updatedAt.toISOString(),confirmed:true})).created,false);eq(await prisma.cashEntry.count(),0);
+ if(process.env.FINANCE_PROOF_ROOT)await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-captured-input.pdf'),capPdf.rawPayload);
+ console.log('PASS: '+checks+' InputRecon/AP assertions including captured exact-value printing, no historical refresh, provenance, immutable source money, PDF rollback and explicit AP approval without cash.');
 }finally{await app.close();await prisma.$disconnect();}

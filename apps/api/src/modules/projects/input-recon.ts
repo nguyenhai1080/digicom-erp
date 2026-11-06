@@ -17,10 +17,18 @@ export function assertInputSnapshot(r:Prisma.InputReconciliationGetPayload<{}>){
  const s=r.sourceSnapshot as any;
  if(!s?.data||inputDigest(s)!==r.sourceDigest||Object.entries(s.data).some(([k,v])=>String((r as any)[k]?.toFixed?.()??(r as any)[k])!==String(typeof v==='string'&&/^\d+(\.\d+)?$/.test(v)?D(v).toFixed():v)))fail('Số liệu đối soát không khớp snapshot đã lưu.');
 }
+export function isCapturedInput(r:{sourceSnapshot:Prisma.JsonValue}){return (r.sourceSnapshot as any)?.sourceKind==='DGC_CAPTURED_BOOK_V1';}
+export async function assertCapturedInputSource(tx:Prisma.TransactionClient,companyId:string,r:Prisma.InputReconciliationGetPayload<{}>){
+ assertInputSnapshot(r);
+ const snapshot=r.sourceSnapshot as any,s=snapshot?.source;
+ if(!isCapturedInput(r)||r.companyId!==companyId||!s)fail('Không khớp hồ sơ đầu vào đã chuyển.');
+ const link=await tx.dgcImportLink.findFirst({where:{companyId,targetModel:'inputReconciliation',targetId:r.id,snapshotHash:snapshot.snapshotHash,rowHash:s.rowHash,sheetId:s.sheetId,sourceRow:s.sourceRow}});
+ if(!link||!await tx.auditLog.findFirst({where:{companyId,action:'DGC_CAPTURED_BOOK_TRANSFER'}}))fail('Chưa có biên nhận chuyển đối soát đầu vào.');
+}
 const period=z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),digest=z.string().regex(/^[a-f0-9]{64}$/);
 const id=(v:unknown)=>parse(z.object({id:z.uuid()}).strict(),v).id;
 const includes={sourceRevenue:true,inputPartner:true,inputContract:true,outputPartner:true,outputContract:true,service:true,payable:true} as const;
-export const inputReconDto=(r:Prisma.InputReconciliationGetPayload<{include:typeof includes}>)=>({...r,sourceSnapshot:undefined,inputPartnerKey:r.inputPartner.partnerKey,outputPartnerKey:r.outputPartner.partnerKey,serviceKey:r.service.serviceKey,serviceName:r.service.serviceName,inputContractCode:r.inputContract.contractCode,sourceRevenueCode:r.sourceRevenue.revenueCode});
+export const inputReconDto=(r:Prisma.InputReconciliationGetPayload<{include:typeof includes}>)=>({...r,sourceSnapshot:undefined,capturedHistory:isCapturedInput(r),sourceStatus:isCapturedInput(r)?(r.sourceSnapshot as any).sourceStatus:null,inputPartnerKey:r.inputPartner.partnerKey,outputPartnerKey:r.outputPartner.partnerKey,serviceKey:r.service.serviceKey,serviceName:r.service.serviceName,inputContractCode:r.inputContract.contractCode,sourceRevenueCode:r.sourceRevenue.revenueCode});
 export async function requireDgc(tx:Prisma.TransactionClient,companyId:string){if((await tx.company.findUniqueOrThrow({where:{id:companyId}})).companyCode!=='DGC')throw new CommandError(404,'Chức năng đối soát đầu vào dành cho DGC.');}
 
 export async function inputReconPlan(tx:Prisma.TransactionClient,companyId:string,revenueId:string){
@@ -90,7 +98,7 @@ export async function inputReconRoutes(app:FastifyInstance,config:AuthConfig){
  app.get('/api/v1/input-recon',{preHandler:requirePermission('INPUT_RECON_VIEW')},async req=>{const q=parse(z.object({period:period.optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict(),req.query),companyId=req.auth!.companyId;return prisma.$transaction(async tx=>{await requireDgc(tx,companyId);const where={companyId,...(q.period?{period:q.period}:{})};const [rows,total]=await Promise.all([tx.inputReconciliation.findMany({where,include:includes,orderBy:[{period:'desc'},{inputReconCode:'desc'},{id:'asc'}],take:10,skip:(q.page-1)*10}),tx.inputReconciliation.count({where})]);return {items:rows.map(inputReconDto),total,page:q.page,limit:10};});});
  app.post('/api/v1/input-recon/:id/refresh',{onRequest:writeGuard('INPUT_RECON_GENERATE',config)},async req=>{
   const rid=id(req.params),b=parse(z.object({expectedUpdatedAt:timestamp,digest,confirmed:z.literal(true)}).strict(),req.body),user=req.auth!;
-  return prisma.$transaction(async tx=>{const old=await tx.inputReconciliation.findFirst({where:{companyId:user.companyId,id:rid}});if(!old)throw new CommandError(404,'Không tìm thấy đối soát.');await lockInputSource(tx,user.companyId,old.sourceRevenueId);const r=await tx.inputReconciliation.findUniqueOrThrow({where:{id:rid},include:{payable:true}});unchanged(r,b.expectedUpdatedAt);if(!['DRAFT','GENERATED'].includes(r.status)||r.payable)fail('Bản đã duyệt/có AP không được tính lại.');const p=await inputReconPlan(tx,user.companyId,r.sourceRevenueId);if(p.sourceDigest!==b.digest)fail('Nguồn đã thay đổi; cần xem lại.');
+  return prisma.$transaction(async tx=>{const old=await tx.inputReconciliation.findFirst({where:{companyId:user.companyId,id:rid}});if(!old)throw new CommandError(404,'Không tìm thấy đối soát.');if(isCapturedInput(old))fail('Hồ sơ chuyển sổ giữ nguyên số liệu; không tính lại từ nguồn.');await lockInputSource(tx,user.companyId,old.sourceRevenueId);const r=await tx.inputReconciliation.findUniqueOrThrow({where:{id:rid},include:{payable:true}});unchanged(r,b.expectedUpdatedAt);if(!['DRAFT','GENERATED'].includes(r.status)||r.payable)fail('Bản đã duyệt/có AP không được tính lại.');const p=await inputReconPlan(tx,user.companyId,r.sourceRevenueId);if(p.sourceDigest!==b.digest)fail('Nguồn đã thay đổi; cần xem lại.');
    if(r.documentId){await tx.document.update({where:{id:r.documentId},data:{status:'SUPERSEDED'}});await tx.inputReconciliation.updateMany({where:{companyId:user.companyId,documentId:r.documentId,status:'GENERATED'},data:{documentId:null,status:'DRAFT'}});}
    const item=await tx.inputReconciliation.update({where:{id:rid},data:{...p.data,status:'DRAFT',documentId:null,sourceDigest:p.sourceDigest,sourceSnapshot:JSON.parse(JSON.stringify(p.snapshot))}});await audit(tx,user,'INPUT_RECON_REFRESH','InputReconciliation',rid,r,item,'Explicit draft recalculation after source review');return {item};
   },{timeout:30000});
@@ -101,10 +109,7 @@ export async function inputReconRoutes(app:FastifyInstance,config:AuthConfig){
    assertInputSnapshot(r);
    if(r.status==='APPROVED'){if(!r.payable||!r.payable.originalAmount.eq(r.payableAmount)||r.payable.currency!==r.currency||!r.payable.outstandingAmount.eq(r.payable.originalAmount.minus(r.payable.paidAmount)))fail('AP không khớp bản đã duyệt; cần đối chiếu.');return {item:r,payable:r.payable,created:false};}
    unchanged(r,b.expectedUpdatedAt);if(!['DRAFT','GENERATED'].includes(r.status)||r.payable)fail('Trạng thái đối soát không cho phép duyệt.');
-   if((r.sourceSnapshot as any)?.sourceKind==='DGC_CAPTURED_BOOK_V1'){
-    const s=(r.sourceSnapshot as any).source,link=await tx.dgcImportLink.findFirst({where:{companyId:user.companyId,targetModel:'inputReconciliation',targetId:r.id,rowHash:s.rowHash,sheetId:s.sheetId,sourceRow:s.sourceRow}});
-    if(!link||!await tx.auditLog.findFirst({where:{companyId:user.companyId,action:'DGC_CAPTURED_BOOK_TRANSFER'}}))fail('Chưa có biên nhận chuyển đối soát đầu vào.');
-   }else{const p=await inputReconPlan(tx,user.companyId,r.sourceRevenueId);if(p.sourceDigest!==r.sourceDigest)fail('Nguồn hoặc số liệu nháp đã thay đổi. Cần xem lại/cập nhật trước khi duyệt.');}
+   if(isCapturedInput(r)){await assertCapturedInputSource(tx,user.companyId,r);}else{const p=await inputReconPlan(tx,user.companyId,r.sourceRevenueId);if(p.sourceDigest!==r.sourceDigest)fail('Nguồn hoặc số liệu nháp đã thay đổi. Cần xem lại/cập nhật trước khi duyệt.');}
    const payable=await tx.accountPayable.create({data:{companyId:user.companyId,inputReconId:r.id,currency:r.currency,originalAmount:r.payableAmount,outstandingAmount:r.payableAmount}});
    const item=await tx.inputReconciliation.update({where:{id:r.id},data:{status:'APPROVED',approvedById:user.userId,approvedAt:new Date()}});await audit(tx,user,'INPUT_RECON_APPROVE','InputReconciliation',r.id,r,{item,payable});return {item,payable,created:true};
   },{timeout:30000});
