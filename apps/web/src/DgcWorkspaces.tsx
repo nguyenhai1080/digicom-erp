@@ -1,3 +1,4 @@
+import {DgcInvoiceSettings} from './DgcInvoiceSettings';
 import {StatementsOfAccount} from './StatementsOfAccount';
 import {SoaCutoffReview} from './SoaCutoffReview';
 import React,{useId,useState} from 'react';
@@ -41,5 +42,11 @@ export function DgcInvoices(props:Props){
  return <WorkspaceTabs label="Quản lý Invoice" tabs={tabs}/>;
 }
 export function DgcSettings(props:Props){
- return <>{props.permissions.includes('REVENUE_VIEW')&&<ReportingRates {...props} onSaved={()=>props.onRatesSaved?.()}/ >}{props.permissions.includes('SYSTEM_CONFIG_EDIT')&&<CompanyAssets csrf={props.csrf} request={props.request}/>}</>;
+ const tabs:Tab[]=[];
+ if(props.permissions.includes('REVENUE_VIEW'))tabs.push({id:'rates',label:'Tỷ giá báo cáo',content:<ReportingRates {...props} onSaved={()=>props.onRatesSaved?.()}/>});
+ if(props.permissions.includes('SYSTEM_CONFIG_EDIT')){
+  tabs.push({id:'profile',label:'Cấu hình Invoice',content:<DgcInvoiceSettings csrf={props.csrf} request={props.request}/>});
+  tabs.push({id:'assets',label:'Tài sản và chữ ký',content:<CompanyAssets csrf={props.csrf} request={props.request} includeInvoiceSettings={false}/>});
+ }
+ return <WorkspaceTabs label="Cấu hình chung" tabs={tabs}/>;
 }

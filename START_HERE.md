@@ -1,3 +1,5 @@
+**06/11 — UI v0.6.84:** Cấu hình chung chia ba tab Tỷ giá báo cáo / Cấu hình Invoice / Tài sản và chữ ký; 44 kiểm tra browser giả lập đạt, chờ owner triển khai. [Bàn giao](docs/handover/DGC_GROUPED_MENUS_20261106.md).
+
 **06/11 — UI v0.6.83:** menu Quản lý đối soát → Quản lý Doanh thu → Quản lý Invoice → Quản lý Công nợ; SOA là tab thứ tư của Invoice. [Bàn giao](docs/handover/DGC_GROUPED_MENUS_20261106.md). 36 kiểm tra browser giả lập đạt, chờ owner triển khai.
 
 **06/11 — gộp menu theo nhóm tab:** [bàn giao UI v0.6.82](docs/handover/DGC_GROUPED_MENUS_20261106.md). Đối soát ba tab, Công nợ hai tab, Invoice ba tab; tỷ giá ở Cấu hình chung. 31 kiểm tra browser giả lập đạt, chờ owner triển khai; thay bố cục inline v0.6.80.

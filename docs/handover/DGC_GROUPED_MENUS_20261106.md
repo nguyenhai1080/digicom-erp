@@ -20,3 +20,9 @@ Kiểm tra TypeScript/Vite build và 31 kiểm tra browser trên bản build th�
 Owner đổi tên menu thành **Quản lý đối soát**, sắp thứ tự **Quản lý đối soát → Quản lý Doanh thu → Quản lý Invoice → Quản lý Công nợ**. Bỏ SOA khỏi sidebar và thêm **Statement of Account** làm tab thứ tư trong Quản lý Invoice, dùng nguyên component SOA và phần đối chiếu khoản thu theo ngày chốt. Chỉ hiện khi đủ AR_VIEW + INVOICE_VIEW + INVOICE_PAYMENT_VIEW; quyền tạo SOA vẫn do INVOICE_CREATE kiểm riêng. Tab chưa chọn không tải SOA, không phát sinh quyền hoặc giao dịch thật.
 
 Build TypeScript/Vite và 36 kiểm tra browser với phản hồi GET giả lập đạt: tên/thứ tự menu, bốn tab Invoice, mở SOA, thiếu quyền không thấy/gọi SOA, các nhóm tab trước, mobile và GST. Private artifacts/sidebar-layout-check/invoice-soa-tabs*. Chuẩn bị nhánh triển khai; chưa xác nhận host đã lên v0.6.83.
+
+## Cấu hình chung theo tab — UI v0.6.84
+
+Owner yêu cầu tách chức năng Cấu hình chung. Ba tab: **Tỷ giá báo cáo**, **Cấu hình Invoice**, **Tài sản và chữ ký**. Tỷ giá vẫn cần REVENUE_VIEW; hai tab còn lại cần SYSTEM_CONFIG_EDIT. Chỉ tải chức năng khi tab được chọn. CompanyAssets có tùy chọn ẩn cấu hình Invoice nhúng để không lặp lại biểu mẫu trong tab tài sản; mặc định cũ giữ nguyên cho nơi khác/GST. Ghép ảnh và quản lý phiên bản vẫn ở tab tài sản, không upload hoặc thay ảnh thật.
+
+Build TypeScript/Vite và 44 kiểm tra browser GET giả lập đạt: ba tab, tải riêng profile/assets, không lặp form, tài khoản chỉ xem tỷ giá hoặc chỉ quản trị, hồi quy nhóm menu/SOA, mobile/GST. Private artifacts/sidebar-layout-check/settings-tabs*. Gói triển khai v0.6.84 chuẩn bị trên codex/dgc-deploy, chờ owner triển khai; không đổi API/schema/env/role hoặc dữ liệu host.
