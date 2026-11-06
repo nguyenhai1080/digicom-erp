@@ -1,4 +1,4 @@
-# Roadmap DGC ERP hiện tại — 06/11/2026
+# Roadmap DGC ERP hiện tại — 07/11/2026
 
 ## Đã hoàn tất trên host
 
@@ -8,6 +8,8 @@
 - Tháng 10/2026 cũ đã lưu lịch sử; owner tự nhập lại đối soát và lập Invoice để thử nghiệp vụ. Không nhập, ký hoặc phát hành thay owner.
 
 ## Đang làm và thứ tự tiếp theo
+
+**Dashboard v0.6.92 đã xây, chờ owner triển khai:** [kinh doanh + điều hành](handover/DGC_DASHBOARD_BUSINESS_20261107.md). Doanh thu/tăng trưởng theo kỳ, AR theo sổ hiện tại, Tài khoản chờ thiết lập, Phải trả và doanh thu lịch sử được giữ; không đổi dữ liệu/cash.
 
 1. **Ưu tiên phát sinh: tên miền erp.digicomjsc.com.** Đã cập nhật APP_URL trên đúng Digicom-Erp, v21 online; origin chính thức qua guard, origin lạ/thiếu Origin vẫn 403. [Bàn giao tên miền](handover/DGC_OFFICIAL_DOMAIN_20261105.md).
 2. **SOA vận hành.** Đã triển khai v23: preview/PDF/lưu nháp, phân trang, ba ảnh ký trang cuối và hủy nháp bảo toàn PDF; đăng ký toàn bộ liên kết Invoice cùng transaction. Windows/Linux 131 + hồi quy 64 đạt; đường đọc host đã kiểm ngày 06/11. Xem [bàn giao SOA](handover/DGC_SOA_RUNTIME_20261105.md). Chưa phát hành SOA thật hoặc thay sổ host. Khoản thu chỉ tính đến hết ngày chốt theo quyết định owner.
