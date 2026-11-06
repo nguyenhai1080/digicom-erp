@@ -1,3 +1,5 @@
+**06/11 — sửa menu tràn màn hình:** [bàn giao](docs/handover/DGC_SIDEBAR_SCROLL_20261106.md). UI v0.6.81 có cuộn menu riêng, gồm cả tạo Invoice liền sau đối soát; đã kiểm bốn kích thước, chờ owner triển khai.
+
 **06/11 — giao diện tạo Invoice liền sau đối soát:** [bàn giao](docs/handover/DGC_INLINE_INVOICE_20261106.md). UI v0.6.80 đã chuẩn bị, chưa triển khai host; giữ nguyên bước xem PDF/xác nhận và quyền.
 
 # Bắt đầu làm việc với DGC Finance
