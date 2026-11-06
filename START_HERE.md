@@ -1,3 +1,5 @@
+**06/11 — giao diện tạo Invoice liền sau đối soát:** [bàn giao](docs/handover/DGC_INLINE_INVOICE_20261106.md). UI v0.6.80 đã chuẩn bị, chưa triển khai host; giữ nguyên bước xem PDF/xác nhận và quyền.
+
 # Bắt đầu làm việc với DGC Finance
 
 **Đã lấy tỷ giá GST vào DGC 06/11 lúc 13:36:** [biên nhận và kiểm thật](docs/handover/DGC_GST_FX_APPLIED_20261106.md). Đã thêm 96 kỳ, tổng 97, giữ nguyên toàn bộ bản 01/2026; từng rate/source đọc lại khớp, GST không đổi. Dashboard có VND, USD/AR giữ nguyên. Không nhập lại. GST chưa có 10/2026, kế toán nhập riêng. Backup trước 13:29 và sau 13:36 đều thành công, đã tải và khôi phục riêng trên localhost; 730 kiểm tra xác nhận tài chính/chứng từ/nguồn cũ không đổi. Chênh lệch gồm đúng 96 cấu hình FX, nhật ký tương ứng và một lượt đăng nhập đồng thời. Không mở importer hoặc redeploy; đọc bàn giao mới trước khi tiếp tục.
