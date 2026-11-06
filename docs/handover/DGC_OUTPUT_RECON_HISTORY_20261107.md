@@ -13,3 +13,7 @@ Lưu ý snapshot: envelope đối soát base có preparation hash; khi documentS
 Kiểm tra: API + web build đạt; 47 assertions trên DB giả lập mới, gồm dòng base thiếu snapshot riêng, pagination/filter/search/archive, permission/tenant, PDF bytes/tamper, privacy và fingerprint cả 63 bảng không đổi sau đọc. 94 kiểm tra browser phản hồi giả lập chỉ GET đạt, gồm 10 dòng, phân trang, tìm/period, archive toggle, PDF thiếu, tab/permission/mobile/GST. Đã xem ảnh trang lịch sử; private artifacts/sidebar-layout-check/recon-history*. Test có lệnh test:output-recon-history trong apps/api/package.json.
 
 Không đổi schema/env/quyền/tiền/trạng thái/file nguồn; không duyệt, phát hành, nhập lại hoặc thao tác host. Bộ Dashboard kết hợp vẫn là bản phác thảo riêng, chưa triển khai. Đã chuẩn bị nhánh codex/dgc-deploy, owner triển khai lại và Ctrl+F5, chưa xác nhận host lên v0.6.89.
+
+## Điều chỉnh thứ tự — UI v0.6.90
+
+Theo yêu cầu owner: đổi “PDF nhận trên hệ thống mới” thành **Danh sách đối soát** và đặt toàn bộ bảng/phân trang mới lên trước **Đối soát đã chuyển từ hệ thống cũ**. Bộ lọc kỳ/tìm kiếm vẫn dùng chung; thông báo trống trỏ xuống danh sách đã chuyển ở phía dưới. Không đổi API/quyền hoặc dữ liệu. Build web đạt; kiểm browser xác nhận thứ tự heading và hồi quy luồng tra cứu. Chờ owner triển khai UI v0.6.90, API vẫn v0.6.89.
