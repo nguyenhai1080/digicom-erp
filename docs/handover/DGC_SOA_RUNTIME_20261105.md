@@ -27,3 +27,13 @@ Migration mới thêm statements_of_account; FK composite company/partner và co
 - PDF giả lập render bằng Poppler, đã xem trang đầu/cuối; sửa khoảng logo để tránh chạm thông tin pháp nhân. Chưa coi đây là nghiệm thu của nhân viên thực tế.
 
 Proof riêng dưới ignored artifacts/dgc-migration/20261105/soa; không đóng gói PDF/ảnh nguồn hoặc dữ liệu giả lập vào release. Linux/backup/deploy/kiểm host được ghi sau khi thực hiện, không suy từ build local.
+
+## Đã triển khai và xác minh trên host
+
+Source 18f3c1799a38efa6f6b8e9de33ce7f848a0deb32, release một website f2dc25b5723c79e05e705647406b1b2fb21abdc9 (144 file, không donor records/secrets), v23 trực tuyến ngày 05/11. Linux Node22/0,3 CPU/512 MB RAM/192 MB heap đạt 131 checks; toàn bộ migration áp dụng thành công trên DB trial. DB host backup trước lúc 13:39 và sau lúc 13:47 đều Thành công, 2,4 MB; chưa restore thử hai bản này, không tuyên bố đã làm.
+
+Public health trên erp.digicomjsc.com trả 200/database connected, endpoint SOA không có phiên trả 401. UI asset khớp byte bản đã test: SHA256 71e554d900ef662faa5c09931bf713b7361a0a46ff9e2fb808112b64adb25fdc. Bộ nhập/bootstrap/seed/cash không được mở lại.
+
+Ngày 06/11 đã xác minh qua phiên owner trên tên miền chính thức: menu/form Statement of Account, Movitel, USD/VND, includePaid, chỉnh vị trí và danh sách 0 SOA mới đọc được. GET đối chiếu chốt 05/11/2026 đọc 53 Invoice/6 trang, tổng phải thu ban đầu 742.959,02 USD, thu đến chốt 717.630,48 USD, còn 25.328,54 USD. Đây là kiểm đường đọc và tổng đã ghi nhận, không thẩm định lại tính hợp lệ sổ cũ. Không tạo, ký, hủy hoặc phát hành SOA/Invoice thật. Nghiệm thu tạo tài liệu của người dùng thực tế vẫn để người dùng thực hiện.
+
+Proof private: artifacts/dgc-migration/20261105/soa (Linux, backup, release/public checks), artifacts/dgc-migration/20261106/soa/host-read.txt và host-read.png. Các ghi chú WIP trong tài liệu cũ đã được thay thế bởi mốc này.

@@ -1,8 +1,10 @@
 # Bắt đầu làm việc với DGC Finance
 
-**Dashboard v22:** [đã bổ sung Phải trả và Tài khoản](docs/handover/DGC_DASHBOARD_CARDS_20261105.md), dữ liệu chưa có hiện Chưa cập nhật. Không bật quỹ/ngân hàng hoặc tạo số dư; SOA WIP vẫn ngoài release.
+**SOA v23 đã xác minh 06/11:** [bàn giao](docs/handover/DGC_SOA_RUNTIME_20261105.md), [hướng dẫn](docs/DGC_SOA_GUIDE.md). Preview/lưu/hủy PDF nháp đã test; host đọc 53 Invoice và dư ngày chốt 25.328,54 USD, 0 SOA mới. Không tạo/ký tài liệu thật; còn UAT người dùng. Các ghi chú SOA WIP trước đây đã được thay thế.
 
-**Tên miền chính thức:** [erp.digicomjsc.com](https://erp.digicomjsc.com/) — APP_URL đã đổi, v21 online và origin guard đã kiểm. Xem [bàn giao tên miền](docs/handover/DGC_OFFICIAL_DOMAIN_20261105.md) và [roadmap hiện tại](docs/DGC_ROADMAP.md). SOA mới đang làm ở working tree, chưa deploy; không lẫn với các bản ổn định đã chạy.
+**Dashboard v22:** [đã bổ sung Phải trả và Tài khoản](docs/handover/DGC_DASHBOARD_CARDS_20261105.md), dữ liệu chưa có hiện Chưa cập nhật. Không bật quỹ/ngân hàng hoặc tạo số dư; SOA đã bổ sung từ v23.
+
+**Tên miền chính thức:** [erp.digicomjsc.com](https://erp.digicomjsc.com/) — APP_URL đã đổi, v21 online và origin guard đã kiểm. Xem [bàn giao tên miền](docs/handover/DGC_OFFICIAL_DOMAIN_20261105.md) và [roadmap hiện tại](docs/DGC_ROADMAP.md). SOA đã triển khai riêng ở v23; xem bàn giao mới ở trên.
 
 **Ảnh ký đối soát đã chỉnh 05/11:** [bố cục theo mẫu owner](docs/handover/DGC_SIGNING_LAYOUT_20261105.md), v20 online và SIGNING_COMPOSITE v3 đang dùng. Chữ ký qua giữa dấu, chức danh/họ tên đã nâng gần sát mép dưới dấu theo yêu cầu mới; ảnh gốc và chứng từ cũ giữ nguyên. Không tự restamp đối soát của owner.
 
@@ -161,6 +163,7 @@ Mục tiêu là đưa DGC Finance lên Vibehost ở tài khoản cũ, tên miề
 > Đọc START_HERE.md và docs/handover/HANDOVER.md. Phân biệt code ERP Core dự kiến dùng cho DGC với Apps Script hiện hành. Kiểm tra nhánh feature/dgc-finance tại D:/Projects/DGC-FINANCE-WEB, so sánh với nền GST ổn định và đọc baseline nghiệp vụ DGC. Chuẩn bị code và repository DGC riêng trong project này; trước khi triển khai phải có kế hoạch môi trường DGC độc lập và rà soát tính năng còn thiếu. Chuyển dữ liệu phải thử trên staging, giữ nguồn gốc và đối soát trước khi đưa vào sử dụng.
 
 Các việc tạo repository, giải phóng host cũ, triển khai DGC và nhập dữ liệu chưa hoàn tất. Tài liệu bàn giao không thay thế bước kiểm tra này. Không đưa `.env`, token, bản sao dữ liệu thật hoặc kho PDF lên Git.
+
 
 
 
