@@ -1,6 +1,6 @@
 # Bắt đầu làm việc với DGC Finance
 
-**Nghiên cứu lấy tỷ giá GST 06/11:** [phương án và kiểm thử](docs/handover/DGC_GST_FX_RESEARCH_20261106.md). GST có 97 kỳ 09/2018–09/2026; chuẩn bị thêm 96 kỳ vào DGC, giữ kỳ 01/2026 đã có/xung đột. GST chưa có 10/2026. Planner 22 + API bản sao 309 checks đạt, tiền/chứng từ cũ không đổi. Chưa nhập FX vào host; không mở importer hoặc redeploy. Khi tiếp tục đọc lại hai bảng trước khi áp dụng; FX còn được dùng cho đối soát đầu vào mới bằng VND.
+**Đã lấy tỷ giá GST vào DGC 06/11 lúc 13:36:** [biên nhận và kiểm thật](docs/handover/DGC_GST_FX_APPLIED_20261106.md). Đã thêm 96 kỳ, tổng 97, giữ nguyên toàn bộ bản 01/2026; từng rate/source đọc lại khớp, GST không đổi. Dashboard có VND, USD/AR giữ nguyên. Không nhập lại. GST chưa có 10/2026, kế toán nhập riêng. Backup trước 13:29 thành công; backup sau 13:36 còn Đang chờ/0 B, chưa so hash hai DB thật. Không mở importer hoặc redeploy; đọc bàn giao mới trước khi tiếp tục.
 
 **Khôi phục sau chuyển đã diễn tập 06/11:** [biên bản](docs/handover/DGC_BACKUP_RESTORE_20261106.md), [hướng dẫn](docs/DGC_BACKUP_RECOVERY_GUIDE.md). DB/kho đã restore riêng, 460 Attachment khớp hash, 3.207 trường tiền khớp gói chuyển; runtime Linux v24 đọc được. Có cảnh báo 26 payload appendix lệch chữ số cuối metadata thời gian; giữ DB nguyên trạng và nguồn gốc riêng, verifier exit 2, không tuyên bố sạch mọi hash. Không sửa host/import lại hoặc cản owner tự nhập tháng 10. Lượt này không cần redeploy.
 

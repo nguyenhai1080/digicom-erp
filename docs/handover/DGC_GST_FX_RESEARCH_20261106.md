@@ -1,5 +1,7 @@
 # Lấy tỷ giá USD/VND từ ERP GST — nghiên cứu 06/11/2026
 
+**Cập nhật:** [đã thêm 96 kỳ lên DGC thật lúc 13:36](DGC_GST_FX_APPLIED_20261106.md) sau owner đồng ý. Trạng thái “chưa nhập” bên dưới là mốc nghiên cứu trước áp dụng; không nhập lại.
+
 ## Đã kiểm nguồn thật
 
 Owner yêu cầu nghiên cứu nhập tỷ giá USD/VND từ ERP GST sang DGC, sau đó tự đăng nhập GST trong trình duyệt ChatGPT. Đã đọc bảng **Cấu hình chung → Bảng tỷ giá chung VND / USD** và JSON hiển thị tại `https://erp.gsttech.vn/api/v1/revenue-fx`. Chỉ GET, không sửa GST, không lấy tỷ giá thực thu từ receipt hoặc dữ liệu quỹ/ngân hàng.
