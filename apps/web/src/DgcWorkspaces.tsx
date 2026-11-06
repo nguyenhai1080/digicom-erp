@@ -1,3 +1,5 @@
+import {StatementsOfAccount} from './StatementsOfAccount';
+import {SoaCutoffReview} from './SoaCutoffReview';
 import React,{useId,useState} from 'react';
 import {OutputRecon} from './OutputRecon';
 import {InputRecon} from './InputRecon';
@@ -20,7 +22,7 @@ export function DgcReconciliation(props:Props){
  if(has('RECON_VIEW'))tabs.push({id:'output',label:'Đối soát đầu ra',content:<OutputRecon {...props}/>});
  if(has('INVOICE_VIEW')&&has('INVOICE_CREATE'))tabs.push({id:'create',label:'Tạo Invoice',content:<Invoices {...props} creationOnly/>});
  if(has('INPUT_RECON_VIEW'))tabs.push({id:'input',label:'Đối soát đầu vào',content:<InputRecon {...props}/>});
- return <WorkspaceTabs label="Đối soát" tabs={tabs}/>;
+ return <WorkspaceTabs label="Quản lý đối soát" tabs={tabs}/>;
 }
 export function DgcDebt(props:Props){
  const has=(p:string)=>props.permissions.includes(p),tabs:Tab[]=[];
@@ -30,11 +32,13 @@ export function DgcDebt(props:Props){
 }
 export function DgcInvoices(props:Props){
  if(!props.permissions.includes('INVOICE_VIEW'))return null;
- return <WorkspaceTabs label="Quản lý Invoice" tabs={[
+ const tabs:Tab[]=[
   {id:'issued',label:'Invoice đã phát hành',content:<Invoices {...props} listOnly hideNavigation initialTab="issued"/>},
   {id:'unissued',label:'Invoice chưa phát hành',content:<Invoices {...props} listOnly hideNavigation initialTab="unissued"/>},
   {id:'history',label:'Invoice lịch sử',content:<><p><a href="/operations/restart-october">Hồ sơ tháng 10/2026 trước khi nhập lại</a></p><InvoiceHistory request={props.request}/></>}
- ]}/>;
+ ];
+ if(['AR_VIEW','INVOICE_VIEW','INVOICE_PAYMENT_VIEW'].every(p=>props.permissions.includes(p)))tabs.push({id:'soa',label:'Statement of Account',content:<><StatementsOfAccount {...props}/><details><summary>Đối chiếu chi tiết khoản thu theo ngày chốt</summary><SoaCutoffReview request={props.request}/></details></>});
+ return <WorkspaceTabs label="Quản lý Invoice" tabs={tabs}/>;
 }
 export function DgcSettings(props:Props){
  return <>{props.permissions.includes('REVENUE_VIEW')&&<ReportingRates {...props} onSaved={()=>props.onRatesSaved?.()}/ >}{props.permissions.includes('SYSTEM_CONFIG_EDIT')&&<CompanyAssets csrf={props.csrf} request={props.request}/>}</>;

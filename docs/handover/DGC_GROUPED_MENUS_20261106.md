@@ -14,3 +14,9 @@ Tab chỉ hiện khi đủ quyền hiện có. Nhóm mở được nếu có ít
 Kiểm tra TypeScript/Vite build và 31 kiểm tra browser trên bản build thật với API giả lập chỉ GET: nhóm/tab đúng thứ tự, danh sách Invoice tải đúng publication, không có form tạo trong tab chưa phát hành, mở lịch sử, tỷ giá trong cấu hình, phân quyền từng nhóm, chặn gọi API tab không có quyền, bàn phím, mobile không tràn ngang và GST giữ bố cục cũ. Đã xem ảnh desktop/mobile. Bằng chứng private artifacts/sidebar-layout-check/grouped-tabs*. Không chạy nghiệp vụ thật hoặc ghi host; không đổi backend, schema, env hay quyền tài khoản.
 
 Đã chuẩn bị nhánh triển khai codex/dgc-deploy; owner triển khai lại và Ctrl+F5 để kiểm tra trên host. Chưa tuyên bố host đã lên v0.6.82 hoặc nghiệm thu tài chính.
+
+## Cập nhật tiếp theo — UI v0.6.83
+
+Owner đổi tên menu thành **Quản lý đối soát**, sắp thứ tự **Quản lý đối soát → Quản lý Doanh thu → Quản lý Invoice → Quản lý Công nợ**. Bỏ SOA khỏi sidebar và thêm **Statement of Account** làm tab thứ tư trong Quản lý Invoice, dùng nguyên component SOA và phần đối chiếu khoản thu theo ngày chốt. Chỉ hiện khi đủ AR_VIEW + INVOICE_VIEW + INVOICE_PAYMENT_VIEW; quyền tạo SOA vẫn do INVOICE_CREATE kiểm riêng. Tab chưa chọn không tải SOA, không phát sinh quyền hoặc giao dịch thật.
+
+Build TypeScript/Vite và 36 kiểm tra browser với phản hồi GET giả lập đạt: tên/thứ tự menu, bốn tab Invoice, mở SOA, thiếu quyền không thấy/gọi SOA, các nhóm tab trước, mobile và GST. Private artifacts/sidebar-layout-check/invoice-soa-tabs*. Chuẩn bị nhánh triển khai; chưa xác nhận host đã lên v0.6.83.
