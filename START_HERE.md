@@ -1,3 +1,5 @@
+**06/11 — UI v0.6.85:** bỏ tiêu đề QUẢN LÝ và thanh cuộn menu, thu gọn khoảng cách; đủ 11 mục không cần cuộn ở năm kích thước desktop đã kiểm. 74 checks browser giả lập đạt, chờ owner triển khai. [Bàn giao](docs/handover/DGC_GROUPED_MENUS_20261106.md).
+
 **06/11 — UI v0.6.84:** Cấu hình chung chia ba tab Tỷ giá báo cáo / Cấu hình Invoice / Tài sản và chữ ký; 44 kiểm tra browser giả lập đạt, chờ owner triển khai. [Bàn giao](docs/handover/DGC_GROUPED_MENUS_20261106.md).
 
 **06/11 — UI v0.6.83:** menu Quản lý đối soát → Quản lý Doanh thu → Quản lý Invoice → Quản lý Công nợ; SOA là tab thứ tư của Invoice. [Bàn giao](docs/handover/DGC_GROUPED_MENUS_20261106.md). 36 kiểm tra browser giả lập đạt, chờ owner triển khai.

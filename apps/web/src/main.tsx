@@ -28,7 +28,7 @@ import {OctoberRestart} from './OctoberRestart';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.84';
+const version = '0.6.85';
 async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin',
@@ -97,7 +97,7 @@ function App() {
   if(session.user.companyCode==='DGC'&&session.user.permissions.includes('INVOICE_VIEW')&&window.location.pathname==='/operations/restart-october')return <OctoberRestart request={api} csrf={session.csrfToken}/>;
   const isDgc=session.user.companyCode==='DGC',has=(p:string)=>session.user.permissions.includes(p);
   const workspaceProps={permissions:session.user.permissions,csrf:session.csrfToken,request:api,ratesVersion:reconFxVersion};
-  return <div className="shell"><aside><h2>{branding.appName}</h2><p className="sidebar-subtitle">Hệ thống quản lý công việc và tài chính<br/>{session.user.companyCode}</p><div className="nav-title">QUẢN LÝ</div><nav className="sidebar-nav" aria-label="Quản lý ERP">
+  return <div className={'shell'+(isDgc?' dgc-shell':'')}><aside><h2>{branding.appName}</h2><p className="sidebar-subtitle">Hệ thống quản lý công việc và tài chính<br/>{session.user.companyCode}</p>{!isDgc&&<div className="nav-title">QUẢN LÝ</div>}<nav className="sidebar-nav" aria-label="Quản lý ERP">
     <button className={'nav ' + (page === 'dashboard' ? 'active' : '')} aria-current={page==='dashboard'?'page':undefined} onClick={() => { setPage('dashboard'); setMessage(''); }}>Dashboard</button>
     {session.user.permissions.includes('PROJECT_VIEW') && <button className={'nav ' + (page === 'projects' ? 'active' : '')} aria-current={page==='projects'?'page':undefined} onClick={() => setPage('projects')}>Quản lý Dự án</button>}
     {session.user.permissions.includes('SERVICE_VIEW') && <button className={'nav ' + (page === 'services' ? 'active' : '')} aria-current={page==='services'?'page':undefined} onClick={() => setPage('services')}>Quản lý Dịch vụ</button>}

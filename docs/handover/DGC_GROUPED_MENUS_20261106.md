@@ -26,3 +26,9 @@ Build TypeScript/Vite và 36 kiểm tra browser với phản hồi GET giả l�
 Owner yêu cầu tách chức năng Cấu hình chung. Ba tab: **Tỷ giá báo cáo**, **Cấu hình Invoice**, **Tài sản và chữ ký**. Tỷ giá vẫn cần REVENUE_VIEW; hai tab còn lại cần SYSTEM_CONFIG_EDIT. Chỉ tải chức năng khi tab được chọn. CompanyAssets có tùy chọn ẩn cấu hình Invoice nhúng để không lặp lại biểu mẫu trong tab tài sản; mặc định cũ giữ nguyên cho nơi khác/GST. Ghép ảnh và quản lý phiên bản vẫn ở tab tài sản, không upload hoặc thay ảnh thật.
 
 Build TypeScript/Vite và 44 kiểm tra browser GET giả lập đạt: ba tab, tải riêng profile/assets, không lặp form, tài khoản chỉ xem tỷ giá hoặc chỉ quản trị, hồi quy nhóm menu/SOA, mobile/GST. Private artifacts/sidebar-layout-check/settings-tabs*. Gói triển khai v0.6.84 chuẩn bị trên codex/dgc-deploy, chờ owner triển khai; không đổi API/schema/env/role hoặc dữ liệu host.
+
+## Menu gọn, bỏ tiêu đề và thanh cuộn — UI v0.6.85
+
+Owner yêu cầu bỏ chữ QUẢN LÝ phía trên Dashboard và giảm cuộn menu. DGC bỏ dòng tiêu đề đó, giảm padding/khoảng cách của mục menu và phần đầu/cuối; màn cao dưới 700px dùng khoảng cách gọn hơn. Ẩn thanh cuộn của nav/sidebar, bỏ khoảng trống dành cho scrollbar. Vẫn giữ cuộn/focus dự phòng nếu viewport quá thấp, để không cắt mất chức năng. Thay đổi chỉ scope .dgc-shell, GST giữ kiểu cũ.
+
+TypeScript/Vite build và 74 kiểm tra browser GET giả lập đạt. Toàn bộ 11 mục menu vừa vùng nav, không cần cuộn tại 1366×768, 1280×720, 960×540, 900×600 và 720×480; không còn nav-title, thanh cuộn ẩn, mục cuối nằm trong viewport. Hồi quy tab/permission/mobile/GST đạt, đã xem ảnh 960×540. Private artifacts/sidebar-layout-check/compact-menu*. Gói v0.6.85 chờ owner triển khai, không thay dữ liệu/quyền/API.
