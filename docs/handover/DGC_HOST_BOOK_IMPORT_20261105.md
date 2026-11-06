@@ -1,5 +1,7 @@
 # Sổ DGC đã nhập chính thức — 05/11/2026
 
+**Cập nhật 06/11:** [đã diễn tập khôi phục DB/kho sau chuyển trên localhost](DGC_BACKUP_RESTORE_20261106.md), kèm cảnh báo metadata nguồn riêng. Ghi chú “chưa restore” bên dưới mô tả thời điểm 05/11, không phải trạng thái hiện tại.
+
 Đường nhập nguyên trạng đã commit trên website Digicom-Erp, DB riêng `dgc_erp_db`. Đây là lần nhập vận hành thật, không phải rollback trial. Không chạy lại bộ nhập hoặc quay lại các vòng thẩm định tính hợp lệ lịch sử.
 
 ## Phạm vi đã chuyển

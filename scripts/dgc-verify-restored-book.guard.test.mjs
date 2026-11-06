@@ -1,0 +1,3 @@
+import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';
+for(const value of ['postgresql://fixture:unused@db.example.test:5432/dgc_migration_staging_restore_20261106','postgresql://fixture:unused@127.0.0.1:55433/dgc_erp_db','postgresql://fixture:unused@localhost:55433/erp_execution_acceptance_input_recon_test']){const r=spawnSync(process.execPath,['scripts/dgc-verify-restored-book.mjs'],{env:{...process.env,DATABASE_URL:value},encoding:'utf8'});assert.notEqual(r.status,0);assert.match(r.stderr,/Dedicated LOCAL restored database required/);}
+console.log('PASS: 3 recovery-target rejection checks; no database connection attempted.');

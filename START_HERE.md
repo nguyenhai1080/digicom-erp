@@ -1,5 +1,7 @@
 # Bắt đầu làm việc với DGC Finance
 
+**Khôi phục sau chuyển đã diễn tập 06/11:** [biên bản](docs/handover/DGC_BACKUP_RESTORE_20261106.md), [hướng dẫn](docs/DGC_BACKUP_RECOVERY_GUIDE.md). DB/kho đã restore riêng, 460 Attachment khớp hash, 3.207 trường tiền khớp gói chuyển; runtime Linux v24 đọc được. Có cảnh báo 26 payload appendix lệch chữ số cuối metadata thời gian; giữ DB nguyên trạng và nguồn gốc riêng, verifier exit 2, không tuyên bố sạch mọi hash. Không sửa host/import lại hoặc cản owner tự nhập tháng 10. Lượt này không cần redeploy.
+
 **Đầu vào v24 đã kiểm 06/11:** [bàn giao bản in số liệu đã chuyển](docs/handover/DGC_INPUT_CAPTURED_PRINT_20261106.md). Hồ sơ captured xem chỉ đọc, chặn tính lại; bản in tra cứu giữ tiền/tỷ giá/trạng thái. Windows/Linux 233 checks đạt; host preview/PDF đúng ba hồ sơ, AP vẫn 0. Không lưu/duyệt hồ sơ thật hoặc thay tháng 10 của owner.
 
 **SOA v23 đã xác minh 06/11:** [bàn giao](docs/handover/DGC_SOA_RUNTIME_20261105.md), [hướng dẫn](docs/DGC_SOA_GUIDE.md). Preview/lưu/hủy PDF nháp đã test; host đọc 53 Invoice và dư ngày chốt 25.328,54 USD, 0 SOA mới. Không tạo/ký tài liệu thật; còn UAT người dùng. Các ghi chú SOA WIP trước đây đã được thay thế.
