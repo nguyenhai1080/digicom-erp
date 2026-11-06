@@ -19,10 +19,21 @@ Host không có nút nhập file FX tùy chọn trong UI hiện tại. Vì vậy
 
 Một lượt chờ browser bị gián đoạn khi đang điền kỳ tiếp theo. Đã đọc lại server, xác nhận 74 kỳ đã lưu đúng rồi chỉ tạo 22 kỳ còn thiếu; không bấm lặp để đoán trạng thái. Tiến trình private và kết quả cuối đều giữ lại. Không promote DB trial hoặc đăng nhập thay người thật.
 
-**Backup sau nhập lúc 13:36 còn Đang chờ / 0 B trên Vibe Host tại lần kiểm cuối.** Nút tải/restore của bản này bị khóa, nên chưa tải được để so fingerprint hai DB thật trước/sau. Không ghi là backup sau đã thành công hoặc mọi bảng DB thật đã được so hash. Backup trước đã tải và restore vào localhost riêng; script so hai dump mới chỉ chuẩn bị, chưa chạy vì thiếu dump sau. Khi tiếp tục, kiểm đúng bản đang chờ rồi tải/đối chiếu nếu đã xong; không nhập lại FX hoặc tạo thêm backup chỉ để né trạng thái chờ.
+## Sao lưu và đối chiếu đã hoàn tất
+
+Bản backup sau nhập **13:36 đã Thành công**, khoảng 2,4 MB khi đọc lại Vibe Host; đã tải đúng bản đang chờ trước đó, không tạo thêm backup. Hai dump thật trước/sau được khôi phục vào hai DB localhost riêng và so sánh chỉ đọc, **730 kiểm tra đạt trên 63 bảng**.
+
+- **59 bảng có fingerprint nguyên vẹn**, gồm dữ liệu tài chính, chứng từ/tệp đính kèm và nguồn captured. Không thay tiền, ngày, trạng thái hay raw payload.
+- `configurations`: đúng **96 cấu hình FX mới**; toàn bộ cấu hình đã có giữ nguyên.
+- `audit_logs`: đúng **96 REPORTING_FX_CREATE và một AUTH_LOGIN**; mọi audit cũ giữ nguyên.
+- `auth_sessions` và `users`: một phiên đăng nhập mới khớp AUTH_LOGIN; user tương ứng chỉ đổi `lastLoginAt`/`updatedAt`. Phiên cũ, thông tin tài khoản, mật khẩu, hồ sơ và quyền giữ nguyên.
+
+Lần so đầu giả định cả metadata đăng nhập không đổi nên dừng; log được giữ lại. Kết quả cuối kiểm riêng, giới hạn chính xác dấu vết đăng nhập đồng thời trên, không bỏ qua thay đổi tùy ý. Việc xác minh không ghi DB thật hoặc DB khôi phục, không restore lên host và không triển khai lại.
+
+Kết quả này chứng minh dữ liệu nguồn đã lưu không đổi giữa hai bản sao; không xóa cảnh báo hash timestamp appendix đã tồn tại từ trước và không thay nghiệm thu nghiệp vụ của owner.
 
 ## Bằng chứng
 
-Private `artifacts/dgc-migration/20261106/gst-fx/live/1330/`: capture GST/DGC trước; `import-plan.json/.csv`; `ui-progress.json`, các checkpoint/resume server; `dgc-after.json`, `gst-after.json`, `live-proof.json`; `rates-2026.png/.txt`, `dashboard-final.png/.txt`; `backup-before.txt`, `db-before.dump`, `backup-after.txt`. Không đưa dữ liệu rates/raw/actor IDs/dump vào Git/release.
+Private `artifacts/dgc-migration/20261106/gst-fx/live/1330/`: capture GST/DGC trước; `import-plan.json/.csv`; `ui-progress.json`, các checkpoint/resume server; `dgc-after.json`, `gst-after.json`, `live-proof.json`; `rates-2026.png/.txt`, `dashboard-final.png/.txt`; `backup-before.txt`, `db-before.dump`, `backup-after.txt` (trạng thái chờ cũ), `backup-after-completed.txt/.png`, `db-after.dump`, `dump-pins.json`, `db-comparison-proof.json`, `db-comparison-final.log`. Không đưa dữ liệu rates/raw/actor IDs/dump vào Git/release.
 
 [Nghiên cứu và 309 checks bản sao](DGC_GST_FX_RESEARCH_20261106.md) vẫn là bằng chứng thử, không phải kết quả DB hash thật. Bàn giao này thay thế trạng thái “chưa nhập FX host” của ghi chú trước. Tháng 10 tiếp tục chờ kế toán nhập tỷ giá có căn cứ và owner tự thử nghiệp vụ.
