@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {CashEntries} from './CashAccounts';
 import {CashTransfers} from './CashTransfers';
 import {formatMoney} from './numbers';
-type Props={request:(path:string,body?:unknown,csrf?:string)=>Promise<any>;csrf:string;permissions:string[]};
+type Props={deferred?:boolean;request:(path:string,body?:unknown,csrf?:string)=>Promise<any>;csrf:string;permissions:string[]};
 const purposes=['Lương','Thưởng','Ăn uống','Thuê văn phòng','Điện nước / Internet','Phần mềm / Hosting','Thiết bị','Đi lại / Vận chuyển','Thuế / Kế toán','Phúc lợi','Chi phí dự án','Góp quỹ / Bổ sung quỹ','Phân chia lợi nhuận','Khác'];
 const cashMoney=(v:any,c='VND')=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:c==='USD'?2:0,maximumFractionDigits:2}).format(Number(v));
 const today=()=>new Date().toLocaleDateString('en-CA');
@@ -10,7 +10,17 @@ const fresh=()=>({requestId:crypto.randomUUID(),direction:'OUT',cashAccountId:''
 const status=(v:string)=>({DRAFT:'Nháp',POSTED:'Đã ghi nhận',VOIDED:'Đã hủy'}[v]??v);
 function Pages({page,total,busy,onPage,label,pageSize=10}:{page:number;total:number;busy:boolean;onPage:(p:number)=>void;label:string;pageSize?:number}){return <div className="pagination"><span>{total} {label} · Trang {page}/{Math.max(1,Math.ceil(total/pageSize))} · {pageSize} kết quả/trang</span><button disabled={busy||page<=1} onClick={()=>onPage(page-1)}>Trang trước {label}</button><button disabled={busy||page*pageSize>=total} onClick={()=>onPage(page+1)}>Trang sau {label}</button></div>;}
 async function fileData(f:File){if(f.size>5*1024*1024)throw Error('Chứng từ tối đa 5 MB.');const bytes=new Uint8Array(await f.arrayBuffer());let text='';for(let i=0;i<bytes.length;i+=8192)text+=String.fromCharCode(...bytes.subarray(i,i+8192));return {filename:f.name,base64:btoa(text)};}
-export function CashManagement(props:Props){const [tab,setTab]=useState('transactions');return <><div className="form-actions" role="group" aria-label="Quản lý Thu chi">{[['transactions','Thu / Chi'],['transfers','Chuyển tiền'],['ledger','Sổ tài khoản'],['history','Lịch sử quỹ'],['report','Báo cáo']].map(([id,name])=><button key={id} aria-pressed={tab===id} className={tab===id?'action-primary':''} onClick={()=>setTab(id)}>{name}</button>)}</div>{tab==='transactions'?<Transactions {...props}/>:tab==='transfers'?<CashTransfers {...props}/>:tab==='ledger'?<CashEntries request={props.request}/>:tab==='history'?<History {...props}/>:<Report {...props}/>}</>;}
+export function CashManagement(props:Props){const [tab,setTab]=useState('transactions');return <><div className="form-actions" role="group" aria-label="Quản lý Thu chi">{[['transactions','Thu / Chi'],['transfers','Chuyển tiền'],['ledger','Sổ tài khoản'],['history','Lịch sử quỹ'],['report','Báo cáo']].map(([id,name])=><button key={id} aria-pressed={tab===id} className={tab===id?'action-primary':''} onClick={()=>setTab(id)}>{name}</button>)}</div>{props.deferred?<DeferredCashPanel tab={tab}/>:tab==='transactions'?<Transactions {...props}/>:tab==='transfers'?<CashTransfers {...props}/>:tab==='ledger'?<CashEntries request={props.request}/>:tab==='history'?<History {...props}/>:<Report {...props}/>}</>;}
+function DeferredCashPanel({tab}:{tab:string}){
+ const view=({
+  transactions:{title:'Thu / Chi',headers:['Mã / ngày','Loại / tài khoản','Nội dung / mục đích','Số tiền','Trạng thái / thao tác'],action:'+ Thêm thu / chi'},
+  transfers:{title:'Chuyển tiền',headers:['Mã / ngày','Tài khoản nguồn','Tài khoản nhận','Số tiền','Trạng thái'],action:'+ Tạo chuyển tiền'},
+  ledger:{title:'Sổ tài khoản',headers:['Ngày','Tài khoản / quỹ','Diễn giải','Thu','Chi','Số dư']},
+  history:{title:'Lịch sử quỹ',headers:['Ngày','Tài khoản / quỹ','Loại giao dịch','Nội dung','Số tiền']},
+  report:{title:'Báo cáo thu chi',headers:['Kỳ','Tài khoản / quỹ','Tổng thu','Tổng chi','Chênh lệch']}
+ } as Record<string,{title:string;headers:string[];action?:string}>)[tab];
+ return <section className="panel" aria-label={view.title+' chưa thiết lập'}><div className="panel-heading"><h2>{view.title}</h2>{view.action&&<button className="action-primary" disabled>{view.action}</button>}</div><p className="notice" role="status">Chưa thiết lập tài khoản ngân hàng / quỹ. Chức năng thu chi đang chờ áp dụng.</p><p className="muted">Các tab được hiển thị để tiện truy cập. Chưa mở nhập liệu, chuyển tiền hoặc báo cáo số dư; không tính khoản thu Invoice lịch sử thành số dư tiền.</p><div className="table-scroll"><table><thead><tr>{view.headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody><tr><td colSpan={view.headers.length}>Chưa thiết lập — chưa có số liệu thu chi để hiển thị.</td></tr></tbody></table></div></section>;
+}
 function Transactions({request,csrf,permissions}:Props){
  const canCreate=permissions.includes('PAYMENT_CREATE'),canPost=['PAYMENT_APPROVE','PAYMENT_POST'].every(p=>permissions.includes(p));
  const [data,setData]=useState<any>(null),[page,setPage]=useState(1),[period,setPeriod]=useState(''),[account,setAccount]=useState(''),[filterStatus,setStatus]=useState(''),[editor,setEditor]=useState<any>(null),[confirmed,setConfirmed]=useState(false),[voiding,setVoiding]=useState<any>(null),[reason,setReason]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[refresh,setRefresh]=useState(0);const seq=useRef(0);

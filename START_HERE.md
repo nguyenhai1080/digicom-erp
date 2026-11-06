@@ -1,3 +1,5 @@
+**07/11 — UI v0.6.91:** hiện lại Quản lý Thu chi với đủ 5 tab chờ thiết lập, không gọi API tiền/tạo số dư/giao dịch. [Bàn giao](docs/handover/DGC_CASH_MENU_DEFERRED_20261107.md). 112 browser checks giả lập đạt, chờ owner triển khai; cash vẫn deferred.
+
 **07/11 — UI v0.6.90:** “Danh sách đối soát” đặt trước “Đối soát đã chuyển từ hệ thống cũ”; đổi tên bảng mới và giữ nguyên các chức năng tra cứu. [Bàn giao](docs/handover/DGC_OUTPUT_RECON_HISTORY_20261107.md). Chờ owner triển khai.
 
 **07/11 — v0.6.89:** thêm danh sách đối soát đã chuyển ở tab Đối soát đầu ra (lọc kỳ/tìm kiếm/10 dòng/PDF gốc/bản lưu). [Bàn giao](docs/handover/DGC_OUTPUT_RECON_HISTORY_20261107.md). 47 API + 94 browser checks đạt; chờ owner triển khai, không nhập lại lịch sử.
