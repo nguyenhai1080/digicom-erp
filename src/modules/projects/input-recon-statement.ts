@@ -3,13 +3,14 @@ import {prisma,Prisma} from '@erp/db';
 import {z} from 'zod';
 import {requirePermission,type AuthConfig} from '../auth/access.js';
 import {audit,CommandError,date,parse,writeGuard} from './commands.js';
-import {assertInputSnapshot,inputDigest,inputReconPlan,requireDgc} from './input-recon.js';
+import {assertInputSnapshot,assertCapturedInputSource,isCapturedInput,inputDigest,inputReconPlan,requireDgc} from './input-recon.js';
 import {derivedBytes,persistPdf,rollbackFiles} from './financial-documents.js';
 import {readDgcInvoiceProfile} from './dgc-invoice-profile.js';
 import {renderInputStatement,type InputStatement} from './input-recon-pdf.js';
 import {usdWords} from './invoice-template.js';
+import {renderCapturedInputStatement,type CapturedInputStatement} from './input-recon-captured-pdf.js';
 
-const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v),selection=z.object({period:z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),inputPartnerId:z.uuid(),inputContractId:z.uuid().optional(),reconDate:date,includeApproved:z.boolean().default(true)}).strict();
+const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v),selection=z.object({period:z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),inputPartnerId:z.uuid(),inputContractId:z.uuid().optional(),reconDate:date,includeApproved:z.boolean().default(true),sourceMode:z.enum(['CURRENT','CAPTURED']).default('CURRENT')}).strict();
 function fail(s:string):never{throw new CommandError(409,s);}
 export function inputVndWords(value:string){
  let n=BigInt(D(value).toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP).toFixed(0));if(n===0n)return 'Không đồng chẵn';
@@ -21,11 +22,20 @@ export function inputVndWords(value:string){
 }
 async function statementPlan(tx:Prisma.TransactionClient,companyId:string,body:z.infer<typeof selection>){
  await requireDgc(tx,companyId);
- const rows=await tx.inputReconciliation.findMany({where:{companyId,period:body.period,inputPartnerId:body.inputPartnerId,...(body.inputContractId?{inputContractId:body.inputContractId}:{}),status:{in:body.includeApproved?['DRAFT','GENERATED','APPROVED']:['DRAFT','GENERATED']}},include:{service:true,inputContract:true,inputPartner:true,outputPartner:true},orderBy:[{serviceId:'asc'},{inputReconCode:'asc'},{id:'asc'}],take:501});
- if(!rows.length||rows.length>500)fail('Cần từ 1 đến 500 dòng đối soát để lập biên bản.');
+ const all=await tx.inputReconciliation.findMany({where:{companyId,period:body.period,inputPartnerId:body.inputPartnerId,...(body.inputContractId?{inputContractId:body.inputContractId}:{}),status:{in:body.includeApproved?['DRAFT','GENERATED','APPROVED']:['DRAFT','GENERATED']}},include:{service:true,inputContract:true,inputPartner:true,outputPartner:true},orderBy:[{serviceId:'asc'},{inputReconCode:'asc'},{id:'asc'}],take:501});
+ if(all.length>500)fail('Vượt 500 dòng đối soát trong phạm vi đã chọn.');
+ const captured=body.sourceMode==='CAPTURED',rows=all.filter(r=>isCapturedInput(r)===captured);
+ if(!rows.length)fail(captured?'Không có hồ sơ chuyển sổ trong phạm vi đã chọn.':'Không có đối soát mới; hồ sơ chuyển sổ dùng chức năng In số liệu đã chuyển.');
  if(new Set(rows.map(r=>r.inputContractId)).size!==1)fail('Có nhiều hợp đồng Input; chọn một hợp đồng để lập đúng một biên bản.');
- if(new Set(rows.map(r=>r.currency+'|'+r.fxRate.toFixed())).size!==1)fail('Các dòng khác tiền tệ hoặc tỷ giá; cần đối chiếu trước khi in.');
+ if(new Set(rows.map(r=>r.currency+(captured?'':'|'+r.fxRate.toFixed()))).size!==1)fail('Các dòng khác tiền tệ hoặc tỷ giá; cần đối chiếu trước khi in.');
  const first=rows[0],currency=first.currency;
+ if(captured){
+  for(const r of rows){await assertCapturedInputSource(tx,companyId,r);if([r.service,r.inputContract,r.inputPartner,r.outputPartner].some(x=>x.companyId!==companyId))fail('Liên kết biên bản không cùng công ty.');}
+  const config=await readDgcInvoiceProfile(tx,companyId),sum=(k:'baseUsd'|'foreignAmount'|'localAmount'|'taxAmount'|'whtAmount'|'payableAmount')=>rows.reduce((s,r)=>s.plus(r[k]),D('0')).toFixed(2);
+  const data:CapturedInputStatement={captured:true,period:body.period,reconDate:body.reconDate,issuer:config.profile.issuerName,partner:first.inputPartner.legalName,partnerKey:first.inputPartner.partnerKey,contractNumber:first.inputContract.contractNumber??first.inputContract.contractCode,currency,lines:rows.map(r=>({code:r.inputReconCode,service:r.service.serviceName,baseUsd:r.baseUsd.toFixed(2),shareRate:r.shareRate.toFixed(),foreignAmount:r.foreignAmount.toFixed(2),fxRate:r.fxRate.toFixed(),localAmount:r.localAmount.toFixed(2),taxRate:r.taxRate.toFixed(),taxAmount:r.taxAmount.toFixed(2),whtAmount:r.whtAmount.toFixed(2),payableAmount:r.payableAmount.toFixed(2)})),totals:{baseUsd:sum('baseUsd'),foreignAmount:sum('foreignAmount'),localAmount:sum('localAmount'),taxAmount:sum('taxAmount'),whtAmount:sum('whtAmount'),payableAmount:sum('payableAmount')}};
+  const latest=await tx.document.aggregate({where:{companyId,entityType:'InputReconStatement',entityId:first.inputContractId,documentType:'INPUT_RECON',documentNumber:body.period},_max:{versionNo:true}}),version=(latest._max.versionNo??0)+1;
+  return {rows,data,version,digest:inputDigest({selection:body,data,profile:config.metadata,rows:rows.map(r=>({id:r.id,updatedAt:r.updatedAt,sourceDigest:r.sourceDigest})),version})};
+ }
  const round=(d:Prisma.Decimal)=>d.toDecimalPlaces(currency==='VND'?0:2,Prisma.Decimal.ROUND_HALF_UP);
  const groups=new Map<string,InputStatement['lines'][number]>();
  for(const r of rows){
@@ -55,13 +65,15 @@ export async function inputStatementRoutes(app:FastifyInstance,config:AuthConfig
    const result=await prisma.$transaction(async tx=>{
     if(action==='statement-create')await tx.$queryRaw`SELECT id FROM companies WHERE id=${user.companyId}::uuid FOR UPDATE`;
     const p=await statementPlan(tx,user.companyId,input);if(p.digest!==expected)fail('Nguồn hoặc biên bản đã thay đổi. Xem lại trước khi lưu.');
-    const bytes=await renderInputStatement(p.data);if(action==='statement-pdf-preview')return {bytes};
-    const filename='Input_Recon_'+p.data.partnerKey.replace(/[^A-Za-z0-9_-]/g,'_')+'_'+input.period+'_v'+p.version+'.pdf';
+    const bytes='captured'in p.data?await renderCapturedInputStatement(p.data):await renderInputStatement(p.data);if(action==='statement-pdf-preview')return {bytes};
+    const filename=(input.sourceMode==='CAPTURED'?'Captured_Input_Recon_':'Input_Recon_')+p.data.partnerKey.replace(/[^A-Za-z0-9_-]/g,'_')+'_'+input.period+'_v'+p.version+'.pdf';
     const doc=await persistPdf(tx,user,'InputReconStatement',p.rows[0].inputContractId,'INPUT_RECON',filename,bytes,p.version,rollback);
     await tx.document.update({where:{id:doc.id},data:{documentNumber:input.period}});
     const oldIds=[...new Set(p.rows.flatMap(r=>r.documentId?[r.documentId]:[]))];
+    if(input.sourceMode==='CAPTURED')await tx.inputReconciliation.updateMany({where:{companyId:user.companyId,id:{in:p.rows.map(r=>r.id)}},data:{documentId:doc.id}});else{
     await tx.inputReconciliation.updateMany({where:{companyId:user.companyId,id:{in:p.rows.map(r=>r.id)},status:{in:['DRAFT','GENERATED']}},data:{status:'GENERATED',documentId:doc.id}});
     await tx.inputReconciliation.updateMany({where:{companyId:user.companyId,id:{in:p.rows.map(r=>r.id)},status:'APPROVED'},data:{documentId:doc.id}});
+    }
     for(const id of oldIds)if(!await tx.inputReconciliation.count({where:{companyId:user.companyId,documentId:id}}))await tx.document.updateMany({where:{companyId:user.companyId,id},data:{status:'SUPERSEDED'}});
     await audit(tx,user,'INPUT_RECON_PDF','Document',doc.id,null,{data:p.data,rowIds:p.rows.map(r=>r.id),sourceDigests:p.rows.map(r=>r.sourceDigest),version:p.version});
     return {documentId:doc.id,version:p.version,filename};
