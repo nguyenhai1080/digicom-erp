@@ -1,3 +1,4 @@
+import {dashboardOperationsRoutes} from './dashboard-operations.js';
 import {manualRevenueActions} from './manual-revenue-access.js';
 import type {FastifyInstance} from 'fastify';
 import {prisma,Prisma} from '@erp/db';
@@ -85,6 +86,7 @@ async function issuePlan(tx:Prisma.TransactionClient,companyId:string,id:string)
  return {selected,candidates,digest};
 }
 export async function financeLedgerRoutes(app:FastifyInstance,config:AuthConfig){
+ await app.register(dashboardOperationsRoutes);
  app.get('/api/v1/dashboard/revenue',{preHandler:requirePermission('REVENUE_VIEW')},async request=>{
   const companyId=request.auth!.companyId;
   const rows=await prisma.revenue.findMany({where:{companyId,currency:{in:['USD','VND']},partner:{companyId},service:{companyId},contract:{companyId},isCurrent:true,status:{in:['INVOICE_READY','INVOICED','PARTIALLY_PAID','PAID']},reconciliation:{companyId,isCurrent:true,status:'APPROVED'},calculationJson:{path:['dgc'],equals:true}},select:{currency:true,periodStart:true,serviceId:true,service:{select:{serviceName:true}},netAmount:true,calculationJson:true}});
