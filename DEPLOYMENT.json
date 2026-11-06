@@ -1,6 +1,6 @@
 {
   "format": "dgc-single-site-release-v1",
-  "sourceCommit": "5e2f07f39b1bc0ba5a678fd3fadda1851811b9b0",
+  "sourceCommit": "08f85701d7dbb90a3f899ce6057ff106e93e9904",
   "sourceBranch": "dgc/main",
   "deploymentBranch": "codex/dgc-deploy",
   "applicationCount": 1,
