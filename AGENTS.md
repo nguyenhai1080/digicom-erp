@@ -1,5 +1,7 @@
 # ERP Core inherits ERP DGC
 
+- Captured output recon reader prepared (2026-11-07): v0.6.89, docs/handover/DGC_OUTPUT_RECON_HISTORY_20261107.md. RECON_VIEW/DGC-only GET history/PDF lists transferred Reconciliation separately from native Uploads, with search/month/10-row pagination/archive toggle. Physical source provenance + transfer-receipt base/appendix snapshots resolve original PDFs; never infer from filenames or preparation-envelope hash. Backup clone has 265 current + 5 archived groups, 259 + 5 linked originals; missing links stay explicit. 47 API/94 synthetic browser checks passed. No financial writes/importer/schema/env changes; owner deployment pending. Dashboard hybrid remains a mockup only.
+
 - Digicom display branding prepared (2026-11-06): UI v0.6.86, docs/handover/DGC_DIGICOM_BRANDING_20261106.md. Owner title is Hệ thống quản trị tài chính Digicom, app label Digicom ERP. Convert DGC branding only in presentation; retain tenant companyCode=DGC, API/role/source codes, financial identifiers and original PDF/data. GST branding stays separate. Host env changes unnecessary; owner deployment pending.
 
 - DGC menu update prepared (2026-11-06): UI v0.6.83 renames reconciliation to Quản lý đối soát; order reconciliation/revenue/Invoice/debt. SOA is fourth Invoice tab, gated by AR_VIEW + INVOICE_VIEW + INVOICE_PAYMENT_VIEW; existing INVOICE_CREATE still gates writes. 36 synthetic GET-only browser checks passed. See docs/handover/DGC_GROUPED_MENUS_20261106.md; owner deployment pending.

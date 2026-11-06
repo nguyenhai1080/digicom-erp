@@ -20,7 +20,7 @@ function WorkspaceTabs({label,tabs}:{label:string;tabs:Tab[]}){
 }
 export function DgcReconciliation(props:Props){
  const has=(p:string)=>props.permissions.includes(p),tabs:Tab[]=[];
- if(has('RECON_VIEW'))tabs.push({id:'output',label:'Đối soát đầu ra',content:<OutputRecon {...props}/>});
+ if(has('RECON_VIEW'))tabs.push({id:'output',label:'Đối soát đầu ra',content:<OutputRecon {...props} includeTransferred/>});
  if(has('INVOICE_VIEW')&&has('INVOICE_CREATE'))tabs.push({id:'create',label:'Tạo Invoice',content:<Invoices {...props} creationOnly/>});
  if(has('INPUT_RECON_VIEW'))tabs.push({id:'input',label:'Đối soát đầu vào',content:<InputRecon {...props}/>});
  return <WorkspaceTabs label="Quản lý đối soát" tabs={tabs}/>;

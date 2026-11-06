@@ -85,3 +85,5 @@ h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:20px;line-height:1
  .dgc-shell .workspace-tabs button{flex:1 1 140px;min-height:44px}
  .dgc-shell .top-user .muted{overflow-wrap:anywhere}.dgc-shell .top-user>div{min-width:0}.dgc-shell .top-user>button{flex-shrink:0}
 }
+
+.recon-history{margin:18px 0 24px}.recon-history .form-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.recon-history .check-label{margin:8px 0}.recon-history td>small{display:block;margin-top:4px;overflow-wrap:anywhere}
