@@ -1,3 +1,5 @@
+**06/11 — UI v0.6.87:** cân font Segoe UI và phân cấp chữ; menu/tiêu đề nhẹ hơn, trạng thái KPI nhỏ hơn số tiền. [Bàn giao](docs/handover/DGC_TYPOGRAPHY_20261106.md). 89 checks browser giả lập đạt; chờ owner triển khai, không đổi số liệu/PDF.
+
 **06/11 — UI v0.6.86:** tên hiển thị Digicom ERP, tiêu đề “Hệ thống quản trị tài chính Digicom”; nhãn DGC đổi thành Digicom, tenant/mã chứng từ gốc giữ nguyên. [Bàn giao](docs/handover/DGC_DIGICOM_BRANDING_20261106.md). Chờ owner triển khai, không cần đổi env.
 
 **06/11 — UI v0.6.85:** bỏ tiêu đề QUẢN LÝ và thanh cuộn menu, thu gọn khoảng cách; đủ 11 mục không cần cuộn ở năm kích thước desktop đã kiểm. 74 checks browser giả lập đạt, chờ owner triển khai. [Bàn giao](docs/handover/DGC_GROUPED_MENUS_20261106.md).
