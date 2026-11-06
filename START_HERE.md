@@ -1,3 +1,5 @@
+**06/11 — UI v0.6.88:** dùng font Arial và bố trí menu theo CSS GST đang chạy, thay Segoe UI v0.6.87. Giữ thương hiệu Digicom và các tab; mobile mở/đóng menu. [Bàn giao](docs/handover/DGC_GST_STYLE_20261106.md). 87 browser checks giả lập đạt, chờ owner triển khai.
+
 **06/11 — UI v0.6.87:** cân font Segoe UI và phân cấp chữ; menu/tiêu đề nhẹ hơn, trạng thái KPI nhỏ hơn số tiền. [Bàn giao](docs/handover/DGC_TYPOGRAPHY_20261106.md). 89 checks browser giả lập đạt; chờ owner triển khai, không đổi số liệu/PDF.
 
 **06/11 — UI v0.6.86:** tên hiển thị Digicom ERP, tiêu đề “Hệ thống quản trị tài chính Digicom”; nhãn DGC đổi thành Digicom, tenant/mã chứng từ gốc giữ nguyên. [Bàn giao](docs/handover/DGC_DIGICOM_BRANDING_20261106.md). Chờ owner triển khai, không cần đổi env.

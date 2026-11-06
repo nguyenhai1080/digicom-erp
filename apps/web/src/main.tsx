@@ -28,7 +28,7 @@ import {OctoberRestart} from './OctoberRestart';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.87';
+const version = '0.6.88';
 async function api(path: string, body?: unknown, csrf?: string) {
   const response = await fetch('/api/v1' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin',
@@ -50,6 +50,7 @@ function App() {
   const [health, setHealth] = useState('Đang kiểm tra dịch vụ…');
   const [message, setMessage] = useState('');
   const [page, setPage] = useState('dashboard');
+  const [menuOpen,setMenuOpen]=useState(false);
   const [reconFxVersion,setReconFxVersion]=useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -98,7 +99,7 @@ function App() {
   if(session.user.companyCode==='DGC'&&session.user.permissions.includes('INVOICE_VIEW')&&window.location.pathname==='/operations/restart-october')return <OctoberRestart request={api} csrf={session.csrfToken}/>;
   const isDgc=session.user.companyCode==='DGC',has=(p:string)=>session.user.permissions.includes(p);
   const workspaceProps={permissions:session.user.permissions,csrf:session.csrfToken,request:api,ratesVersion:reconFxVersion};
-  return <div className={'shell'+(isDgc?' dgc-shell':'')}><aside><h2>{branding.appName}</h2><p className="sidebar-subtitle">{isDgc?branding.appTitle:<>Hệ thống quản lý công việc và tài chính<br/>{companyDisplayName(session.user.companyCode)}</>}</p>{!isDgc&&<div className="nav-title">QUẢN LÝ</div>}<nav className="sidebar-nav" aria-label="Quản lý ERP">
+  return <div className={'shell'+(isDgc?' dgc-shell':'')}><aside><div className="sidebar-brand"><h2>{branding.appName}</h2>{isDgc&&<button type="button" className="menu-toggle" aria-expanded={menuOpen} aria-controls="erp-navigation" onClick={()=>setMenuOpen(v=>!v)}>{menuOpen?'Đóng menu':'Mở menu'}</button>}</div><p className="sidebar-subtitle">{isDgc?branding.appTitle:<>Hệ thống quản lý công việc và tài chính<br/>{companyDisplayName(session.user.companyCode)}</>}</p>{!isDgc&&<div className="nav-title">QUẢN LÝ</div>}<nav id="erp-navigation" className="sidebar-nav" aria-label="Quản lý ERP" data-open={menuOpen} onClick={e=>{if(isDgc&&(e.target as HTMLElement).closest('button.nav'))setMenuOpen(false);}}>
     <button className={'nav ' + (page === 'dashboard' ? 'active' : '')} aria-current={page==='dashboard'?'page':undefined} onClick={() => { setPage('dashboard'); setMessage(''); }}>Dashboard</button>
     {session.user.permissions.includes('PROJECT_VIEW') && <button className={'nav ' + (page === 'projects' ? 'active' : '')} aria-current={page==='projects'?'page':undefined} onClick={() => setPage('projects')}>Quản lý Dự án</button>}
     {session.user.permissions.includes('SERVICE_VIEW') && <button className={'nav ' + (page === 'services' ? 'active' : '')} aria-current={page==='services'?'page':undefined} onClick={() => setPage('services')}>Quản lý Dịch vụ</button>}
