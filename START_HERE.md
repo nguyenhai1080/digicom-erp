@@ -1,3 +1,5 @@
+**06/11 — gộp menu theo nhóm tab:** [bàn giao UI v0.6.82](docs/handover/DGC_GROUPED_MENUS_20261106.md). Đối soát ba tab, Công nợ hai tab, Invoice ba tab; tỷ giá ở Cấu hình chung. 31 kiểm tra browser giả lập đạt, chờ owner triển khai; thay bố cục inline v0.6.80.
+
 **06/11 — sửa menu tràn màn hình:** [bàn giao](docs/handover/DGC_SIDEBAR_SCROLL_20261106.md). UI v0.6.81 có cuộn menu riêng, gồm cả tạo Invoice liền sau đối soát; đã kiểm bốn kích thước, chờ owner triển khai.
 
 **06/11 — giao diện tạo Invoice liền sau đối soát:** [bàn giao](docs/handover/DGC_INLINE_INVOICE_20261106.md). UI v0.6.80 đã chuẩn bị, chưa triển khai host; giữ nguyên bước xem PDF/xác nhận và quyền.

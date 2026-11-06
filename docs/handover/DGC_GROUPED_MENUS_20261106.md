@@ -1,0 +1,16 @@
+# Gộp menu nghiệp vụ DGC — 06/11/2026
+
+Theo yêu cầu owner, UI v0.6.82 tổ chức:
+
+- Đối soát: Đối soát đầu ra / Tạo Invoice / Đối soát đầu vào.
+- Quản lý Công nợ: Công nợ phải thu / Công nợ phải trả.
+- Quản lý Invoice: Invoice đã phát hành / Invoice chưa phát hành / Invoice lịch sử.
+- Tỷ giá báo cáo nằm trong Cấu hình chung; bỏ mục menu riêng và khối tỷ giá ở màn đối soát.
+
+Tạo Invoice chuyển từ khối nằm dưới upload sang tab riêng trong cùng nhóm Đối soát, thay bố cục v0.6.80. Màn Invoice chuyên quản lý các bản đã/chưa phát hành và lịch sử. Giữ liên kết hồ sơ tháng 10 trong tab lịch sử. Menu cuộn v0.6.81 vẫn áp dụng.
+
+Tab chỉ hiện khi đủ quyền hiện có. Nhóm mở được nếu có ít nhất một tab: RECON_VIEW, INVOICE_VIEW + INVOICE_CREATE, INPUT_RECON_VIEW; công nợ dùng AR_VIEW/AP_VIEW riêng. Cấu hình chung mở cho REVENUE_VIEW hoặc SYSTEM_CONFIG_EDIT; chỉ REVENUE_VIEW được đọc tỷ giá, chỉ SYSTEM_CONFIG_EDIT tải tài sản/mẫu/chữ ký. Không mở rộng quyền quản trị cho kế toán. Tab chỉ tải dữ liệu khi được chọn; phím trái/phải/Home/End đổi tab và focus. GST giữ màn cũ.
+
+Kiểm tra TypeScript/Vite build và 31 kiểm tra browser trên bản build thật với API giả lập chỉ GET: nhóm/tab đúng thứ tự, danh sách Invoice tải đúng publication, không có form tạo trong tab chưa phát hành, mở lịch sử, tỷ giá trong cấu hình, phân quyền từng nhóm, chặn gọi API tab không có quyền, bàn phím, mobile không tràn ngang và GST giữ bố cục cũ. Đã xem ảnh desktop/mobile. Bằng chứng private artifacts/sidebar-layout-check/grouped-tabs*. Không chạy nghiệp vụ thật hoặc ghi host; không đổi backend, schema, env hay quyền tài khoản.
+
+Đã chuẩn bị nhánh triển khai codex/dgc-deploy; owner triển khai lại và Ctrl+F5 để kiểm tra trên host. Chưa tuyên bố host đã lên v0.6.82 hoặc nghiệm thu tài chính.

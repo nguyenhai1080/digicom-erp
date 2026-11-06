@@ -55,3 +55,5 @@ h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:20px;line-height:1
 .cards.cash-report-cards{grid-template-columns:repeat(4,minmax(0,1fr))}.cash-report-cards h3{font-size:17px}.cash-report-cards p{font-variant-numeric:tabular-nums;white-space:nowrap}@media(max-width:1100px){.cards.cash-report-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.cards.cash-report-cards{grid-template-columns:1fr}}
 
 .recon-upload-toolbar{margin:0 0 14px}.recon-upload-toolbar .action-primary{margin:0}.recon-search-toolbar input:not([type=month]){flex:1;min-width:180px;width:auto}.recon-search-toolbar input[type=month]{width:180px;flex:0 0 180px}@media(max-width:650px){.recon-search-toolbar input:not([type=month]){flex-basis:100%}}
+
+.workspace-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}.workspace-tabs button{margin:0}.workspace-tabs [role=tab]:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
