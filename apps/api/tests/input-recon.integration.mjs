@@ -202,7 +202,7 @@ try{
  const extraPlan=await ok(url+'/preview',{revenueId:otherRow.id});
  const extraDraft=await ok(url+'/generate',{revenueId:otherRow.id,digest:extraPlan.digest,confirmed:true},201);
  await prisma.inputReconciliation.update({where:{id:extraDraft.item.id},data:{inputContractId:batchServices[0].inp.id}});
- const extraScope=await post(url+'/statement-preview',bs);eq(extraScope.statusCode,409);eq(extraScope.json().message.includes('không còn thuộc phạm vi'),true);
+ const extraScope=await post(url+'/statement-preview',bs);eq(extraScope.statusCode,409);eq(extraScope.json().message.includes('Hồ sơ ngoài phạm vi'),true);
  await prisma.inputReconciliation.update({where:{id:extraDraft.item.id},data:{inputContractId:otherPair.inp.id}});
  // Simulate a pre-upgrade partial draft in this disposable fixture only.
  const partial=await prisma.inputReconciliation.findFirstOrThrow({where:{sourceRevenueId:ids[0]}});
@@ -239,6 +239,26 @@ try{
  await prisma.serviceRelationship.deleteMany({where:{companyId:company.id,parentServiceId:parentService.id}});
  for(const r of batchRows)await prisma.revenue.update({where:{id:r.id},data:{calculationJson:{...r.calculationJson,rowType:'CHILD',includeInMonthlyTotal:false,parentServiceId:parentService.id}}});
  contractPlan=await ok(url+'/contract-preview',contractSelection);eq(contractPlan.items.length,3);eq(contractPlan.excludedServices,['BATCH_TOTAL']);
+ // Production regression: the aggregate was removed from the contract after its draft existed.
+ await prisma.contractService.deleteMany({where:{companyId:company.id,contractId:batchServices[0].inp.id,serviceId:parentService.id}});
+ let unlinked=await ok(url+'/contract-preview',contractSelection);eq(unlinked.items.length,3);eq(unlinked.excludedServices,['BATCH_TOTAL']);
+ let unlinkedStatement=await ok(url+'/statement-preview',bs);eq(unlinkedStatement.data.lines.length,3);eq(unlinkedStatement.data.totals,grouped.data.totals);
+ const unlinkedSave=await ok(url+'/statement-create',{...bs,digest:unlinkedStatement.digest,confirmed:true},201);eq(unlinkedSave.version,1);
+ eq(await prisma.inputReconciliation.findUniqueOrThrow({where:{id:parentDraft.id}}),parentDraft);
+ eq((await post(url+'/'+parentDraft.id+'/approve',{expectedUpdatedAt:parentDraft.updatedAt.toISOString(),confirmed:true})).statusCode,409);
+ const annotated=(await request('GET',url+'?period=2026-10&inputContractId='+batchServices[0].inp.id)).json();eq(annotated.items.find(r=>r.id===parentDraft.id).aggregateReference,true);eq(annotated.items.filter(r=>r.aggregateReference).length,1);
+ // Even a superseded aggregate source stays identifiable by service family, not its current source ID.
+ await prisma.revenue.update({where:{id:parentRevenue.id},data:{isCurrent:false,status:'SUPERSEDED'}});
+ unlinkedStatement=await ok(url+'/statement-preview',bs);eq(unlinkedStatement.data.lines.length,3);eq(unlinkedStatement.data.totals,grouped.data.totals);
+ const unlinkedPdf=await post(url+'/statement-pdf-preview',{...bs,digest:unlinkedStatement.digest,confirmed:true});eq(unlinkedPdf.statusCode,200);
+ if(process.env.FINANCE_PROOF_ROOT)await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-unlinked-total-reference.pdf'),unlinkedPdf.rawPayload);
+ const inactiveParentAp=await prisma.accountPayable.create({data:{companyId:company.id,inputReconId:parentDraft.id,currency:'VND',originalAmount:parentDraft.payableAmount,outstandingAmount:parentDraft.payableAmount}});
+ eq((await post(url+'/contract-preview',contractSelection)).statusCode,409);eq((await post(url+'/statement-preview',bs)).statusCode,409);await prisma.accountPayable.delete({where:{id:inactiveParentAp.id}});
+ // Relationship-only recognition works when imported/native child metadata is absent.
+ for(const r of batchRows)await prisma.revenue.update({where:{id:r.id},data:{calculationJson:r.calculationJson}});
+ for(const x of batchServices)await prisma.serviceRelationship.create({data:{companyId:company.id,parentServiceId:parentService.id,childServiceId:x.svc.id,relationshipType:'AGGREGATED',effectiveFrom:new Date('2026-01-01')}});
+ unlinked=await ok(url+'/contract-preview',contractSelection);eq(unlinked.items.length,3);eq(unlinked.excludedServices,['BATCH_TOTAL']);
+ eq((await ok(url+'/statement-preview',bs)).data.lines.length,3);eq(await prisma.inputReconciliation.findUniqueOrThrow({where:{id:parentDraft.id}}),parentDraft);
  eq(await prisma.accountPayable.count(),beforeBatch.ap);eq(await prisma.cashEntry.count(),beforeBatch.cash);
  console.log('PASS: '+checks+' InputRecon/AP assertions including aggregate/child deduplication, contract-driven preview, immutable legacy total, AP conflict protection, complete scopes and no cash.');
 }finally{await app.close();await prisma.$disconnect();}

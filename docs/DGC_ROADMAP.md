@@ -10,6 +10,8 @@
 
 **Sửa cấp tổng/chi tiết v0.6.96:** chỉ dùng dịch vụ con, giữ dòng tổng để tham chiếu; thao tác chọn hợp đồng/kỳ trực tiếp, bỏ chọn từng dịch vụ. [Bàn giao mới](handover/DGC_INPUT_CONTRACT_FIRST_20261110.md). Chờ triển khai và owner lập PDF mới.
 
+**Tương thích nháp tổng cũ v0.6.97:** giữ dòng tổng đã bỏ khỏi cấu hình hợp đồng như tham chiếu, không chặn hoặc cộng vào biên bản ba dịch vụ con. [Bàn giao](handover/DGC_INPUT_LEGACY_TOTAL_20261110.md). 360 API/24 browser đạt; chờ triển khai.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |

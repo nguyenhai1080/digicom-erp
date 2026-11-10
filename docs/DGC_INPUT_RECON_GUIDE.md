@@ -10,3 +10,5 @@
 Dòng tổng và tệp cũ vẫn được giữ trong hồ sơ, không cần xóa để lập lại PDF. Nếu dòng tổng đã có công nợ, hệ thống báo xung đột để xử lý riêng, không tự sửa số tiền thật. Nguồn thay đổi cần xem lại; hồ sơ đã chuyển và bản đã duyệt không tự tính lại.
 
 Form v0.6.94 trở đi dùng Letter ngang, bảng 8 cột ô gộp. Tên pháp nhân lấy từ cấu hình Invoice/hồ sơ đối tác. PDF VND làm tròn từng dòng rồi cộng; sổ giữ hai chữ số thập phân. PDF đã lưu trước đó giữ nguyên; chủ động lập phiên bản mới để nhận mẫu và phạm vi mới. Quỹ/ngân hàng vẫn chờ thiết lập riêng.
+
+Từ v0.6.97, nháp tổng cũ vẫn được nhận diện là tham chiếu dù dịch vụ tổng đã bỏ khỏi danh mục hợp đồng hiện hành. Không cần xóa nháp; mở lại Lập biên bản theo hợp đồng để lấy ba dòng chi tiết. Nếu còn lỗi về dòng khác, thông báo nêu mã hồ sơ/dịch vụ/nguồn cần kiểm tra.

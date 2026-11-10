@@ -1,3 +1,5 @@
+**10/11 — v0.6.97 chuẩn bị:** sửa nháp tổng cũ không còn trong liên kết hợp đồng hiện hành vẫn chặn biên bản. Nhận diện qua parentServiceId/quan hệ của ba dịch vụ con; IR-0001 giữ làm tham chiếu, không tính/duyệt thêm. [Bàn giao](docs/handover/DGC_INPUT_LEGACY_TOTAL_20261110.md). 360 API + 24 browser đạt; đã đọc phiên thật xác nhận bốn Draft/chưa AP, không ghi sổ thật. Chờ triển khai.
+
 **10/11 — v0.6.96 chuẩn bị:** sửa cộng trùng dịch vụ tổng/con bằng quan hệ cha–con và metadata nguồn; biên bản chỉ dùng chi tiết, nháp tổng cũ giữ nguyên và không duyệt thêm AP. Thao tác mới chọn kỳ/hợp đồng → Lập biên bản theo hợp đồng, không tick dịch vụ. [Bàn giao](docs/handover/DGC_INPUT_CONTRACT_FIRST_20261110.md). Linux 336 API và 20 browser đạt; chờ owner triển khai/PDF mới, không sửa sổ thật.
 
 **10/11 — v0.6.95 chuẩn bị:** biên bản đầu vào phải đủ dịch vụ hợp đồng/kỳ. Chọn một nguồn cũng tự mở đủ nhóm, bổ sung nháp thiếu và giữ bản đã có; chặn tạo/in từng phần hoặc cộng dòng ngoài phạm vi. [Bàn giao](docs/handover/DGC_INPUT_FULL_CONTRACT_20261110.md). Chờ triển khai; không sửa sổ thật/captured/cash.
