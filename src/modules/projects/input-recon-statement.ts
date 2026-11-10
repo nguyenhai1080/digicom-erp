@@ -1,3 +1,4 @@
+import {inputContractSources} from './input-recon-coverage.js';
 import type {FastifyInstance} from 'fastify';
 import {prisma,Prisma} from '@erp/db';
 import {z} from 'zod';
@@ -35,6 +36,11 @@ async function statementPlan(tx:Prisma.TransactionClient,companyId:string,body:z
   const data:CapturedInputStatement={captured:true,period:body.period,reconDate:body.reconDate,issuer:config.profile.issuerName,partner:first.inputPartner.legalName,partnerKey:first.inputPartner.partnerKey,contractNumber:first.inputContract.contractNumber??first.inputContract.contractCode,currency,lines:rows.map(r=>({code:r.inputReconCode,service:r.service.serviceName,baseUsd:r.baseUsd.toFixed(2),shareRate:r.shareRate.toFixed(),foreignAmount:r.foreignAmount.toFixed(2),fxRate:r.fxRate.toFixed(),localAmount:r.localAmount.toFixed(2),taxRate:r.taxRate.toFixed(),taxAmount:r.taxAmount.toFixed(2),whtAmount:r.whtAmount.toFixed(2),payableAmount:r.payableAmount.toFixed(2)})),totals:{baseUsd:sum('baseUsd'),foreignAmount:sum('foreignAmount'),localAmount:sum('localAmount'),taxAmount:sum('taxAmount'),whtAmount:sum('whtAmount'),payableAmount:sum('payableAmount')}};
   const latest=await tx.document.aggregate({where:{companyId,entityType:'InputReconStatement',entityId:first.inputContractId,documentType:'INPUT_RECON',documentNumber:body.period},_max:{versionNo:true}}),version=(latest._max.versionNo??0)+1;
   return {rows,data,version,digest:inputDigest({selection:body,data,profile:config.metadata,rows:rows.map(r=>({id:r.id,updatedAt:r.updatedAt,sourceDigest:r.sourceDigest})),version})};
+ }
+ for(const outputPartnerId of new Set(rows.map(r=>r.outputPartnerId))){
+  const expected=await inputContractSources(tx,companyId,first.inputContractId,body.period,outputPartnerId);
+  if(rows.some(r=>r.outputPartnerId===outputPartnerId&&!expected.some(source=>source.id===r.sourceRevenueId)))fail('Có dòng đối soát không còn thuộc phạm vi dịch vụ/nguồn hiện tại của hợp đồng; cần kiểm tra bản cũ trước khi lập biên bản, không cộng trùng.');
+  if(expected.some(source=>!rows.some(r=>r.sourceRevenueId===source.id)))fail('Biên bản chưa đủ dịch vụ/nguồn của hợp đồng. Cần tạo đủ các dòng còn thiếu trước khi in.');
  }
  const round=(d:Prisma.Decimal)=>d.toDecimalPlaces(currency==='VND'?0:2,Prisma.Decimal.ROUND_HALF_UP);
  const groups=new Map<string,InputStatement['lines'][number]>();
