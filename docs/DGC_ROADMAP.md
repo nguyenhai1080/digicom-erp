@@ -8,6 +8,8 @@
 
 **Luồng hợp đồng v0.6.95:** đã chuẩn bị kiểm đủ các dịch vụ con và nguồn khi tạo nháp/lập biên bản; chọn một dòng tự xem toàn hợp đồng, giữ bản đã có và bổ sung phần thiếu. Chờ triển khai và owner thử lại. [Bàn giao](handover/DGC_INPUT_FULL_CONTRACT_20261110.md).
 
+**Sửa cấp tổng/chi tiết v0.6.96:** chỉ dùng dịch vụ con, giữ dòng tổng để tham chiếu; thao tác chọn hợp đồng/kỳ trực tiếp, bỏ chọn từng dịch vụ. [Bàn giao mới](handover/DGC_INPUT_CONTRACT_FIRST_20261110.md). Chờ triển khai và owner lập PDF mới.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |

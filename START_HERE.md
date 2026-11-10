@@ -1,3 +1,5 @@
+**10/11 — v0.6.96 chuẩn bị:** sửa cộng trùng dịch vụ tổng/con bằng quan hệ cha–con và metadata nguồn; biên bản chỉ dùng chi tiết, nháp tổng cũ giữ nguyên và không duyệt thêm AP. Thao tác mới chọn kỳ/hợp đồng → Lập biên bản theo hợp đồng, không tick dịch vụ. [Bàn giao](docs/handover/DGC_INPUT_CONTRACT_FIRST_20261110.md). Linux 336 API và 20 browser đạt; chờ owner triển khai/PDF mới, không sửa sổ thật.
+
 **10/11 — v0.6.95 chuẩn bị:** biên bản đầu vào phải đủ dịch vụ hợp đồng/kỳ. Chọn một nguồn cũng tự mở đủ nhóm, bổ sung nháp thiếu và giữ bản đã có; chặn tạo/in từng phần hoặc cộng dòng ngoài phạm vi. [Bàn giao](docs/handover/DGC_INPUT_FULL_CONTRACT_20261110.md). Chờ triển khai; không sửa sổ thật/captured/cash.
 
 **10/11 — v0.6.94 chuẩn bị:** dựng lại PDF đối soát đầu vào theo form owner: Letter ngang, serif, bảng 8 cột ô gộp, tổng/bằng chữ/đại diện. [Bàn giao](docs/handover/DGC_INPUT_FORM_20261110.md). Linux 288 API/PDF regression và 33 đối chiếu form đạt; chờ triển khai. PDF cũ giữ nguyên, chủ động lập phiên bản mới để nhận mẫu mới. Không đổi tiền/công thức/captured/cash.
