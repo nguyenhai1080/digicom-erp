@@ -34,3 +34,7 @@ API/web build đạt. 33 kiểm tra helper cho tiền chính xác, lớn hơn sa
 ## Triển khai
 
 Không đổi schema/env/roles/importers hoặc dữ liệu/PDF. Source phát triển dgc/main, gói một website sinh bằng package-single-site.mjs trên codex/dgc-deploy. Owner triển khai lại rồi Ctrl+F5; chưa xác nhận host đã lên v0.6.92 hoặc nghiệm thu số liệu/nghiệp vụ thật. Bàn giao này thay trạng thái Dashboard chỉ là mockup trong các ghi chú cũ. Quỹ/ngân hàng tiếp tục chờ owner yêu cầu áp dụng.
+
+## Xác nhận bản online — 10/11/2026
+
+Kiểm GET công khai tại erp.digicomjsc.com xác nhận health release 0.6.92, DB connected; asset UI index-CTXvoaaV.js SHA256 46fc62a9269f07489fbd2aaab9cab52d45d726e2dc5b08b0afe0f1781716bebb khớp byte gói nguồn cb6eb71/deploy 98c1e4d. Trạng thái chờ triển khai ở trên đã được thay bằng xác nhận này. Không đọc dữ liệu tài chính/đăng nhập trong lượt kiểm; nghiệm thu báo cáo và nghiệp vụ của người dùng vẫn chưa được xác nhận. Xem roadmap rà soát 10/11.
