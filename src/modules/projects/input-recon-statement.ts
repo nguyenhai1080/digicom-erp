@@ -1,4 +1,4 @@
-import {inputContractSources} from './input-recon-coverage.js';
+import {inputContractCoverage} from './input-recon-coverage.js';
 import type {FastifyInstance} from 'fastify';
 import {prisma,Prisma} from '@erp/db';
 import {z} from 'zod';
@@ -11,7 +11,7 @@ import {renderInputStatement,type InputStatement} from './input-recon-pdf.js';
 import {usdWords} from './invoice-template.js';
 import {renderCapturedInputStatement,type CapturedInputStatement} from './input-recon-captured-pdf.js';
 
-const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v),selection=z.object({period:z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),inputPartnerId:z.uuid(),inputContractId:z.uuid().optional(),reconDate:date,includeApproved:z.boolean().default(true),sourceMode:z.enum(['CURRENT','CAPTURED']).default('CURRENT')}).strict();
+const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v),selection=z.object({period:z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),inputPartnerId:z.uuid(),inputContractId:z.uuid().optional(),outputPartnerId:z.uuid().optional(),reconDate:date,includeApproved:z.boolean().default(true),sourceMode:z.enum(['CURRENT','CAPTURED']).default('CURRENT')}).strict();
 function fail(s:string):never{throw new CommandError(409,s);}
 export function inputVndWords(value:string){
  let n=BigInt(D(value).toDecimalPlaces(0,Prisma.Decimal.ROUND_HALF_UP).toFixed(0));if(n===0n)return 'Không đồng chẵn';
@@ -23,9 +23,18 @@ export function inputVndWords(value:string){
 }
 async function statementPlan(tx:Prisma.TransactionClient,companyId:string,body:z.infer<typeof selection>){
  await requireDgc(tx,companyId);
- const all=await tx.inputReconciliation.findMany({where:{companyId,period:body.period,inputPartnerId:body.inputPartnerId,...(body.inputContractId?{inputContractId:body.inputContractId}:{}),status:{in:body.includeApproved?['DRAFT','GENERATED','APPROVED']:['DRAFT','GENERATED']}},include:{service:true,inputContract:true,inputPartner:true,outputPartner:true},orderBy:[{serviceId:'asc'},{inputReconCode:'asc'},{id:'asc'}],take:501});
+ const all=await tx.inputReconciliation.findMany({where:{companyId,period:body.period,inputPartnerId:body.inputPartnerId,...(body.outputPartnerId?{outputPartnerId:body.outputPartnerId}:{}),...(body.inputContractId?{inputContractId:body.inputContractId}:{}),status:{in:body.includeApproved?['DRAFT','GENERATED','APPROVED']:['DRAFT','GENERATED']}},include:{service:true,inputContract:true,inputPartner:true,outputPartner:true},orderBy:[{serviceId:'asc'},{inputReconCode:'asc'},{id:'asc'}],take:501});
  if(all.length>500)fail('Vượt 500 dòng đối soát trong phạm vi đã chọn.');
- const captured=body.sourceMode==='CAPTURED',rows=all.filter(r=>isCapturedInput(r)===captured);
+ const captured=body.sourceMode==='CAPTURED';let rows=all.filter(r=>isCapturedInput(r)===captured);const excludedServices:string[]=[];
+ if(new Set(rows.map(r=>r.inputContractId)).size>1)fail('Có nhiều hợp đồng Input; chọn một hợp đồng để lập đúng một biên bản.');
+ if(!captured&&rows.length){
+  for(const outputPartnerId of new Set(rows.map(r=>r.outputPartnerId))){
+   const coverage=await inputContractCoverage(tx,companyId,rows[0].inputContractId,body.period,outputPartnerId);
+   excludedServices.push(...coverage.excludedServices);rows=rows.filter(r=>!coverage.excludedSourceIds.includes(r.sourceRevenueId));
+   if(rows.some(r=>r.outputPartnerId===outputPartnerId&&!coverage.sources.some(source=>source.id===r.sourceRevenueId)))fail('Có dòng đối soát không còn thuộc phạm vi dịch vụ/nguồn hiện tại của hợp đồng; cần kiểm tra bản cũ trước khi lập biên bản, không cộng trùng.');
+   if(coverage.sources.some(source=>!rows.some(r=>r.sourceRevenueId===source.id)))fail('Biên bản chưa đủ dịch vụ/nguồn của hợp đồng. Cần tạo đủ các dòng còn thiếu trước khi in.');
+  }
+ }
  if(!rows.length)fail(captured?'Không có hồ sơ chuyển sổ trong phạm vi đã chọn.':'Không có đối soát mới; hồ sơ chuyển sổ dùng chức năng In số liệu đã chuyển.');
  if(new Set(rows.map(r=>r.inputContractId)).size!==1)fail('Có nhiều hợp đồng Input; chọn một hợp đồng để lập đúng một biên bản.');
  if(new Set(rows.map(r=>r.currency+(captured?'':'|'+r.fxRate.toFixed()))).size!==1)fail('Các dòng khác tiền tệ hoặc tỷ giá; cần đối chiếu trước khi in.');
@@ -35,12 +44,7 @@ async function statementPlan(tx:Prisma.TransactionClient,companyId:string,body:z
   const config=await readDgcInvoiceProfile(tx,companyId),sum=(k:'baseUsd'|'foreignAmount'|'localAmount'|'taxAmount'|'whtAmount'|'payableAmount')=>rows.reduce((s,r)=>s.plus(r[k]),D('0')).toFixed(2);
   const data:CapturedInputStatement={captured:true,period:body.period,reconDate:body.reconDate,issuer:config.profile.issuerName,partner:first.inputPartner.legalName,partnerKey:first.inputPartner.partnerKey,contractNumber:first.inputContract.contractNumber??first.inputContract.contractCode,currency,lines:rows.map(r=>({code:r.inputReconCode,service:r.service.serviceName,baseUsd:r.baseUsd.toFixed(2),shareRate:r.shareRate.toFixed(),foreignAmount:r.foreignAmount.toFixed(2),fxRate:r.fxRate.toFixed(),localAmount:r.localAmount.toFixed(2),taxRate:r.taxRate.toFixed(),taxAmount:r.taxAmount.toFixed(2),whtAmount:r.whtAmount.toFixed(2),payableAmount:r.payableAmount.toFixed(2)})),totals:{baseUsd:sum('baseUsd'),foreignAmount:sum('foreignAmount'),localAmount:sum('localAmount'),taxAmount:sum('taxAmount'),whtAmount:sum('whtAmount'),payableAmount:sum('payableAmount')}};
   const latest=await tx.document.aggregate({where:{companyId,entityType:'InputReconStatement',entityId:first.inputContractId,documentType:'INPUT_RECON',documentNumber:body.period},_max:{versionNo:true}}),version=(latest._max.versionNo??0)+1;
-  return {rows,data,version,digest:inputDigest({selection:body,data,profile:config.metadata,rows:rows.map(r=>({id:r.id,updatedAt:r.updatedAt,sourceDigest:r.sourceDigest})),version})};
- }
- for(const outputPartnerId of new Set(rows.map(r=>r.outputPartnerId))){
-  const expected=await inputContractSources(tx,companyId,first.inputContractId,body.period,outputPartnerId);
-  if(rows.some(r=>r.outputPartnerId===outputPartnerId&&!expected.some(source=>source.id===r.sourceRevenueId)))fail('Có dòng đối soát không còn thuộc phạm vi dịch vụ/nguồn hiện tại của hợp đồng; cần kiểm tra bản cũ trước khi lập biên bản, không cộng trùng.');
-  if(expected.some(source=>!rows.some(r=>r.sourceRevenueId===source.id)))fail('Biên bản chưa đủ dịch vụ/nguồn của hợp đồng. Cần tạo đủ các dòng còn thiếu trước khi in.');
+  return {rows,data,version,excludedServices,digest:inputDigest({selection:body,data,profile:config.metadata,rows:rows.map(r=>({id:r.id,updatedAt:r.updatedAt,sourceDigest:r.sourceDigest})),version})};
  }
  const round=(d:Prisma.Decimal)=>d.toDecimalPlaces(currency==='VND'?0:2,Prisma.Decimal.ROUND_HALF_UP);
  const groups=new Map<string,InputStatement['lines'][number]>();
@@ -59,11 +63,11 @@ async function statementPlan(tx:Prisma.TransactionClient,companyId:string,body:z
  const data:InputStatement={period:body.period,reconDate:body.reconDate,fromDate:body.period+'-01',toDate,issuer:config.profile.issuerName,partner:first.inputPartner.legalName,partnerKey:first.inputPartner.partnerKey,contractNumber:first.inputContract.contractNumber??first.inputContract.contractCode,outputPartners:[...new Set(rows.map(r=>r.outputPartner.partnerKey))],outputNetworks:[...new Set(rows.map(r=>r.outputPartner.partnerKey+(r.outputPartner.countryName?' - '+r.outputPartner.countryName:'')))],currency,fxRate:first.fxRate.toFixed(),deductions:rows.reduce((sum,r)=>sum.plus(r.taxAmount).plus(r.whtAmount),D('0')).toFixed(2),lines,totals,amountInWords:currency==='VND'?inputVndWords(totals.partnerAmount):usdWords(totals.partnerAmount)};
  const latest=await tx.document.aggregate({where:{companyId,entityType:'InputReconStatement',entityId:first.inputContractId,documentType:'INPUT_RECON',documentNumber:body.period},_max:{versionNo:true}});
  const version=(latest._max.versionNo??0)+1;
- return {rows,data,version,digest:inputDigest({selection:body,data,profile:config.metadata,rows:rows.map(r=>({id:r.id,updatedAt:r.updatedAt,sourceDigest:r.sourceDigest})),version})};
+ return {rows,data,version,excludedServices,digest:inputDigest({selection:body,data,profile:config.metadata,rows:rows.map(r=>({id:r.id,updatedAt:r.updatedAt,sourceDigest:r.sourceDigest})),version})};
 }
 let producing=false;
 export async function inputStatementRoutes(app:FastifyInstance,config:AuthConfig){
- app.post('/api/v1/input-recon/statement-preview',{onRequest:writeGuard('INPUT_RECON_GENERATE',config)},async req=>{const b=parse(selection,req.body);return prisma.$transaction(async tx=>{const p=await statementPlan(tx,req.auth!.companyId,b);return {data:p.data,digest:p.digest,rowIds:p.rows.map(r=>r.id)};},{isolationLevel:'RepeatableRead',timeout:30000});});
+ app.post('/api/v1/input-recon/statement-preview',{onRequest:writeGuard('INPUT_RECON_GENERATE',config)},async req=>{const b=parse(selection,req.body);return prisma.$transaction(async tx=>{const p=await statementPlan(tx,req.auth!.companyId,b);return {data:p.data,digest:p.digest,excludedServices:p.excludedServices,rowIds:p.rows.map(r=>r.id)};},{isolationLevel:'RepeatableRead',timeout:30000});});
  const confirmed=selection.extend({digest:z.string().regex(/^[a-f0-9]{64}$/),confirmed:z.literal(true)}).strict();
  for(const action of ['statement-pdf-preview','statement-create'] as const)app.post('/api/v1/input-recon/'+action,{onRequest:writeGuard('INPUT_RECON_GENERATE',config)},async(req,reply)=>{
   if(producing)throw new CommandError(429,'Đang tạo biên bản khác. Thử lại sau.');producing=true;const rollback:string[]=[];
