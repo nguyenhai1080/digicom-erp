@@ -6,6 +6,8 @@
 
 **Mẫu in đầu vào v0.6.94:** đã dựng lại theo form owner sau phản hồi v0.6.93; chờ triển khai, PDF đã lưu cũ không bị ghi đè. [Bàn giao mẫu in](handover/DGC_INPUT_FORM_20261110.md).
 
+**Luồng hợp đồng v0.6.95:** đã chuẩn bị kiểm đủ các dịch vụ con và nguồn khi tạo nháp/lập biên bản; chọn một dòng tự xem toàn hợp đồng, giữ bản đã có và bổ sung phần thiếu. Chờ triển khai và owner thử lại. [Bàn giao](handover/DGC_INPUT_FULL_CONTRACT_20261110.md).
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |

@@ -151,6 +151,12 @@ try{
  eq((await post(url+'/batch-preview',batch)).statusCode,409);
  await ok('/api/v1/revenue-fx/import',{items:[{period:'2026-10',rate:'25750',source:'Synthetic October fixture only'}],confirmed:true});
  let bp=await ok(url+'/batch-preview',batch);eq(bp.items.length,3);eq(bp.currency,'VND');eq(bp.payableAmount,'2787952.50');
+ const expanded=await ok(url+'/batch-preview',{revenueIds:[ids[0]]});eq(expanded.items.length,3);eq(expanded.digest,bp.digest);
+ const singlePreview=await ok(url+'/preview',{revenueId:ids[0]});eq((await post(url+'/generate',{revenueId:ids[0],digest:singlePreview.digest,confirmed:true})).statusCode,409);
+ eq((await post(url+'/batch-generate',{revenueIds:[ids[0]],digest:bp.digest,confirmed:true})).statusCode,409);
+ await prisma.revenue.update({where:{id:ids[2]},data:{status:'CANCELLED'}});
+ const missingChild=await post(url+'/batch-preview',{revenueIds:[ids[0]]});eq(missingChild.statusCode,409);eq(missingChild.json().message.includes('BATCH2'),true);
+ await prisma.revenue.update({where:{id:ids[2]},data:{status:batchRows[2].status}});
  eq((await request('GET',url+'/sources?period=2026-10&inputContractId='+batchServices[0].inp.id)).json().total,3);
  const inactiveCandidate=await prisma.contract.findFirstOrThrow({where:{companyId:company.id,dgcDirection:'Input',status:'DRAFT',services:{some:{serviceId:batchServices[1].svc.id}}}});
  const scopedInactive=(await request('GET',url+'/sources?period=2026-10&inputContractId='+inactiveCandidate.id)).json();eq(scopedInactive.total,1);eq(scopedInactive.items[0].ready,false);
@@ -193,6 +199,21 @@ try{
  const grouped=await ok(url+'/statement-preview',bs);eq(grouped.data.lines.length,3);eq(grouped.data.deductions,'309784.53');
  const groupedPdf=await post(url+'/statement-pdf-preview',{...bs,digest:grouped.digest,confirmed:true});eq(groupedPdf.statusCode,200);eq((await PDFDocument.load(groupedPdf.rawPayload)).getPageCount(),1);
  if(process.env.FINANCE_PROOF_ROOT)await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-contract-group.pdf'),groupedPdf.rawPayload);
+ const extraPlan=await ok(url+'/preview',{revenueId:otherRow.id});
+ const extraDraft=await ok(url+'/generate',{revenueId:otherRow.id,digest:extraPlan.digest,confirmed:true},201);
+ await prisma.inputReconciliation.update({where:{id:extraDraft.item.id},data:{inputContractId:batchServices[0].inp.id}});
+ const extraScope=await post(url+'/statement-preview',bs);eq(extraScope.statusCode,409);eq(extraScope.json().message.includes('không còn thuộc phạm vi'),true);
+ await prisma.inputReconciliation.update({where:{id:extraDraft.item.id},data:{inputContractId:otherPair.inp.id}});
+ // Simulate a pre-upgrade partial draft in this disposable fixture only.
+ const partial=await prisma.inputReconciliation.findFirstOrThrow({where:{sourceRevenueId:ids[0]}});
+ await prisma.inputReconciliation.deleteMany({where:{companyId:company.id,sourceRevenueId:{in:ids.slice(1)}}});
+ eq((await post(url+'/statement-preview',bs)).statusCode,409);
+ eq((await post(url+'/statement-pdf-preview',{...bs,digest:grouped.digest,confirmed:true})).statusCode,409);
+ eq((await post(url+'/statement-create',{...bs,digest:grouped.digest,confirmed:true})).statusCode,409);
+ const recover=await ok(url+'/batch-preview',{revenueIds:[ids[1]]});eq(recover.items.length,3);eq(recover.items.filter(r=>r.existing).length,1);
+ const recovered=await ok(url+'/batch-generate',{revenueIds:recover.items.map(r=>r.sourceRevenueId),digest:recover.digest,confirmed:true},201);eq(recovered.created,2);eq(recovered.existing,1);
+ eq(await prisma.inputReconciliation.findUniqueOrThrow({where:{id:partial.id}}),partial);
+ eq((await ok(url+'/statement-preview',bs)).data.lines.length,3);
  eq(await prisma.accountPayable.count(),beforeBatch.ap);eq(await prisma.cashEntry.count(),beforeBatch.cash);
  console.log('PASS: '+checks+' InputRecon/AP assertions including contract-scoped atomic batch, replay, concurrency, stale FX, captured printing and no cash.');
 }finally{await app.close();await prisma.$disconnect();}

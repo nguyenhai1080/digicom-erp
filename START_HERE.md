@@ -1,3 +1,5 @@
+**10/11 — v0.6.95 chuẩn bị:** biên bản đầu vào phải đủ dịch vụ hợp đồng/kỳ. Chọn một nguồn cũng tự mở đủ nhóm, bổ sung nháp thiếu và giữ bản đã có; chặn tạo/in từng phần hoặc cộng dòng ngoài phạm vi. [Bàn giao](docs/handover/DGC_INPUT_FULL_CONTRACT_20261110.md). Chờ triển khai; không sửa sổ thật/captured/cash.
+
 **10/11 — v0.6.94 chuẩn bị:** dựng lại PDF đối soát đầu vào theo form owner: Letter ngang, serif, bảng 8 cột ô gộp, tổng/bằng chữ/đại diện. [Bàn giao](docs/handover/DGC_INPUT_FORM_20261110.md). Linux 288 API/PDF regression và 33 đối chiếu form đạt; chờ triển khai. PDF cũ giữ nguyên, chủ động lập phiên bản mới để nhận mẫu mới. Không đổi tiền/công thức/captured/cash.
 
 **10/11 — chuẩn bị v0.6.93:** hoàn thiện thao tác đối soát đầu vào theo hợp đồng: chọn nhiều dịch vụ, xem trước/tạo nháp atomic, lọc kỳ/hợp đồng và chuyển sang biên bản PDF. [Bàn giao](docs/handover/DGC_INPUT_CONTRACT_WORKFLOW_20261110.md), [hướng dẫn](docs/DGC_INPUT_RECON_GUIDE.md). Linux 288 API/20 browser/17 công thức đạt; chờ owner triển khai và nghiệm thu thật. Không đổi công thức, không chạm sổ thật/cash.

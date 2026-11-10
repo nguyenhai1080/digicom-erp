@@ -1,3 +1,4 @@
+import {inputContractSources} from './input-recon-coverage.js';
 import type {FastifyInstance} from 'fastify';
 import {prisma,Prisma} from '@erp/db';
 import {z} from 'zod';
@@ -78,9 +79,12 @@ export async function lockInputSource(tx:Prisma.TransactionClient,companyId:stri
  await tx.$queryRaw`SELECT id FROM companies WHERE id=${companyId}::uuid FOR UPDATE`;
 }
 const batchSelection=z.object({revenueIds:z.array(z.uuid()).min(1).max(100).refine(ids=>new Set(ids).size===ids.length,'Không chọn nguồn trùng.')}).strict();
-async function inputBatchPlan(tx:Prisma.TransactionClient,companyId:string,revenueIds:string[]){
- const plans=[];for(const revenueId of [...revenueIds].sort())plans.push(await inputReconPlan(tx,companyId,revenueId));
+async function inputBatchPlan(tx:Prisma.TransactionClient,companyId:string,revenueIds:string[],expand=false){
+ let plans:Awaited<ReturnType<typeof inputReconPlan>>[]=[];for(const revenueId of [...revenueIds].sort())plans.push(await inputReconPlan(tx,companyId,revenueId));
  if(new Set(plans.map(p=>[p.data.period,p.data.inputContractId,p.data.outputPartnerId].join('|'))).size!==1)fail('Chọn các dịch vụ cùng kỳ, hợp đồng đầu vào và đối tác đầu ra để lập một biên bản.');
+ const seed=plans[0],sources=await inputContractSources(tx,companyId,seed.data.inputContractId,seed.data.period,seed.data.outputPartnerId);
+ if(expand){plans=[];for(const source of sources)plans.push(await inputReconPlan(tx,companyId,source.id));}
+ else if(sources.length!==plans.length||sources.some(r=>!plans.some(p=>p.data.sourceRevenueId===r.id)))fail('Phải lập đủ dịch vụ và nguồn của hợp đồng/kỳ. Xem lại toàn bộ hợp đồng trước khi tạo.');
  if(plans.some(p=>p.existing&&(p.existing.sourceDigest!==p.sourceDigest||isCapturedInput(p.existing))))fail('Một nguồn đã có đối soát khác cơ sở tính; xem lại riêng bản đã tạo.');
  for(const p of plans)if(p.existing)assertInputSnapshot(p.existing);
  const first=plans[0];
@@ -95,7 +99,7 @@ export async function inputReconRoutes(app:FastifyInstance,config:AuthConfig){
   const b=parse(action==='batch-preview'?batchSelection:batchSelection.extend({digest,confirmed:z.literal(true)}).strict(),req.body),user=req.auth!;
   const result=await prisma.$transaction(async tx=>{
    // All members must share the same period/output partner before the one existing scope lock.
-   const before=await inputBatchPlan(tx,user.companyId,b.revenueIds);
+   const before=await inputBatchPlan(tx,user.companyId,b.revenueIds,action==='batch-preview');
    if(action==='batch-preview')return {...before,plans:undefined,items:before.plans.map(p=>({...p.data,...p.summary,existing:!!p.existing}))};
    await lockInputSource(tx,user.companyId,b.revenueIds[0]);
    const plan=await inputBatchPlan(tx,user.companyId,b.revenueIds);
@@ -120,7 +124,7 @@ export async function inputReconRoutes(app:FastifyInstance,config:AuthConfig){
  app.post('/api/v1/input-recon/preview',{onRequest:writeGuard('INPUT_RECON_GENERATE',config)},async req=>{const b=parse(z.object({revenueId:z.uuid()}).strict(),req.body);return prisma.$transaction(async tx=>{const p=await inputReconPlan(tx,req.auth!.companyId,b.revenueId);return {...p.data,...p.summary,digest:p.sourceDigest,existing:p.existing?{id:p.existing.id,status:p.existing.status,updatedAt:p.existing.updatedAt}:null};},{isolationLevel:'RepeatableRead',timeout:30000});});
  app.post('/api/v1/input-recon/generate',{onRequest:writeGuard('INPUT_RECON_GENERATE',config)},async(req,reply)=>{
   const b=parse(z.object({revenueId:z.uuid(),digest,confirmed:z.literal(true)}).strict(),req.body),user=req.auth!;
-  const result=await prisma.$transaction(async tx=>{await lockInputSource(tx,user.companyId,b.revenueId);const p=await inputReconPlan(tx,user.companyId,b.revenueId);if(p.sourceDigest!==b.digest)fail('Nguồn, hợp đồng hoặc tỷ giá đã thay đổi. Xem lại trước khi tạo.');
+  const result=await prisma.$transaction(async tx=>{await lockInputSource(tx,user.companyId,b.revenueId);const p=await inputReconPlan(tx,user.companyId,b.revenueId);if(p.sourceDigest!==b.digest)fail('Nguồn, hợp đồng hoặc tỷ giá đã thay đổi. Xem lại trước khi tạo.');if((await inputContractSources(tx,user.companyId,p.data.inputContractId,p.data.period,p.data.outputPartnerId)).length>1)fail('Hợp đồng có nhiều dịch vụ/nguồn; dùng Lập đủ dịch vụ hợp đồng, không tạo nháp riêng từng dòng.');
    if(p.existing){if(p.existing.sourceDigest!==p.sourceDigest)fail('Đã có đối soát nhưng nguồn thay đổi; cần xem lại bản nháp.');return {item:p.existing,created:false};}
    const item=await tx.inputReconciliation.create({data:{companyId:user.companyId,inputReconCode:await code(tx,user.companyId,'INPUT_RECON','IR'),...p.data,sourceDigest:p.sourceDigest,sourceSnapshot:JSON.parse(JSON.stringify(p.snapshot)),createdById:user.userId}});
    await audit(tx,user,'INPUT_RECON_GENERATE','InputReconciliation',item.id,null,item);return {item,created:true};
