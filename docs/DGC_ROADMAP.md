@@ -12,6 +12,8 @@
 
 **Tương thích nháp tổng cũ v0.6.97:** giữ dòng tổng đã bỏ khỏi cấu hình hợp đồng như tham chiếu, không chặn hoặc cộng vào biên bản ba dịch vụ con. [Bàn giao](handover/DGC_INPUT_LEGACY_TOTAL_20261110.md). 360 API/24 browser đạt; chờ triển khai.
 
+**Đối soát đầu ra v0.6.98:** sửa lỗi chốt khi CRBT và MEUBEAT_(CRBT) là cùng một dịch vụ. Giữ hai dòng nguồn nhưng chỉ ghi một doanh thu nếu khớp toàn bộ tiền/hợp đồng. [Bàn giao](handover/DGC_RECON_ALIAS_POSTING_20261110.md). Kiểm thử đạt; chờ triển khai và owner tự chốt RUP0006.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |
