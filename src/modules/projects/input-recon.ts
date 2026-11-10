@@ -77,12 +77,43 @@ export async function lockInputSource(tx:Prisma.TransactionClient,companyId:stri
  await financialPeriodLock(tx,companyId,rv.partnerId,rv.periodStart.toISOString().slice(0,7));
  await tx.$queryRaw`SELECT id FROM companies WHERE id=${companyId}::uuid FOR UPDATE`;
 }
+const batchSelection=z.object({revenueIds:z.array(z.uuid()).min(1).max(100).refine(ids=>new Set(ids).size===ids.length,'Không chọn nguồn trùng.')}).strict();
+async function inputBatchPlan(tx:Prisma.TransactionClient,companyId:string,revenueIds:string[]){
+ const plans=[];for(const revenueId of [...revenueIds].sort())plans.push(await inputReconPlan(tx,companyId,revenueId));
+ if(new Set(plans.map(p=>[p.data.period,p.data.inputContractId,p.data.outputPartnerId].join('|'))).size!==1)fail('Chọn các dịch vụ cùng kỳ, hợp đồng đầu vào và đối tác đầu ra để lập một biên bản.');
+ if(plans.some(p=>p.existing&&(p.existing.sourceDigest!==p.sourceDigest||isCapturedInput(p.existing))))fail('Một nguồn đã có đối soát khác cơ sở tính; xem lại riêng bản đã tạo.');
+ for(const p of plans)if(p.existing)assertInputSnapshot(p.existing);
+ const first=plans[0];
+ return {plans,digest:inputDigest(plans.map(p=>({revenueId:p.data.sourceRevenueId,digest:p.sourceDigest}))),period:first.data.period,inputContractId:first.data.inputContractId,inputPartnerId:first.data.inputPartnerId,inputContractCode:first.summary.inputContractCode,inputPartnerKey:first.summary.inputPartnerKey,currency:first.data.currency,payableAmount:plans.reduce((sum,p)=>sum.plus(p.data.payableAmount),D('0')).toFixed(2)};
+}
 export async function inputReconRoutes(app:FastifyInstance,config:AuthConfig){
+ app.get('/api/v1/input-recon/contracts',{preHandler:requirePermission('INPUT_RECON_VIEW')},async req=>{
+  const companyId=req.auth!.companyId;
+  return prisma.$transaction(async tx=>{await requireDgc(tx,companyId);const rows=await tx.contract.findMany({where:{companyId,dgcDirection:'Input',partner:{companyId}},include:{partner:true},orderBy:[{contractCode:'asc'},{id:'asc'}],take:1001});if(rows.length>1000)fail('Vượt giới hạn danh mục hợp đồng đầu vào.');return {items:rows.map(c=>({id:c.id,contractCode:c.contractCode,contractNumber:c.contractNumber,partnerKey:c.partner.partnerKey,status:c.status,currency:c.currency}))};});
+ });
+ for(const action of ['batch-preview','batch-generate'] as const)app.post('/api/v1/input-recon/'+action,{onRequest:writeGuard('INPUT_RECON_GENERATE',config)},async(req,reply)=>{
+  const b=parse(action==='batch-preview'?batchSelection:batchSelection.extend({digest,confirmed:z.literal(true)}).strict(),req.body),user=req.auth!;
+  const result=await prisma.$transaction(async tx=>{
+   // All members must share the same period/output partner before the one existing scope lock.
+   const before=await inputBatchPlan(tx,user.companyId,b.revenueIds);
+   if(action==='batch-preview')return {...before,plans:undefined,items:before.plans.map(p=>({...p.data,...p.summary,existing:!!p.existing}))};
+   await lockInputSource(tx,user.companyId,b.revenueIds[0]);
+   const plan=await inputBatchPlan(tx,user.companyId,b.revenueIds);
+   if(!('digest'in b)||b.digest!==plan.digest)fail('Nguồn, hợp đồng hoặc tỷ giá đã thay đổi. Xem lại danh sách trước khi tạo.');
+   const items=[];let created=0;
+   for(const p of plan.plans){if(p.existing){items.push(p.existing);continue;}
+    const item=await tx.inputReconciliation.create({data:{companyId:user.companyId,inputReconCode:await code(tx,user.companyId,'INPUT_RECON','IR'),...p.data,sourceDigest:p.sourceDigest,sourceSnapshot:JSON.parse(JSON.stringify(p.snapshot)),createdById:user.userId}});
+    await audit(tx,user,'INPUT_RECON_GENERATE','InputReconciliation',item.id,null,item);items.push(item);created++;
+   }
+   return {items,created,existing:items.length-created,period:plan.period,inputContractId:plan.inputContractId,inputPartnerId:plan.inputPartnerId};
+  },{isolationLevel:'ReadCommitted',timeout:60000});
+  return reply.code('created'in result&&result.created?201:200).send(result);
+ });
  app.get('/api/v1/input-recon/sources',{preHandler:requirePermission('INPUT_RECON_VIEW')},async req=>{
-  const q=parse(z.object({period:period.optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict(),req.query),companyId=req.auth!.companyId;
-  return prisma.$transaction(async tx=>{await requireDgc(tx,companyId);const where:Prisma.RevenueWhereInput={companyId,isCurrent:true,currency:{in:['USD','VND']},status:{in:['INVOICE_READY','INVOICED','PARTIALLY_PAID','PAID']},reconciliation:{companyId,isCurrent:true,status:'APPROVED'},inputReconciliations:{none:{}},...(q.period?{periodStart:new Date(q.period+'-01')}:{})};
+  const q=parse(z.object({period:period.optional(),inputContractId:z.uuid().optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict(),req.query),companyId=req.auth!.companyId;
+  return prisma.$transaction(async tx=>{await requireDgc(tx,companyId);const where:Prisma.RevenueWhereInput={companyId,isCurrent:true,currency:{in:['USD','VND']},status:{in:['INVOICE_READY','INVOICED','PARTIALLY_PAID','PAID']},reconciliation:{companyId,isCurrent:true,status:'APPROVED'},inputReconciliations:{none:{}},service:{contractServices:{some:{companyId,contract:{companyId,dgcDirection:'Input'},...(q.inputContractId?{contractId:q.inputContractId}:{})}}},...(q.period?{periodStart:new Date(q.period+'-01')}:{})};
    const [rows,total]=await Promise.all([tx.revenue.findMany({where,include:{partner:true,service:true},orderBy:[{periodStart:'desc'},{revenueCode:'desc'},{id:'asc'}],take:10,skip:(q.page-1)*10}),tx.revenue.count({where})]);
-   const items=[];for(const r of rows){try{const p=await inputReconPlan(tx,companyId,r.id);items.push({id:r.id,...p.summary,...p.data,ready:true});}catch(e){if(!(e instanceof CommandError))throw e;items.push({id:r.id,period:r.periodStart.toISOString().slice(0,7),sourceRevenueCode:r.revenueCode,serviceKey:r.service.serviceKey,outputPartnerKey:r.partner.partnerKey,ready:false,message:e.message});}}
+   const items=[];for(const r of rows){try{const p=await inputReconPlan(tx,companyId,r.id);if(q.inputContractId&&p.data.inputContractId!==q.inputContractId)fail('Nguồn thuộc hợp đồng đầu vào khác đang hiệu lực; chọn đúng hợp đồng để tạo.');items.push({id:r.id,...p.summary,...p.data,ready:true});}catch(e){if(!(e instanceof CommandError))throw e;items.push({id:r.id,period:r.periodStart.toISOString().slice(0,7),sourceRevenueCode:r.revenueCode,serviceKey:r.service.serviceKey,outputPartnerKey:r.partner.partnerKey,ready:false,message:e.message});}}
    return {items,total,page:q.page,limit:10};
   },{isolationLevel:'RepeatableRead',timeout:30000});
  });
@@ -95,7 +126,7 @@ export async function inputReconRoutes(app:FastifyInstance,config:AuthConfig){
    await audit(tx,user,'INPUT_RECON_GENERATE','InputReconciliation',item.id,null,item);return {item,created:true};
   },{timeout:30000});return reply.code(result.created?201:200).send(result);
  });
- app.get('/api/v1/input-recon',{preHandler:requirePermission('INPUT_RECON_VIEW')},async req=>{const q=parse(z.object({period:period.optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict(),req.query),companyId=req.auth!.companyId;return prisma.$transaction(async tx=>{await requireDgc(tx,companyId);const where={companyId,...(q.period?{period:q.period}:{})};const [rows,total]=await Promise.all([tx.inputReconciliation.findMany({where,include:includes,orderBy:[{period:'desc'},{inputReconCode:'desc'},{id:'asc'}],take:10,skip:(q.page-1)*10}),tx.inputReconciliation.count({where})]);return {items:rows.map(inputReconDto),total,page:q.page,limit:10};});});
+ app.get('/api/v1/input-recon',{preHandler:requirePermission('INPUT_RECON_VIEW')},async req=>{const q=parse(z.object({period:period.optional(),inputContractId:z.uuid().optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict(),req.query),companyId=req.auth!.companyId;return prisma.$transaction(async tx=>{await requireDgc(tx,companyId);const where={companyId,...(q.period?{period:q.period}:{}),...(q.inputContractId?{inputContractId:q.inputContractId}:{})};const [rows,total]=await Promise.all([tx.inputReconciliation.findMany({where,include:includes,orderBy:[{period:'desc'},{inputReconCode:'desc'},{id:'asc'}],take:10,skip:(q.page-1)*10}),tx.inputReconciliation.count({where})]);return {items:rows.map(inputReconDto),total,page:q.page,limit:10};});});
  app.post('/api/v1/input-recon/:id/refresh',{onRequest:writeGuard('INPUT_RECON_GENERATE',config)},async req=>{
   const rid=id(req.params),b=parse(z.object({expectedUpdatedAt:timestamp,digest,confirmed:z.literal(true)}).strict(),req.body),user=req.auth!;
   return prisma.$transaction(async tx=>{const old=await tx.inputReconciliation.findFirst({where:{companyId:user.companyId,id:rid}});if(!old)throw new CommandError(404,'Không tìm thấy đối soát.');if(isCapturedInput(old))fail('Hồ sơ chuyển sổ giữ nguyên số liệu; không tính lại từ nguồn.');await lockInputSource(tx,user.companyId,old.sourceRevenueId);const r=await tx.inputReconciliation.findUniqueOrThrow({where:{id:rid},include:{payable:true}});unchanged(r,b.expectedUpdatedAt);if(!['DRAFT','GENERATED'].includes(r.status)||r.payable)fail('Bản đã duyệt/có AP không được tính lại.');const p=await inputReconPlan(tx,user.companyId,r.sourceRevenueId);if(p.sourceDigest!==b.digest)fail('Nguồn đã thay đổi; cần xem lại.');
