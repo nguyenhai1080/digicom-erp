@@ -1,3 +1,5 @@
+**10/11 — v0.6.94 chuẩn bị:** dựng lại PDF đối soát đầu vào theo form owner: Letter ngang, serif, bảng 8 cột ô gộp, tổng/bằng chữ/đại diện. [Bàn giao](docs/handover/DGC_INPUT_FORM_20261110.md). Linux 288 API/PDF regression và 33 đối chiếu form đạt; chờ triển khai. PDF cũ giữ nguyên, chủ động lập phiên bản mới để nhận mẫu mới. Không đổi tiền/công thức/captured/cash.
+
 **10/11 — chuẩn bị v0.6.93:** hoàn thiện thao tác đối soát đầu vào theo hợp đồng: chọn nhiều dịch vụ, xem trước/tạo nháp atomic, lọc kỳ/hợp đồng và chuyển sang biên bản PDF. [Bàn giao](docs/handover/DGC_INPUT_CONTRACT_WORKFLOW_20261110.md), [hướng dẫn](docs/DGC_INPUT_RECON_GUIDE.md). Linux 288 API/20 browser/17 công thức đạt; chờ owner triển khai và nghiệm thu thật. Không đổi công thức, không chạm sổ thật/cash.
 
 **10/11 — đã xác nhận v0.6.92 online:** health DB connected, UI khớp SHA256 gói phát hành. [Roadmap đã rà soát](docs/DGC_ROADMAP.md). Ghi chú “chờ triển khai” v0.6.82–v0.6.92 phía dưới là lịch sử; còn nghiệm thu thật kỳ 10, tài khoản nhân viên và báo cáo. Không thao tác sổ/host trong lượt kiểm công khai.

@@ -9,3 +9,5 @@
 Tỷ lệ và thuế lấy từ hợp đồng, cơ sở lấy từ doanh thu đầu ra đã chốt. Tỷ giá dùng đúng tháng, không tự chuyển tỷ giá tháng trước sang tháng mới. Khi nguồn/tỷ lệ/FX đổi sau xem trước, hệ thống yêu cầu xem lại. Bản nháp cũ có **Xem nguồn / cập nhật**; hồ sơ đã duyệt và số liệu chuyển từ hệ thống cũ không tự tính lại.
 
 Biên bản VND hiển thị số nguyên từng dòng; công nợ giữ hai chữ số thập phân theo công thức hiện có. Tài liệu mới không sao chép chữ ký số từ bản tham khảo. Chức năng thu chi/quỹ/ngân hàng vẫn chờ thiết lập riêng.
+
+Mẫu in v0.6.94 theo form đã gửi: khổ Letter ngang, bảng 8 cột ô gộp. PDF đã lưu trước đó được giữ nguyên; mở Biên bản, tạo PDF xem trước rồi lưu phiên bản mới để nhận mẫu mới. Tên pháp nhân lấy theo Cấu hình Invoice và hồ sơ đối tác.

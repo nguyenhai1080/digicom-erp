@@ -4,6 +4,8 @@
 
 **Bổ sung 10/11:** v0.6.93 đã chuẩn bị luồng đối soát đầu vào theo hợp đồng và tạo nháp nhiều dịch vụ, xem PDF/duyệt AP theo quyền. Chờ triển khai và owner nghiệm thu trên kỳ phát sinh. [Bàn giao](handover/DGC_INPUT_CONTRACT_WORKFLOW_20261110.md), [hướng dẫn](DGC_INPUT_RECON_GUIDE.md).
 
+**Mẫu in đầu vào v0.6.94:** đã dựng lại theo form owner sau phản hồi v0.6.93; chờ triển khai, PDF đã lưu cũ không bị ghi đè. [Bàn giao mẫu in](handover/DGC_INPUT_FORM_20261110.md).
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |
