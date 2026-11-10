@@ -134,5 +134,65 @@ try{
  eq((await request('GET',url+'/'+cap.id+'/pdf')).statusCode,200);eq((await post(url+'/statement-create',capPayload)).statusCode,409);
  const afterPrint=await prisma.inputReconciliation.findUniqueOrThrow({where:{id:cap.id}});const capApproved=await ok(url+'/'+cap.id+'/approve',{expectedUpdatedAt:afterPrint.updatedAt.toISOString(),confirmed:true});eq(capApproved.created,true);eq(capApproved.payable.originalAmount,'999627.78');eq(await moneySnapshot(),preserved);eq((await ok(url+'/'+cap.id+'/approve',{expectedUpdatedAt:afterPrint.updatedAt.toISOString(),confirmed:true})).created,false);eq(await prisma.cashEntry.count(),0);
  if(process.env.FINANCE_PROOF_ROOT)await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-captured-input.pdf'),capPdf.rawPayload);
- console.log('PASS: '+checks+' InputRecon/AP assertions including captured exact-value printing, no historical refresh, provenance, immutable source money, PDF rollback and explicit AP approval without cash.');
+ // Contract-scoped batch workflow; never creates AP or cash until separate approval.
+ const batchServices=[];
+ for(let n=0;n<3;n++){
+  const svc=await prisma.service.create({data:{companyId:company.id,serviceCode:'BATCH'+n,serviceKey:'BATCH'+n,serviceName:'Dịch vụ hợp đồng '+n,category:'OTHER'}});
+  const pair=await contracts(svc);if(n===0)batchServices.push({svc,...pair});else{
+   await prisma.contract.update({where:{id:pair.inp.id},data:{status:'DRAFT'}});
+   await prisma.contractService.create({data:{companyId:company.id,contractId:batchServices[0].inp.id,serviceId:svc.id,businessModel:'REVENUE_SHARE',dgcStatus:'ACTIVE',revenueShareRate:'.4'}});
+   batchServices.push({svc,out:pair.out,inp:batchServices[0].inp});
+  }
+ }
+ const batchRows=[];for(const x of batchServices)batchRows.push(await source(x.svc,x.out,'2026-10','100.25'));
+ const ids=batchRows.map(r=>r.id),batch={revenueIds:ids};
+ eq((await request('GET',url+'/contracts',undefined,{cookie:''})).statusCode,401);
+ const options=(await request('GET',url+'/contracts')).json();eq(options.items.some(c=>c.id===batchServices[0].inp.id&&c.partnerKey===input.partnerKey),true);
+ eq((await post(url+'/batch-preview',batch)).statusCode,409);
+ await ok('/api/v1/revenue-fx/import',{items:[{period:'2026-10',rate:'25750',source:'Synthetic October fixture only'}],confirmed:true});
+ let bp=await ok(url+'/batch-preview',batch);eq(bp.items.length,3);eq(bp.currency,'VND');eq(bp.payableAmount,'2787952.50');
+ eq((await request('GET',url+'/sources?period=2026-10&inputContractId='+batchServices[0].inp.id)).json().total,3);
+ const inactiveCandidate=await prisma.contract.findFirstOrThrow({where:{companyId:company.id,dgcDirection:'Input',status:'DRAFT',services:{some:{serviceId:batchServices[1].svc.id}}}});
+ const scopedInactive=(await request('GET',url+'/sources?period=2026-10&inputContractId='+inactiveCandidate.id)).json();eq(scopedInactive.total,1);eq(scopedInactive.items[0].ready,false);
+ eq((await request('GET',url+'/sources?period=2026-10&inputContractId='+randomUUID())).json().total,0);
+ eq((await post(url+'/batch-preview',{revenueIds:[ids[0],ids[0]]})).statusCode,400);
+ eq((await post(url+'/batch-preview',{revenueIds:[]})).statusCode,400);
+ eq((await post(url+'/batch-preview',{revenueIds:[...ids,randomUUID()]})).statusCode,404);
+ const otherSvc=await prisma.service.create({data:{companyId:company.id,serviceCode:'OTHER_BATCH',serviceKey:'OTHER_BATCH',serviceName:'Other contract',category:'OTHER'}}),otherPair=await contracts(otherSvc),otherRow=await source(otherSvc,otherPair.out,'2026-10');
+ eq((await post(url+'/batch-preview',{revenueIds:[ids[0],otherRow.id]})).statusCode,409);
+ const noInput=await prisma.service.create({data:{companyId:company.id,serviceCode:'NO_INPUT',serviceKey:'NO_INPUT',serviceName:'No input contract',category:'OTHER'}}),noPair=await contracts(noInput);
+ await prisma.contractService.deleteMany({where:{contractId:noPair.inp.id}});await source(noInput,noPair.out,'2026-10');
+ eq((await request('GET',url+'/sources?period=2026-10')).json().items.some(r=>r.serviceKey==='NO_INPUT'),false);
+ const payload={...batch,digest:bp.digest,confirmed:true},beforeBatch={rows:await prisma.inputReconciliation.count(),ap:await prisma.accountPayable.count(),cash:await prisma.cashEntry.count()};
+ await capability('INPUT_RECON_GENERATE',false);eq((await post(url+'/batch-generate',payload)).statusCode,403);await capability('INPUT_RECON_GENERATE',true);
+ eq((await post(url+'/batch-generate',payload,{'x-csrf-token':'bad'})).statusCode,403);
+ eq((await post(url+'/batch-generate',payload,{origin:'https://foreign.test'})).statusCode,403);
+ eq((await post(url+'/batch-generate',{...payload,digest:'0'.repeat(64)})).statusCode,409);
+ await prisma.configuration.update({where:{companyId_configKey:{companyId:company.id,configKey:'REVENUE_FX:2026-10'}},data:{configValue:JSON.stringify({rate:'25751',source:'Synthetic changed'})}});
+ eq((await post(url+'/batch-generate',payload)).statusCode,409);eq(await prisma.inputReconciliation.count(),beforeBatch.rows);
+ bp=await ok(url+'/batch-preview',batch);payload.digest=bp.digest;
+ await prisma.$executeRawUnsafe("CREATE FUNCTION input_batch_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='INPUT_RECON_GENERATE' AND (SELECT count(*) FROM input_reconciliations WHERE period='2026-10')>=2 THEN RAISE EXCEPTION 'synthetic mid-batch failure'; END IF; RETURN NEW; END $$");
+ await prisma.$executeRawUnsafe('CREATE TRIGGER input_batch_failure BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION input_batch_failure()');
+ try{eq((await post(url+'/batch-generate',payload)).statusCode,500);eq(await prisma.inputReconciliation.count(),beforeBatch.rows);}finally{await prisma.$executeRawUnsafe('DROP TRIGGER input_batch_failure ON audit_logs');await prisma.$executeRawUnsafe('DROP FUNCTION input_batch_failure()');}
+ const concurrent=await Promise.all([post(url+'/batch-generate',payload),post(url+'/batch-generate',payload)]);eq(concurrent.map(r=>r.statusCode).sort(),[200,201]);eq(await prisma.inputReconciliation.count(),beforeBatch.rows+3);
+ eq(await prisma.accountPayable.count(),beforeBatch.ap);eq(await prisma.cashEntry.count(),beforeBatch.cash);
+ const foreignCompany=await prisma.company.create({data:{companyCode:'OTHER_'+marker,companyName:'Other tenant',defaultCurrency:'USD'}});
+ const foreignUser=await prisma.user.create({data:{companyId:foreignCompany.id,email:marker+'-foreign@example.test',fullName:'Synthetic foreign user',passwordHash:'unused'}});
+ const foreignRole=await prisma.role.create({data:{companyId:foreignCompany.id,code:'FOREIGN',name:'Synthetic foreign role',permissions:{create:ps.map(p=>({permissionId:p.id}))}}});
+ await prisma.userRole.create({data:{userId:foreignUser.id,roleId:foreignRole.id}});
+ const foreignToken=randomBytes(32).toString('hex');await prisma.authSession.create({data:{companyId:foreignCompany.id,userId:foreignUser.id,tokenHash:tokenHash(foreignToken),expiresAt:new Date(Date.now()+3600000)}});
+ const foreignHeaders={cookie:'erp_session='+foreignToken,'x-csrf-token':csrfToken(foreignToken,config.secret)};
+ eq((await request('GET',url+'/contracts',undefined,foreignHeaders)).statusCode,404);
+ eq((await post(url+'/batch-preview',batch,foreignHeaders)).statusCode,404);
+ eq((await post(url+'/batch-generate',payload,foreignHeaders)).statusCode,404);
+ await capability('INPUT_RECON_VIEW',false);eq((await request('GET',url+'/contracts')).statusCode,403);await capability('INPUT_RECON_VIEW',true);
+ eq((await ok(url+'/batch-generate',{...payload,revenueIds:[...ids].reverse()})).created,0);
+ eq((await request('GET',url+'?period=2026-10&inputContractId='+batchServices[0].inp.id)).json().total,3);
+ eq((await request('GET',url+'/sources?period=2026-10&inputContractId='+batchServices[0].inp.id)).json().total,0);
+ const bs={period:'2026-10',inputPartnerId:input.id,inputContractId:batchServices[0].inp.id,reconDate:'2026-11-03',includeApproved:true};
+ const grouped=await ok(url+'/statement-preview',bs);eq(grouped.data.lines.length,3);eq(grouped.data.deductions,'309784.53');
+ const groupedPdf=await post(url+'/statement-pdf-preview',{...bs,digest:grouped.digest,confirmed:true});eq(groupedPdf.statusCode,200);eq((await PDFDocument.load(groupedPdf.rawPayload)).getPageCount(),1);
+ if(process.env.FINANCE_PROOF_ROOT)await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-contract-group.pdf'),groupedPdf.rawPayload);
+ eq(await prisma.accountPayable.count(),beforeBatch.ap);eq(await prisma.cashEntry.count(),beforeBatch.cash);
+ console.log('PASS: '+checks+' InputRecon/AP assertions including contract-scoped atomic batch, replay, concurrency, stale FX, captured printing and no cash.');
 }finally{await app.close();await prisma.$disconnect();}

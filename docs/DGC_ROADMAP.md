@@ -2,6 +2,8 @@
 
 **Trạng thái:** chuyển sổ đã hoàn tất; bản v0.6.92 đã online. Trọng tâm tiếp theo là nghiệm thu vận hành trên dữ liệu phát sinh thật. Không còn chờ triển khai các bản UI v0.6.82–0.6.92 như ghi chú cũ.
 
+**Bổ sung 10/11:** v0.6.93 đã chuẩn bị luồng đối soát đầu vào theo hợp đồng và tạo nháp nhiều dịch vụ, xem PDF/duyệt AP theo quyền. Chờ triển khai và owner nghiệm thu trên kỳ phát sinh. [Bàn giao](handover/DGC_INPUT_CONTRACT_WORKFLOW_20261110.md), [hướng dẫn](DGC_INPUT_RECON_GUIDE.md).
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |

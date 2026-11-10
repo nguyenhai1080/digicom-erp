@@ -1,3 +1,5 @@
+**10/11 — chuẩn bị v0.6.93:** hoàn thiện thao tác đối soát đầu vào theo hợp đồng: chọn nhiều dịch vụ, xem trước/tạo nháp atomic, lọc kỳ/hợp đồng và chuyển sang biên bản PDF. [Bàn giao](docs/handover/DGC_INPUT_CONTRACT_WORKFLOW_20261110.md), [hướng dẫn](docs/DGC_INPUT_RECON_GUIDE.md). Linux 288 API/20 browser/17 công thức đạt; chờ owner triển khai và nghiệm thu thật. Không đổi công thức, không chạm sổ thật/cash.
+
 **10/11 — đã xác nhận v0.6.92 online:** health DB connected, UI khớp SHA256 gói phát hành. [Roadmap đã rà soát](docs/DGC_ROADMAP.md). Ghi chú “chờ triển khai” v0.6.82–v0.6.92 phía dưới là lịch sử; còn nghiệm thu thật kỳ 10, tài khoản nhân viên và báo cáo. Không thao tác sổ/host trong lượt kiểm công khai.
 
 **07/11 — v0.6.92:** Dashboard kết hợp kinh doanh/điều hành đã xây: bốn KPI gồm Tài khoản, doanh thu/tăng trưởng theo bộ lọc, xu hướng và đóng góp dịch vụ, công việc toàn sổ, Phải trả và doanh thu lịch sử ở hàng phụ. [Bàn giao](docs/handover/DGC_DASHBOARD_BUSINESS_20261107.md). Kiểm tra 33 helper / 15 characterization / 32 API / 67 browser đạt; chờ owner triển khai, không sửa tiền/nguồn/cash.
