@@ -1,3 +1,4 @@
+import {planReconPostings} from './recon-postings.js';
 import {randomUUID} from 'node:crypto';
 import {financialFilename} from './document-filename.js';
 import type {FastifyInstance} from 'fastify';
@@ -51,12 +52,13 @@ async function review(tx:Prisma.TransactionClient,u:Upload){
   if(dgc&&candidates[0].c.currency!==(f.nativeCurrency??'USD')){errors.push('Hợp đồng DGC phải dùng đúng tiền tệ vận hành '+(f.nativeCurrency??'USD')+'.');continue;}
   bindings.push({lineNo:d.lineNo,serviceId:s.id,serviceKey:s.serviceKey,contractId:candidates[0].c.id,contractServiceId:candidates[0].cs.id,contractCode:candidates[0].c.contractCode,contractUpdatedAt:candidates[0].c.updatedAt,contractServiceUpdatedAt:candidates[0].cs.updatedAt});
  }
+ const postingPlan=dgc?planReconPostings(f.details,bindings,u.serviceId):{postings:bindings,references:[],errors:[]};errors.push(...postingPlan.errors);
  const signingMode=reconSigningMode(u.partner.partnerKey,company.companyCode);
  const assets=signingMode==='EXTERNAL_DIGITAL'?[]:await tx.document.findMany({where:{companyId:u.companyId,entityType:'CompanyAsset',entityId:u.companyId,documentType:'SIGNING_COMPOSITE',status:'ACTIVE'},select:{id:true,versionNo:true,attachment:{select:{mimeType:true,checksumSha256:true}}},take:2});
  if(signingMode!=='EXTERNAL_DIGITAL'&&assets.length!==1)errors.push('Chưa có ảnh ghép dấu/chữ ký/chức danh đang hiệu lực trong Tài sản công ty.');
  const signingAsset=assets.length===1?{id:assets[0].id,version:assets[0].versionNo,mime:assets[0].attachment.mimeType,checksum:assets[0].attachment.checksumSha256}:null;
- const digest=sha(JSON.stringify({updatedAt:u.updatedAt,checksum:u.attachment.checksumSha256,financial:f,assessment:a,bindings,signingMode,signingAsset}));
- return {item:stored(u),financial:f,assessment:a,bindings,signingMode,signingAsset,restampPermission:dgc?'RECON_RESTAMP':'RECON_APPROVE',operationalCurrency:f.nativeCurrency??(dgc?'USD':'MZN'),digest,errors:[...new Set(errors)],canFinalize:errors.length===0&&['OCR_EXTRACTED','UNDER_REVIEW'].includes(u.status)};
+ const digest=sha(JSON.stringify({updatedAt:u.updatedAt,checksum:u.attachment.checksumSha256,financial:f,assessment:a,bindings,postingPlan,signingMode,signingAsset}));
+ return {item:stored(u),financial:f,assessment:a,bindings,postingPlan,signingMode,signingAsset,restampPermission:dgc?'RECON_RESTAMP':'RECON_APPROVE',operationalCurrency:f.nativeCurrency??(dgc?'USD':'MZN'),digest,errors:[...new Set(errors)],canFinalize:errors.length===0&&['OCR_EXTRACTED','UNDER_REVIEW'].includes(u.status)};
 }
 let producing=false;
 export async function reconFinalizeRoutes(app:FastifyInstance,config:AuthConfig){
@@ -122,8 +124,8 @@ export async function reconFinalizeRoutes(app:FastifyInstance,config:AuthConfig)
      }
      const f=v.financial,start=new Date(u.period+'-01'),end=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+1,0)),now=new Date();
      const dgc=user.companyCode==='DGC',amounts=f.nativeCurrency?f.native!:dgc?f.usd!:f.mzn!;
-     const rec=await tx.reconciliation.create({data:{companyId:user.companyId,reconCode:await code(tx,user.companyId,'DGC_RECON','REC'),logicalGroupId:randomUUID(),partnerId:u.partnerId,contractId:v.assessment.contracts[0].id,periodStart:start,periodEnd:end,currency:f.nativeCurrency??(dgc?'USD':'MZN'),sourceType:'FILE_UPLOAD',sourceAttachmentId:u.attachmentId,sourceChecksum:u.attachment.checksumSha256,sourceReportedTotal:amounts.partnerRevenue,totalGrossRevenue:amounts.totalServiceRevenue,totalCompanyShare:amounts.remunerationProvider,totalWht:amounts.wht,totalNetRevenue:amounts.partnerRevenue,status:'APPROVED',validatedById:user.userId,validatedAt:now,approvedById:user.userId,approvedAt:now,createdById:user.userId,approvedSnapshot:JSON.parse(JSON.stringify({financial:f,bindings:v.bindings,uploadId:id,sourceChecksum:u.attachment.checksumSha256}))}});reconciliationId=rec.id;
-     for(const d of f.details){const b=v.bindings.find(b=>b.lineNo===d.lineNo)!,scopeKey=[u.partnerId,b.serviceId].join('|');
+     const rec=await tx.reconciliation.create({data:{companyId:user.companyId,reconCode:await code(tx,user.companyId,'DGC_RECON','REC'),logicalGroupId:randomUUID(),partnerId:u.partnerId,contractId:v.assessment.contracts[0].id,periodStart:start,periodEnd:end,currency:f.nativeCurrency??(dgc?'USD':'MZN'),sourceType:'FILE_UPLOAD',sourceAttachmentId:u.attachmentId,sourceChecksum:u.attachment.checksumSha256,sourceReportedTotal:amounts.partnerRevenue,totalGrossRevenue:amounts.totalServiceRevenue,totalCompanyShare:amounts.remunerationProvider,totalWht:amounts.wht,totalNetRevenue:amounts.partnerRevenue,status:'APPROVED',validatedById:user.userId,validatedAt:now,approvedById:user.userId,approvedAt:now,createdById:user.userId,approvedSnapshot:JSON.parse(JSON.stringify({financial:f,bindings:v.bindings,postingPlan:v.postingPlan,uploadId:id,sourceChecksum:u.attachment.checksumSha256}))}});reconciliationId=rec.id;
+     for(const b of v.postingPlan.postings){const d=f.details.find(d=>d.lineNo===b.lineNo)!,scopeKey=[u.partnerId,b.serviceId].join('|');
       const native=f.nativeCurrency==='VND',payable=native?d.partnerRevenue:d.usd.partnerRevenue;
       const operational=dgc&&!native?d.usd:d;
       const ri=await tx.reconciliationItem.create({data:{companyId:user.companyId,reconciliationId:rec.id,contractServiceId:b.contractServiceId,serviceId:b.serviceId,lineNo:d.lineNo,businessScopeKey:scopeKey,periodStart:start,periodEnd:end,grossRevenue:operational.totalServiceRevenue,companyShareAmount:operational.remunerationProvider,whtAmount:operational.wht,netRevenue:operational.partnerRevenue,calculationJson:JSON.parse(JSON.stringify({dgc:true,...d,uploadId:id}))}});
@@ -134,7 +136,7 @@ export async function reconFinalizeRoutes(app:FastifyInstance,config:AuthConfig)
     if(oldFinal?.documentId)await tx.document.updateMany({where:{companyId:user.companyId,id:oldFinal.documentId},data:{status:'SUPERSEDED'}});
     const finalization={reconciliationId,documentId:doc.id,documentVersion:version,signingMode:v.signingMode,signingAssetId:a?.document.id??null,signingAssetVersion:a?.document.versionNo??null,signingAssetChecksum:a?.document.attachment.checksumSha256??null,placement:a?body.placement:null,sourceChecksum:u.attachment.checksumSha256,approvedById:user.userId,approvedAt:new Date().toISOString(),placementOnly};
     const updated=await tx.outputReconUpload.update({where:{id},data:{status:'APPROVED',extractionData:{...metadata,financial:v.financial,identityVerified:true,financialDataVerified:true,finalization}},include});
-    await audit(tx,user,placementOnly?(v.signingMode==='EXTERNAL_DIGITAL'?'RECON_RESTORE_SOURCE':'RECON_RESTAMP'):'RECON_FINALIZE','OutputReconUpload',id,{status:u.status,finalization:oldFinal??null},{status:updated.status,finalization,financial:v.financial});
+    await audit(tx,user,placementOnly?(v.signingMode==='EXTERNAL_DIGITAL'?'RECON_RESTORE_SOURCE':'RECON_RESTAMP'):'RECON_FINALIZE','OutputReconUpload',id,{status:u.status,finalization:oldFinal??null},{status:updated.status,finalization,financial:v.financial,postingPlan:v.postingPlan});
     return {item:stored(updated),finalization,message:placementOnly?'Đã lưu bản PDF mới; số liệu đã chốt được giữ nguyên.':v.signingMode==='EXTERNAL_DIGITAL'?'Đã chốt đối soát và doanh thu; PDF gốc được giữ nguyên để ký số bên ngoài ERP. Có thể tạo Invoice.':'Đã chốt đối soát, doanh thu và lưu PDF có dấu/chữ ký. Có thể tạo Invoice.'};
    },{timeout:30000});return reply.code(201).send(result);
   }catch(e){try{await rollbackFiles(rollback);}catch(cleanup){request.log.error({err:cleanup},'Financial file rollback failed');}throw e;}finally{producing=false;}
