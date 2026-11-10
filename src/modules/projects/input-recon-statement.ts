@@ -23,15 +23,17 @@ export function inputVndWords(value:string){
 }
 async function statementPlan(tx:Prisma.TransactionClient,companyId:string,body:z.infer<typeof selection>){
  await requireDgc(tx,companyId);
- const all=await tx.inputReconciliation.findMany({where:{companyId,period:body.period,inputPartnerId:body.inputPartnerId,...(body.outputPartnerId?{outputPartnerId:body.outputPartnerId}:{}),...(body.inputContractId?{inputContractId:body.inputContractId}:{}),status:{in:body.includeApproved?['DRAFT','GENERATED','APPROVED']:['DRAFT','GENERATED']}},include:{service:true,inputContract:true,inputPartner:true,outputPartner:true},orderBy:[{serviceId:'asc'},{inputReconCode:'asc'},{id:'asc'}],take:501});
+ const all=await tx.inputReconciliation.findMany({where:{companyId,period:body.period,inputPartnerId:body.inputPartnerId,...(body.outputPartnerId?{outputPartnerId:body.outputPartnerId}:{}),...(body.inputContractId?{inputContractId:body.inputContractId}:{}),status:{in:body.includeApproved?['DRAFT','GENERATED','APPROVED']:['DRAFT','GENERATED']}},include:{service:true,inputContract:true,inputPartner:true,outputPartner:true,sourceRevenue:true},orderBy:[{serviceId:'asc'},{inputReconCode:'asc'},{id:'asc'}],take:501});
  if(all.length>500)fail('Vượt 500 dòng đối soát trong phạm vi đã chọn.');
  const captured=body.sourceMode==='CAPTURED';let rows=all.filter(r=>isCapturedInput(r)===captured);const excludedServices:string[]=[];
  if(new Set(rows.map(r=>r.inputContractId)).size>1)fail('Có nhiều hợp đồng Input; chọn một hợp đồng để lập đúng một biên bản.');
  if(!captured&&rows.length){
   for(const outputPartnerId of new Set(rows.map(r=>r.outputPartnerId))){
    const coverage=await inputContractCoverage(tx,companyId,rows[0].inputContractId,body.period,outputPartnerId);
-   excludedServices.push(...coverage.excludedServices);rows=rows.filter(r=>!coverage.excludedSourceIds.includes(r.sourceRevenueId));
-   if(rows.some(r=>r.outputPartnerId===outputPartnerId&&!coverage.sources.some(source=>source.id===r.sourceRevenueId)))fail('Có dòng đối soát không còn thuộc phạm vi dịch vụ/nguồn hiện tại của hợp đồng; cần kiểm tra bản cũ trước khi lập biên bản, không cộng trùng.');
+   excludedServices.push(...coverage.excludedServices);
+   for(const r of rows.filter(r=>r.outputPartnerId===outputPartnerId&&coverage.excludedServiceIds.includes(r.serviceId)))if(r.sourceRevenue.companyId!==companyId||r.sourceRevenue.serviceId!==r.serviceId||r.sourceRevenue.partnerId!==outputPartnerId||r.sourceRevenue.periodStart.toISOString().slice(0,7)!==body.period)fail('Liên kết hồ sơ tổng cũ không khớp dịch vụ/kỳ/mạng; cần kiểm tra hồ sơ '+r.inputReconCode+'.');
+   rows=rows.filter(r=>r.outputPartnerId!==outputPartnerId||!coverage.excludedServiceIds.includes(r.serviceId));
+   if(rows.some(r=>r.outputPartnerId===outputPartnerId&&!coverage.sources.some(source=>source.id===r.sourceRevenueId)))fail('Hồ sơ ngoài phạm vi cần kiểm tra: '+rows.filter(r=>r.outputPartnerId===outputPartnerId&&!coverage.sources.some(source=>source.id===r.sourceRevenueId)).map(r=>r.inputReconCode+' ('+r.service.serviceKey+'/'+r.sourceRevenue.revenueCode+')').join(', ')+'. Không tự cộng hoặc sửa hồ sơ này.');
    if(coverage.sources.some(source=>!rows.some(r=>r.sourceRevenueId===source.id)))fail('Biên bản chưa đủ dịch vụ/nguồn của hợp đồng. Cần tạo đủ các dòng còn thiếu trước khi in.');
   }
  }
