@@ -14,6 +14,8 @@
 
 **Đối soát đầu ra v0.6.98:** sửa lỗi chốt khi CRBT và MEUBEAT_(CRBT) là cùng một dịch vụ. Giữ hai dòng nguồn nhưng chỉ ghi một doanh thu nếu khớp toàn bộ tiền/hợp đồng. [Bàn giao](handover/DGC_RECON_ALIAS_POSTING_20261110.md). Kiểm thử đạt; chờ triển khai và owner tự chốt RUP0006.
 
+**Mẫu Invoice v0.6.99 — 11/11:** chuẩn bị đúng form MOVTV owner xác nhận, sửa ảnh trang xem trước bị CSP chặn. [Bàn giao](handover/DGC_INVOICE_OWNER_FORM_20261111.md). Mẫu GST/REGISTAR đã được owner rút lại. Chờ triển khai và tạo lại preview; giữ nguyên PDF đã lưu.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |

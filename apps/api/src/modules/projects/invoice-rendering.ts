@@ -9,7 +9,7 @@ const meta=(a:Awaited<ReturnType<typeof asset>>)=>({id:a.document.id,version:a.d
 export async function invoiceResources(tx:Prisma.TransactionClient,company:{id:string;companyCode:string}){
  if(company.companyCode==='DGC'){
   const config=await readDgcInvoiceProfile(tx,company.id),logo=await asset(tx,company.id,'COMPANY_LOGO'),stamp=await asset(tx,company.id,'COMPANY_STAMP'),signature=await asset(tx,company.id,'SIGNATURE');
-  return {kind:'DGC' as const,config,logo,stamp,signature,metadata:{template:config.metadata,logo:meta(logo),stamp:meta(stamp),signature:meta(signature)},bank:config.profile.bank,layout:'DGC_V61_V1',workbookExtension:'xlsx' as const};
+  return {kind:'DGC' as const,config,logo,stamp,signature,metadata:{rendererRevision:'DGC_MOVTV_202609_V2',template:config.metadata,logo:meta(logo),stamp:meta(stamp),signature:meta(signature)},bank:config.profile.bank,layout:'DGC_V61_V1',workbookExtension:'xlsx' as const};
  }
  if(company.companyCode!=='GST')throw new CommandError(409,'Chưa có mẫu Invoice cho công ty này.');
  const template=await asset(tx,company.id,'INVOICE_TEMPLATE'),signing=await asset(tx,company.id,'SIGNING_COMPOSITE'),profile=readGstTemplate(template.bytes);

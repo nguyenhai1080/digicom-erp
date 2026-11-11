@@ -26,7 +26,7 @@ export async function registerWeb(app:FastifyInstance,directory:string){
    const type=types[extname(filename).toLowerCase()];if(!type)return missing();
    const size=(await stat(filename)).size;if(size>16*1024*1024)return missing();
    reply.type(type).header('Cache-Control',/\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/.test(path)?'public, max-age=31536000, immutable':'no-cache');
-   reply.header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+   reply.header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
    return reply.send(request.method==='HEAD'?undefined:await readFile(filename));
   }catch(e){if(e instanceof Error&&'code' in e&&e.code==='ENOENT')return missing();throw e;}
  });
