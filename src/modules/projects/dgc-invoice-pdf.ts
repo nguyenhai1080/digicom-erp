@@ -2,20 +2,17 @@ import {PDFDocument,rgb} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {z} from 'zod';
 import {Prisma} from '@erp/db';
 import {CommandError} from './commands.js';
-import {image,drawPlacement,placementSchema,type Placement} from './financial-documents.js';
+import {image,drawPlacement,type Placement} from './financial-documents.js';
 import type {InvoiceData} from './invoice-template.js';
 import type {DgcInvoiceProfile} from './dgc-invoice-profile.js';
-export const dgcPlacementsSchema=z.object({stamp:placementSchema,signature:placementSchema}).strict();
-export type DgcPlacements=z.infer<typeof dgcPlacementsSchema>;
 type Picture={bytes:Buffer;mime:string|null};
-export type DgcPictures={logo:Picture;stamp:Picture;signature:Picture};
+export type DgcPictures={logo:Picture;signing:Picture};
 
 // Owner reference: Movtv INV 08 2026.pdf (11 Nov 2026). Presentation only.
 // Retain pagination for long invoices; never clip source lines to fit one page.
-export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfile,pictures:DgcPictures,placement?:DgcPlacements,includeSigning=true,onLayout?:(value:DgcPlacements)=>void,layoutOnly=false){
+export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfile,pictures:DgcPictures,placement?:Placement,includeSigning=true,onLayout?:(value:Placement)=>void,layoutOnly=false){
  if(data.companyCode!=='DGC'||!['USD','VND'].includes(data.currency??'USD'))throw new CommandError(409,'Mẫu Invoice DGC chỉ dùng cho DGC và USD/VND.');
  const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
  const unicode=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/NotoSans-Regular.ttf',import.meta.url))),{subset:true}),regular=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/LiberationSans-Regular.ttf',import.meta.url))),{subset:true}),bold=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/LiberationSans-Bold.ttf',import.meta.url))),{subset:true});
@@ -59,20 +56,19 @@ export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfil
  }
  const words='Amount in words: '+data.amountInWords.replace(/\.\/\.$/,'')+'./.';
  const bank=['Please make payment to:','Beneficiary: '+profile.bank.beneficiary,'Bank account number: '+profile.bank.account,'Bank name: '+profile.bank.bankName,'Bank address: '+profile.bank.bankAddress,'SWIFT code: '+profile.bank.swift];
- const stamp=await image(doc,pictures.stamp.bytes,pictures.stamp.mime),signature=await image(doc,pictures.signature.bytes,pictures.signature.mime);
- const caption=[...wrap(profile.signatureName,span*.42,8.25,true).map(s=>({s,strong:true})),...wrap(profile.signatureTitle,span*.42).map(s=>({s,strong:false}))];
- const captionHeight=caption.length*9+18,markHeight=Math.max(.16*width*stamp.height/stamp.width,.21*width*signature.height/signature.width);
- const footerHeight=20.25+11+wrap(words,span,8.25,true).length*12+11+bank.reduce((n,s)=>n+wrap(s).length*12,0)+34+markHeight+captionHeight;
+ const signing=await image(doc,pictures.signing.bytes,pictures.signing.mime);
+ const signingWidth=.26,markHeight=signingWidth*width*signing.height/signing.width;
+ const footerHeight=20.25+11+wrap(words,span,8.25,true).length*12+11+bank.reduce((n,s)=>n+wrap(s).length*12,0)+51+markHeight;
  if(footerHeight>700)throw new CommandError(422,'Thông tin thanh toán hoặc ảnh ký quá dài.');
  ensure(footerHeight);
  grid(y,y+20.25,1);center('Total ('+currency+')',cols[0],cols[2],y+7,8.25,true);
  [data.totals.revenue,data.totals.wht,data.totals.payable].forEach((v,n)=>{const m=money(v);if(measure(m,8.25,true)>cols[n+3]-cols[n+2]-10)throw new CommandError(422,'Tổng tiền Invoice vượt khổ cột.');text(m,cols[n+3]-5-measure(m,8.25,true),y+7,8.25,true);});y+=31.25;
  block(words,8.25,true);y+=11;bank.forEach((s,i)=>block(s,8.25,i===0));y+=24;
  text('Thank you for your business!',right-measure('Thank you for your business!'),y);const footerTop=y+15;
- const suggested:DgcPlacements={stamp:{page:doc.getPageCount(),x:.72,y:footerTop/height,width:.16},signature:{page:doc.getPageCount(),x:.77,y:footerTop/height,width:.21}};
- onLayout?.(suggested);const positions=placement??suggested;let bottom=footerTop;
- for(const [key,img] of [['stamp',stamp],['signature',signature]] as const){const p=positions[key],top=p.y*height,b=top+p.width*width*img.height/img.width;if(p.page!==doc.getPageCount()||top<footerTop-.01||b>790-captionHeight||p.x+p.width>1)throw new CommandError(400,'Dấu và chữ ký phải ở trang cuối, dưới thông tin thanh toán và trong khổ trang.');bottom=Math.max(bottom,b);if(includeSigning)drawPlacement(page,img,p);}
- let captionY=bottom+10;for(const line of caption){text(line.s,right-measure(line.s,8.25,line.strong),captionY,8.25,line.strong);captionY+=9;}
+ const suggested:Placement={page:doc.getPageCount(),x:.92-signingWidth,y:footerTop/height,width:signingWidth};
+ onLayout?.(suggested);const position=placement??suggested,top=position.y*height,bottom=top+position.width*width*signing.height/signing.width;
+ if(position.page!==doc.getPageCount()||top<footerTop-.01||bottom>790||position.x+position.width>1)throw new CommandError(400,'Ảnh ghép dấu/chữ ký/chức danh phải ở trang cuối, dưới thông tin thanh toán và trong khổ trang.');
+ if(includeSigning)drawPlacement(page,signing,position);
  // Physical source PDFs remain immutable. This footer uses configured issuer fields.
  for(const p of doc.getPages()){page=p;rule(807);const footer=['Head Office: '+profile.address.replace(/\s+/g,' ')+'. Tel: '+profile.phone+'; Fax: '+profile.fax,'Email: '+profile.email+' Website: '+profile.website].flatMap(s=>wrap(s,span,6.75));if(footer.length>3)throw new CommandError(422,'Địa chỉ chân trang Invoice quá dài.');footer.forEach((s,i)=>text(s,left,813+i*7.5,6.75));}
  doc.setTitle('Digicom Invoice '+data.invoiceNumber);return layoutOnly?Buffer.alloc(0):Buffer.from(await doc.save({useObjectStreams:false}));
