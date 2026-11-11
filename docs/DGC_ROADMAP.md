@@ -20,6 +20,8 @@
 
 **Tách Invoice v0.6.101:** tối ưu preview nhiều nhóm và sửa ngân sách chờ; bundle ba dịch vụ con vẫn một Invoice/ba dòng chi tiết. [Bàn giao](handover/DGC_SPLIT_INVOICE_PREVIEW_20261111.md). Chờ owner triển khai và xem trước lại.
 
+**Preview Invoice v0.6.102:** modal theo DGC cũ, chọn từng Invoice, kéo dấu/chữ ký trực tiếp và giữ vị trí riêng; liên kết PDF sau lưu nháp. [Bàn giao](handover/DGC_INVOICE_PREVIEW_WORKSPACE_20261111.md). 206 Linux API/42 browser/69 web đạt; chờ owner triển khai/nghiệm thu.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |

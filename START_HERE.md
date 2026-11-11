@@ -1,3 +1,5 @@
+**11/11 — v0.6.102:** Preview Invoice kiểu DGC cũ: modal danh sách trái/trang đang chọn phải, tự tải từng trang, kéo dấu/chữ ký và giữ vị trí riêng; kiểm PDF từng Invoice rồi mới lưu nháp. [Bàn giao](docs/handover/DGC_INVOICE_PREVIEW_WORKSPACE_20261111.md). 206 Linux API/42 browser/69 web đạt. Gói ba dịch vụ con giữ một Invoice; chờ owner triển khai, không thao tác sổ thật.
+
 **11/11 — v0.6.101:** sửa timeout xem trước Tách theo dịch vụ: lấy bố cục không tạo PDF thừa, giải phóng transaction trước layout, UI chờ phù hợp. Gói ba dịch vụ con giữ một Invoice/ba dòng. [Bàn giao](docs/handover/DGC_SPLIT_INVOICE_PREVIEW_20261111.md). Không lưu thử Invoice thật; owner triển khai rồi xem trước lại.
 
 **11/11 — v0.6.100:** sửa font Invoice sau phản hồi owner: nhúng Liberation Sans Regular/Bold tương thích Arial thay cho Helvetica chuẩn không nhúng; tiếng Việt/chữ đậm và bố cục tám dịch vụ đã kiểm. [Bàn giao](docs/handover/DGC_INVOICE_EMBEDDED_FONTS_20261111.md). Không đổi PDF đã lưu; triển khai rồi tạo lại preview.

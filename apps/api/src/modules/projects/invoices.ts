@@ -77,7 +77,7 @@ async function publicPlan(p:Awaited<ReturnType<typeof plan>>){
  const invoices:Record<string,unknown>[]=[];for(const i of p.invoices){
   let suggestedPlacement:Placement={page:1,x:.56,y:.77,width:.28},suggestedDgcPlacement:DgcPlacements|undefined;
   await renderInvoice(i.data,p.resources,{placement:suggestedPlacement},false,value=>{if('stamp' in value)suggestedDgcPlacement=value;else suggestedPlacement=value;},true);
-  invoices.push({businessKey:i.businessKey,serviceId:i.serviceId,invoice:i.data,previousDraft:i.old,suggestedPlacement,suggestedDgcPlacement});
+  invoices.push({businessKey:i.businessKey,serviceId:i.serviceId,serviceName:i.serviceId?i.fileServices.join(' · '):'Tất cả dịch vụ',invoice:i.data,previousDraft:i.old,suggestedPlacement,suggestedDgcPlacement});
  }
  return {digest:p.digest,invoices,renderer:p.resources.kind,template:p.resources.metadata.template,signingAsset:p.resources.kind==='GST'?p.resources.metadata.signing:undefined,dgcSigningAssets:p.resources.kind==='DGC'?{stamp:p.resources.metadata.stamp,signature:p.resources.metadata.signature}:undefined,warnings:['Invoice được lưu ở trạng thái Nháp; chưa phát hành hoặc ghi nhận công nợ.']};
 }

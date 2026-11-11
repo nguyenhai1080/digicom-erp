@@ -5,8 +5,8 @@ export async function pdfPreview(path:string,body:unknown,csrf:string){
  const response=await fetch('/api/v1'+path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(body),signal:AbortSignal.timeout(60000)});
  if(!response.ok){const data=await response.json();if(response.status===401)window.dispatchEvent(new Event('erp-session-expired'));throw new Error(data.message||'Không tạo được PDF xem trước.');}return URL.createObjectURL(await response.blob());
 }
-export function SigningControls({value,onChange,disabled=false,maxPage=12}:{value:Placement;onChange:(p:Placement)=>void;disabled?:boolean;maxPage?:number}){
- return <div className="list-toolbar"><label>Trang ký<input type="number" min="1" max={maxPage} disabled={disabled} value={value.page} onChange={e=>onChange({...value,page:Number(e.target.value)})}/></label>{(['x','y','width'] as const).map((k,i)=><label key={k}>{['Ngang (%)','Dọc (%)','Chiều rộng ảnh (%)'][i]}<input type="number" disabled={disabled} min={k==='width'?4:0} max={k==='width'?60:100} value={Math.round(value[k]*100)} onChange={e=>onChange({...value,[k]:Number(e.target.value)/100})}/></label>)}</div>;
+export function SigningControls({value,onChange,disabled=false,maxPage=12,lockPage=false}:{value:Placement;onChange:(p:Placement)=>void;disabled?:boolean;maxPage?:number;lockPage?:boolean}){
+ return <div className="list-toolbar"><label>Trang ký<input type="number" min="1" max={maxPage} disabled={disabled||lockPage} value={value.page} onChange={e=>onChange({...value,page:Number(e.target.value)})}/></label>{(['x','y','width'] as const).map((k,i)=><label key={k}>{['Ngang (%)','Dọc (%)','Chiều rộng ảnh (%)'][i]}<input type="number" disabled={disabled} min={k==='width'?4:0} max={k==='width'?60:100} value={Math.round(value[k]*100)} onChange={e=>onChange({...value,[k]:Number(e.target.value)/100})}/></label>)}</div>;
 }
 type Props={id:string;updatedAt:string;csrf:string;permissions:string[];request:(path:string,body?:unknown,csrf?:string)=>Promise<any>;onChange:()=>Promise<void>};
 export function FinancialReview(props:Props){
