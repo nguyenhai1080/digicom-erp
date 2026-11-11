@@ -17,7 +17,6 @@ import {assertCapturedRevenue} from './captured-book-source.js';
 import {revenueAmounts,nativeAmount} from './revenue-money.js';
 import {invoiceParentLines} from './invoice-lines.js';
 import {dgcInvoiceLines,dgcInvoiceNumber} from './dgc-invoice-lines.js';
-import {dgcPlacementsSchema,type DgcPlacements} from './dgc-invoice-pdf.js';
 import {invoiceResources,renderInvoice,invoiceWorkbook} from './invoice-rendering.js';
 
 const input=z.object({partnerId:z.uuid(),currency:z.enum(['USD','VND']).default('USD'),period:z.string().regex(/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/),invoiceMode:z.enum(['CONSOLIDATED','PER_SERVICE']),serviceId:z.uuid().optional(),invoiceDate:date,paymentTermDays:z.number().int().min(0).max(365).default(45)}).strict().refine(v=>v.invoiceMode==='PER_SERVICE'||!v.serviceId);
@@ -75,18 +74,18 @@ async function plan(tx:Prisma.TransactionClient,companyId:string,body:Input){
 }
 async function publicPlan(p:Awaited<ReturnType<typeof plan>>){
  const invoices:Record<string,unknown>[]=[];for(const i of p.invoices){
-  let suggestedPlacement:Placement={page:1,x:.56,y:.77,width:.28},suggestedDgcPlacement:DgcPlacements|undefined;
-  await renderInvoice(i.data,p.resources,{placement:suggestedPlacement},false,value=>{if('stamp' in value)suggestedDgcPlacement=value;else suggestedPlacement=value;},true);
-  invoices.push({businessKey:i.businessKey,serviceId:i.serviceId,serviceName:i.serviceId?i.fileServices.join(' · '):'Tất cả dịch vụ',invoice:i.data,previousDraft:i.old,suggestedPlacement,suggestedDgcPlacement});
+  let suggestedPlacement:Placement={page:1,x:.56,y:.77,width:.28};
+  await renderInvoice(i.data,p.resources,{placement:suggestedPlacement},false,value=>{suggestedPlacement=value;},true);
+  invoices.push({businessKey:i.businessKey,serviceId:i.serviceId,serviceName:i.serviceId?i.fileServices.join(' · '):'Tất cả dịch vụ',invoice:i.data,previousDraft:i.old,suggestedPlacement});
  }
- return {digest:p.digest,invoices,renderer:p.resources.kind,template:p.resources.metadata.template,signingAsset:p.resources.kind==='GST'?p.resources.metadata.signing:undefined,dgcSigningAssets:p.resources.kind==='DGC'?{stamp:p.resources.metadata.stamp,signature:p.resources.metadata.signature}:undefined,warnings:['Invoice được lưu ở trạng thái Nháp; chưa phát hành hoặc ghi nhận công nợ.']};
+ return {digest:p.digest,invoices,renderer:p.resources.kind,template:p.resources.metadata.template,signingAsset:p.resources.metadata.signing,warnings:['Invoice được lưu ở trạng thái Nháp; chưa phát hành hoặc ghi nhận công nợ.']};
 }
 let producing=false;
 export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
  app.get('/api/v1/invoices/signing-asset',{preHandler:requirePermission('INVOICE_VIEW')},async(request,reply)=>{
   const q=parse(z.object({kind:z.enum(['stamp','signature']).optional(),v:z.uuid().optional()}).strict(),request.query);
-  const kind=request.auth!.companyCode==='DGC'?(q.kind==='stamp'?'COMPANY_STAMP':q.kind==='signature'?'SIGNATURE':null):'SIGNING_COMPOSITE';
-  if(!kind)throw new CommandError(400,'Chọn dấu hoặc chữ ký DGC.');
+  const kind='SIGNING_COMPOSITE';
+  if(request.auth!.companyCode==='DGC'&&q.kind)throw new CommandError(400,'Invoice dùng ảnh ghép dấu/chữ ký/chức danh. Mở lại Preview để tải ảnh ghép.');
   const a=await prisma.$transaction(tx=>asset(tx,request.auth!.companyId,kind,q.v));return reply.type(a.document.attachment.mimeType!).header('Cache-Control','no-store').send(a.bytes);
  });
  app.get('/api/v1/invoices/references',{preHandler:requirePermission('INVOICE_VIEW')},async request=>({canViewPaymentHistory:canReadInvoicePayments(request.auth!),canCancelUnpaid:request.auth!.companyCode==='DGC',canReviewOverdue:request.auth!.companyCode==='DGC',partners:await prisma.partner.findMany({where:{companyId:request.auth!.companyId},select:{id:true,partnerKey:true,legalName:true,paymentTermDays:true},orderBy:{legalName:'asc'},take:1000}),services:await prisma.service.findMany({where:{companyId:request.auth!.companyId,status:'ACTIVE'},select:{id:true,serviceKey:true,serviceName:true},orderBy:{serviceKey:'asc'},take:1000})}));
@@ -126,6 +125,8 @@ export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
    return await publicPlan(p);
   }finally{producing=false;}
  });
+ // Retain parsing of the legacy field only to reject obsolete split-image submissions explicitly.
+ const dgcPlacementsSchema=z.object({stamp:placementSchema,signature:placementSchema}).strict();
  const confirm=input.extend({digest:z.string().regex(/^[a-f0-9]{64}$/),placements:z.array(z.object({businessKey:z.string().max(300),placement:placementSchema,dgcPlacement:dgcPlacementsSchema.optional()}).strict()).min(1).max(100),confirmed:z.literal(true)}).strict();
  const parseConfirmation=(value:unknown)=>{const b=parse(confirm,value),{digest,placements,confirmed,...selection}=b;return {digest,placements,selection:parse(input,selection)};};
  app.post('/api/v1/invoices/preview-page',{onRequest:writeGuard('INVOICE_CREATE',config)},async(request,reply)=>{
@@ -154,7 +155,7 @@ export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
      if(i.old){const previous=await tx.invoice.findFirstOrThrow({where:{id:i.old.id,companyId:user.companyId}});if(previous.paidAmount.gt(0)||previous.status!=='DRAFT')throw new CommandError(409,'Invoice cũ có payment hoặc đã chuyển trạng thái.');
       await tx.invoiceScopeItem.updateMany({where:{companyId:user.companyId,scope:{invoiceId:i.old.id}},data:{isCurrent:false}});await tx.invoiceScope.updateMany({where:{companyId:user.companyId,invoiceId:i.old.id},data:{isCurrent:false,status:'SUPERSEDED'}});await tx.invoice.update({where:{id:i.old.id},data:{isCurrent:false,status:'SUPERSEDED'}});await tx.document.updateMany({where:{companyId:user.companyId,entityType:'Invoice',entityId:i.old.id},data:{status:'SUPERSEDED'}});
      }
-     const snapshot={...i.data,fileServices:i.fileServices,placement,templateId:p.resources.metadata.template.id,templateVersion:p.resources.metadata.template.version,templateChecksum:p.resources.metadata.template.checksum,resourceVersions:p.resources.metadata,...(p.resources.kind==='GST'?{signingAssetId:p.resources.metadata.signing.id,signingAssetVersion:p.resources.metadata.signing.version,signingAssetChecksum:p.resources.metadata.signing.checksum}:{dgcPlacement:positions.dgcPlacement,issuerProfile:p.resources.config.profile}),bank:p.resources.bank,layout:p.resources.layout,workbookDocumentId:workbook.id,sourceRevenueIds:i.headerIds,...(p.resources.kind==='DGC'?{sourceVersions:p.candidates.filter(r=>i.headerIds.includes(r.id)||i.data.lines.some(l=>l.revenueId===r.id)).map(r=>({id:r.id,updatedAt:r.updatedAt.toISOString(),reconciliationUpdatedAt:r.reconciliation.updatedAt.toISOString(),calculationChecksum:sha(JSON.stringify(r.calculationJson))}))}:{}),supersedesId:i.old?.id??null};
+     const snapshot={...i.data,fileServices:i.fileServices,placement,templateId:p.resources.metadata.template.id,templateVersion:p.resources.metadata.template.version,templateChecksum:p.resources.metadata.template.checksum,resourceVersions:p.resources.metadata,signingAssetId:p.resources.metadata.signing.id,signingAssetVersion:p.resources.metadata.signing.version,signingAssetChecksum:p.resources.metadata.signing.checksum,...(p.resources.kind==='DGC'?{signingMode:'DGC_COMPOSITE',issuerProfile:p.resources.config.profile}:{}),bank:p.resources.bank,layout:p.resources.layout,workbookDocumentId:workbook.id,sourceRevenueIds:i.headerIds,...(p.resources.kind==='DGC'?{sourceVersions:p.candidates.filter(r=>i.headerIds.includes(r.id)||i.data.lines.some(l=>l.revenueId===r.id)).map(r=>({id:r.id,updatedAt:r.updatedAt.toISOString(),reconciliationUpdatedAt:r.reconciliation.updatedAt.toISOString(),calculationChecksum:sha(JSON.stringify(r.calculationJson))}))}:{}),supersedesId:i.old?.id??null};
      await tx.invoice.create({data:{id,companyId:user.companyId,invoiceNumber,businessKey:i.businessKey,revisionNo:version,partnerId:b.selection.partnerId,period:b.selection.period,invoiceMode:b.selection.invoiceMode,currency:b.selection.currency,serviceId:i.serviceId,invoiceDate:new Date(i.data.invoiceDate),dueDate:new Date(i.data.dueDate),revenueAmount:i.data.totals.revenue,whtAmount:i.data.totals.wht,payableAmount:i.data.totals.payable,snapshot:JSON.parse(JSON.stringify(snapshot)),documentId:doc.id,createdById:user.userId}});
      const headers=p.candidates.filter(h=>i.headerIds.includes(h.id));
      for(const contractId of [...new Set(headers.map(h=>h.contractId))]){const group=headers.filter(h=>h.contractId===contractId),scope=await tx.invoiceScope.create({data:{companyId:user.companyId,invoiceId:id,scopeCode:await code(tx,user.companyId,'INVOICE_SCOPE','ISCOPE'),logicalGroupId:randomUUID(),partnerId:b.selection.partnerId,contractId,periodStart:group[0].periodStart,periodEnd:group[0].periodEnd,invoiceMode:b.selection.invoiceMode,currency:b.selection.currency,scopeKey:i.businessKey+'|'+contractId,totalAmount:r(group.reduce((s,h)=>s.plus(revenueAmounts(h).payable),D('0'))),status:'INVOICE_READY'}});

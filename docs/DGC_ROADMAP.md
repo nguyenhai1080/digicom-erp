@@ -22,6 +22,8 @@
 
 **Preview Invoice v0.6.102:** modal theo DGC cũ, chọn từng Invoice, kéo dấu/chữ ký trực tiếp và giữ vị trí riêng; liên kết PDF sau lưu nháp. [Bàn giao](handover/DGC_INVOICE_PREVIEW_WORKSPACE_20261111.md). 206 Linux API/42 browser/69 web đạt; chờ owner triển khai/nghiệm thu.
 
+**Ảnh ký Invoice v0.6.103:** dùng nguyên ảnh ghép dấu/chữ ký/chức danh của đối soát; bỏ tên/chức danh in riêng, một vùng kéo. [Bàn giao](handover/DGC_INVOICE_SHARED_COMPOSITE_20261111.md). Chờ owner triển khai và mở Preview mới; không đổi PDF đã lưu hoặc upload lại ảnh.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |

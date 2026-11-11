@@ -1,3 +1,5 @@
+**11/11 — v0.6.103:** Invoice dùng chung ảnh ghép SIGNING_COMPOSITE của đối soát; một vùng kéo, bỏ tên/chức danh dạng chữ in riêng. [Bàn giao](docs/handover/DGC_INVOICE_SHARED_COMPOSITE_20261111.md). 237 Linux API/44 browser/69 web và kiểm PDF đạt. Không ghép/upload lại ảnh thật, không sửa PDF đã lưu. Owner triển khai rồi mở Preview mới.
+
 **11/11 — v0.6.102:** Preview Invoice kiểu DGC cũ: modal danh sách trái/trang đang chọn phải, tự tải từng trang, kéo dấu/chữ ký và giữ vị trí riêng; kiểm PDF từng Invoice rồi mới lưu nháp. [Bàn giao](docs/handover/DGC_INVOICE_PREVIEW_WORKSPACE_20261111.md). 206 Linux API/42 browser/69 web đạt. Gói ba dịch vụ con giữ một Invoice; chờ owner triển khai, không thao tác sổ thật.
 
 **11/11 — v0.6.101:** sửa timeout xem trước Tách theo dịch vụ: lấy bố cục không tạo PDF thừa, giải phóng transaction trước layout, UI chờ phù hợp. Gói ba dịch vụ con giữ một Invoice/ba dòng. [Bàn giao](docs/handover/DGC_SPLIT_INVOICE_PREVIEW_20261111.md). Không lưu thử Invoice thật; owner triển khai rồi xem trước lại.
