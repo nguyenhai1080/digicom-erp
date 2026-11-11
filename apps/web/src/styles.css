@@ -109,3 +109,5 @@ h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:20px;line-height:1
 .invoice-workspace-toolbar{position:sticky;top:0;z-index:2;background:var(--bg);padding:6px 0}
 
 .invoice-workspace-list strong{overflow-wrap:anywhere}
+
+.invoice-signing-area{position:absolute;left:0;width:100%;border:1px dashed #b6c9db;background:#1f4e7905;pointer-events:none}.invoice-workspace-stage .signing-overlay{border:0;outline:1px dashed #1f507c}

@@ -1,3 +1,5 @@
+**11/11 — v0.6.104:** sửa chặn nhầm ảnh ký: dùng đúng đáy thanh toán, Preview kéo/resize trong vùng ký và quy đổi theo phần trong viền. [Bàn giao](docs/handover/DGC_INVOICE_SIGNING_AREA_20261111.md). 246 Linux API/15 geometry/53 browser/69 web và PDF regression đạt; không bỏ kiểm server hoặc sửa hồ sơ thật. Owner triển khai rồi mở Preview mới.
+
 **11/11 — v0.6.103:** Invoice dùng chung ảnh ghép SIGNING_COMPOSITE của đối soát; một vùng kéo, bỏ tên/chức danh dạng chữ in riêng. [Bàn giao](docs/handover/DGC_INVOICE_SHARED_COMPOSITE_20261111.md). 237 Linux API/44 browser/69 web và kiểm PDF đạt. Không ghép/upload lại ảnh thật, không sửa PDF đã lưu. Owner triển khai rồi mở Preview mới.
 
 **11/11 — v0.6.102:** Preview Invoice kiểu DGC cũ: modal danh sách trái/trang đang chọn phải, tự tải từng trang, kéo dấu/chữ ký và giữ vị trí riêng; kiểm PDF từng Invoice rồi mới lưu nháp. [Bàn giao](docs/handover/DGC_INVOICE_PREVIEW_WORKSPACE_20261111.md). 206 Linux API/42 browser/69 web đạt. Gói ba dịch vụ con giữ một Invoice; chờ owner triển khai, không thao tác sổ thật.

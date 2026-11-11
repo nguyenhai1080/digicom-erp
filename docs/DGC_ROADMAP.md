@@ -24,6 +24,8 @@
 
 **Ảnh ký Invoice v0.6.103:** dùng nguyên ảnh ghép dấu/chữ ký/chức danh của đối soát; bỏ tên/chức danh in riêng, một vùng kéo. [Bàn giao](handover/DGC_INVOICE_SHARED_COMPOSITE_20261111.md). Chờ owner triển khai và mở Preview mới; không đổi PDF đã lưu hoặc upload lại ảnh.
 
+**Vùng ký Invoice v0.6.104:** sửa chặn nhầm phần dưới thanh toán và quy đổi khung Preview; kéo/resize được giữ trong vùng ký, server vẫn kiểm tràn/đè nội dung. [Bàn giao](handover/DGC_INVOICE_SIGNING_AREA_20261111.md). Chờ triển khai và Preview mới.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |
