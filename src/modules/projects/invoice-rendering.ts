@@ -16,11 +16,11 @@ export async function invoiceResources(tx:Prisma.TransactionClient,company:{id:s
  return {kind:'GST' as const,template,signing,profile,metadata:{template:meta(template),signing:meta(signing)},bank:profile.bank,layout:profile.layout,workbookExtension:template.document.attachment.storedFilename.endsWith('.xlsm')?'xlsm' as const:'xlsx' as const};
 }
 type Resources=Awaited<ReturnType<typeof invoiceResources>>;
-export function renderInvoice(data:InvoiceData,res:Resources,positions:{placement:Placement;dgcPlacement?:DgcPlacements},includeSigning=true,onLayout?:(p:Placement|DgcPlacements)=>void){
+export function renderInvoice(data:InvoiceData,res:Resources,positions:{placement:Placement;dgcPlacement?:DgcPlacements},includeSigning=true,onLayout?:(p:Placement|DgcPlacements)=>void,layoutOnly=false){
  if(res.kind==='GST')return renderGstInvoice(data,res.profile,{bytes:res.signing.bytes,mime:res.signing.document.attachment.mimeType},positions.placement,includeSigning,onLayout);
  if(includeSigning&&!positions.dgcPlacement)throw new CommandError(400,'Cần xác nhận vị trí dấu và chữ ký riêng cho Invoice DGC.');
  const picture=(a:typeof res.logo)=>({bytes:a.bytes,mime:a.document.attachment.mimeType});
- return renderDgcInvoice(data,res.config.profile,{logo:picture(res.logo),stamp:picture(res.stamp),signature:picture(res.signature)},positions.dgcPlacement,includeSigning,onLayout);
+ return renderDgcInvoice(data,res.config.profile,{logo:picture(res.logo),stamp:picture(res.stamp),signature:picture(res.signature)},positions.dgcPlacement,includeSigning,onLayout,layoutOnly);
 }
 const xml=(s:string)=>s.replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]!));
 export function invoiceWorkbook(data:InvoiceData,res:Resources){
