@@ -1,3 +1,4 @@
+import {invoiceEmailRoutes} from './invoice-email.js';
 import {cashAccountRoutes} from './cash-accounts.js';
 import {cashTransferRoutes} from './cash-transfers.js';
 import {expenseRoutes} from './expenses.js';
@@ -57,6 +58,7 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   await app.register(outputReconRoutes, config);
   await app.register(reconFinalizeRoutes, config);
   await app.register(invoiceRoutes, config);
+  await app.register(invoiceEmailRoutes, config);
   await app.register(invoiceCancelRoutes, config);
   await app.register(dgcInvoiceProfileRoutes, config);
   await app.register(financeLedgerRoutes, config);

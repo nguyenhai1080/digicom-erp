@@ -1,3 +1,5 @@
+**11/11 — v0.6.105:** Gửi email Invoice + đối soát đầu ra: giao diện/luồng kiểm tệp và lịch sử đã chuẩn bị; gửi từ info@digicomjsc.com. Còn owner triển khai, cấu hình SMTP riêng và gửi email nghiệp vụ đầu tiên. Chưa gửi email thật, không tự phát hành Invoice. [Bàn giao](handover/DGC_INVOICE_EMAIL_20261111.md).
+
 # Roadmap Digicom ERP — rà soát 10/11/2026
 
 **Trạng thái:** chuyển sổ đã hoàn tất; bản v0.6.92 đã online. Trọng tâm tiếp theo là nghiệm thu vận hành trên dữ liệu phát sinh thật. Không còn chờ triển khai các bản UI v0.6.82–0.6.92 như ghi chú cũ.

@@ -29,12 +29,12 @@ import {OctoberRestart} from './OctoberRestart';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.104';
+const version = '0.6.105';
 async function api(path: string, body?: unknown, csrf?: string) {
   let response:Response;try{response = await fetch('/api/v1' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin',
     headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(path.startsWith('/dgc-migration/') ? 120000 : (path === '/invoices/create' || path === '/invoices/preview' || path.endsWith('/finalize') || path.startsWith('/input-recon/')) ? 65000 : (path.endsWith('/documents') || path === '/company-assets' || path === '/output-recon/uploads' || path === '/output-recon/inspect' || path.endsWith('/read')) ? (path.endsWith('/read') || path === '/output-recon/inspect' ? 120000 : 60000) : 15000)
+    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(path.startsWith('/dgc-migration/') ? 120000 : (path.startsWith('/invoice-email/') || path === '/invoices/create' || path === '/invoices/preview' || path.endsWith('/finalize') || path.startsWith('/input-recon/')) ? 65000 : (path.endsWith('/documents') || path === '/company-assets' || path === '/output-recon/uploads' || path === '/output-recon/inspect' || path.endsWith('/read')) ? (path.endsWith('/read') || path === '/output-recon/inspect' ? 120000 : 60000) : 15000)
   });
   }catch(e){if(path==='/invoices/preview'&&e instanceof DOMException&&e.name==='TimeoutError')throw new Error('Xem trước Invoice quá thời gian. Chưa có Invoice được lưu. Hãy thử lại hoặc chọn phạm vi dịch vụ nhỏ hơn.');throw e;}
   if (response.status === 401 && path === '/auth/me') return null;
