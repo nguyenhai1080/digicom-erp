@@ -158,5 +158,26 @@ try{
  const overdueUrl='/api/v1/invoices/'+vnd.items[0].id+'/cancel',overdue=await ok(overdueUrl+'-preview',{});
  await ok(overdueUrl,{digest:overdue.digest,reason:'Synthetic overdue VND cancellation',confirmed:true});
  eq((await prisma.accountReceivable.findFirstOrThrow({where:{invoiceId:vnd.items[0].id}})).originalAmount.toFixed(),'1000000');eq(await prisma.cashEntry.count(),0);
+ // All-services split preview: bounded layout, no document/sequence/ledger writes.
+ const splitSelection={...selection,period:'2026-10',invoiceDate:'2026-11-11',invoiceMode:'PER_SERVICE'};
+ const splitSources=[];for(let n=0;n<8;n++)splitSources.push(await approvedRevenue('USD','2026-10','100.00','10.00'));
+ // Synthetic bundle provenance: three details under one authoritative TOTAL.
+ const bundle=splitSources[0],childIds=[];
+ for(const [idx,amount] of ['30.00','30.00','40.00'].entries()){
+  const service=await prisma.service.create({data:{companyId:company.id,serviceKey:'SYN_CHILD_'+idx,serviceCode:randomUUID(),serviceName:'Synthetic bundle child '+(idx+1),category:'OTHER'}});childIds.push(service.id);
+  await prisma.contractService.create({data:{companyId:company.id,contractId:bundle.contractId,serviceId:service.id,businessModel:'REVENUE_SHARE',currency:'USD',dgcStatus:'ACTIVE'}});
+  const wht=idx===2?'4.00':'3.00',payable=idx===2?'36.00':'27.00',scope=partner.id+'|'+service.id;
+  const detail=await prisma.reconciliationItem.create({data:{companyId:company.id,reconciliationId:bundle.reconciliationId,serviceId:service.id,lineNo:idx+2,businessScopeKey:scope,periodStart:bundle.periodStart,periodEnd:bundle.periodEnd,grossRevenue:amount,companyShareAmount:amount,whtAmount:wht,netRevenue:payable}});
+  const {id,createdAt,updatedAt,reconciliation,...copy}=bundle;
+  await prisma.revenue.create({data:{...copy,id:randomUUID(),revenueCode:'SYN_SPLIT_CHILD_'+idx,logicalGroupId:randomUUID(),serviceId:service.id,reconciliationItemId:detail.id,businessScopeKey:scope,grossAmount:amount,companyShareAmount:amount,whtAmount:wht,netAmount:payable,calculationJson:{...bundle.calculationJson,rowType:'CHILD',includeInMonthlyTotal:false,parentServiceId:bundle.serviceId,lineNo:idx+2,nativeRevenue:amount,nativeWht:wht,nativePayable:payable}}});
+ }
+
+ const beforeSplit={invoices:await prisma.invoice.count(),documents:await prisma.document.count(),files:await files(),ar:await prisma.accountReceivable.count(),cash:await prisma.cashEntry.count(),sequence:await prisma.sequence.findUnique({where:{companyId_sequenceName:{companyId:company.id,sequenceName:'DGC_INVOICE_2026-11'}}})};
+ const splitStart=performance.now(),concurrent=await Promise.all([post('/api/v1/invoices/preview',splitSelection),post('/api/v1/invoices/preview',splitSelection)]);eq(concurrent.map(r=>r.statusCode).sort(),[200,429]);const split=concurrent.find(r=>r.statusCode===200).json();
+ eq(split.invoices.length,8);const bundleInvoice=split.invoices.find(i=>i.serviceId===bundle.serviceId);eq(bundleInvoice.invoice.lines.length,3);eq(bundleInvoice.invoice.lines.map(l=>l.serviceId),childIds);eq(bundleInvoice.invoice.lines.every(l=>l.groupServiceId===bundle.serviceId),true);eq(split.invoices.some(i=>childIds.includes(i.serviceId)),false);eq(bundleInvoice.invoice.lines.some(l=>l.serviceId===bundle.serviceId),false);eq(new Set(split.invoices.map(i=>i.serviceId)).size,8);eq(new Set(split.invoices.map(i=>i.invoice.invoiceNumber)).size,8);eq(split.invoices.every(i=>i.suggestedDgcPlacement.stamp.page===1),true);eq(split.invoices.map(i=>i.invoice.totals),Array.from({length:8},()=>({revenue:'100.00',wht:'10.00',payable:'90.00'})));
+ eq(await prisma.invoice.count(),beforeSplit.invoices);eq(await prisma.document.count(),beforeSplit.documents);eq(await files(),beforeSplit.files);eq(await prisma.accountReceivable.count(),beforeSplit.ar);eq(await prisma.cashEntry.count(),beforeSplit.cash);eq(await prisma.sequence.findUnique({where:{companyId_sequenceName:{companyId:company.id,sequenceName:'DGC_INVOICE_2026-11'}}}),beforeSplit.sequence);
+ const one=await ok('/api/v1/invoices/preview',{...splitSelection,serviceId:split.invoices[0].serviceId});eq(one.invoices.length,1);eq(one.invoices[0].serviceId,split.invoices[0].serviceId);
+ const savedSplit=await ok('/api/v1/invoices/create',payload(split,splitSelection),201);eq(savedSplit.items.length,8);const storedBundle=await prisma.invoice.findFirstOrThrow({where:{companyId:company.id,businessKey:bundleInvoice.businessKey,isCurrent:true},include:{scopes:{include:{items:true}}}});eq(storedBundle.snapshot.lines.length,3);eq(storedBundle.snapshot.sourceRevenueIds,[bundle.id]);eq(storedBundle.scopes.flatMap(s=>s.items.map(i=>i.revenueId)),[bundle.id]);eq(await prisma.invoice.count(),beforeSplit.invoices+8);eq(await prisma.accountReceivable.count(),beforeSplit.ar);eq(await prisma.cashEntry.count(),0);
+ console.log('Split eight-service API preview+checks+create elapsedMs='+Math.round(performance.now()-splitStart));
  console.log('PASS: '+checks+' DGC API assertions for profile/version/permissions, separate assets, draft/PDF/workbook, monthly sequence, stale source, rollback, issue/AR and USD/VND with no cash posting.');
 }finally{await app.close();await prisma.$disconnect();}

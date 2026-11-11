@@ -76,7 +76,7 @@ async function plan(tx:Prisma.TransactionClient,companyId:string,body:Input){
 async function publicPlan(p:Awaited<ReturnType<typeof plan>>){
  const invoices:Record<string,unknown>[]=[];for(const i of p.invoices){
   let suggestedPlacement:Placement={page:1,x:.56,y:.77,width:.28},suggestedDgcPlacement:DgcPlacements|undefined;
-  await renderInvoice(i.data,p.resources,{placement:suggestedPlacement},false,value=>{if('stamp' in value)suggestedDgcPlacement=value;else suggestedPlacement=value;});
+  await renderInvoice(i.data,p.resources,{placement:suggestedPlacement},false,value=>{if('stamp' in value)suggestedDgcPlacement=value;else suggestedPlacement=value;},true);
   invoices.push({businessKey:i.businessKey,serviceId:i.serviceId,invoice:i.data,previousDraft:i.old,suggestedPlacement,suggestedDgcPlacement});
  }
  return {digest:p.digest,invoices,renderer:p.resources.kind,template:p.resources.metadata.template,signingAsset:p.resources.kind==='GST'?p.resources.metadata.signing:undefined,dgcSigningAssets:p.resources.kind==='DGC'?{stamp:p.resources.metadata.stamp,signature:p.resources.metadata.signature}:undefined,warnings:['Invoice được lưu ở trạng thái Nháp; chưa phát hành hoặc ghi nhận công nợ.']};
@@ -117,7 +117,15 @@ export async function invoiceRoutes(app:FastifyInstance,config:AuthConfig){
    return {message:'Đã xóa Invoice nháp và ngừng cung cấp PDF/Excel. Có thể tạo lại Invoice từ doanh thu đã chốt.'};
   });
  });
- app.post('/api/v1/invoices/preview',{onRequest:writeGuard('INVOICE_CREATE',config)},async request=>prisma.$transaction(async tx=>publicPlan(await plan(tx,request.auth!.companyId,parse(input,request.body))),{isolationLevel:'RepeatableRead',timeout:15000}));
+ app.post('/api/v1/invoices/preview',{onRequest:writeGuard('INVOICE_CREATE',config)},async request=>{
+  if(producing)throw new CommandError(429,'Đang chuẩn bị Invoice khác. Thử lại sau vài giây.');producing=true;
+  try{
+   // Capture a consistent read plan, then release the DB connection before layout.
+   // Create/preview-PDF still rederive and verify this digest against fresh sources.
+   const p=await prisma.$transaction(tx=>plan(tx,request.auth!.companyId,parse(input,request.body)),{isolationLevel:'RepeatableRead',timeout:15000});
+   return await publicPlan(p);
+  }finally{producing=false;}
+ });
  const confirm=input.extend({digest:z.string().regex(/^[a-f0-9]{64}$/),placements:z.array(z.object({businessKey:z.string().max(300),placement:placementSchema,dgcPlacement:dgcPlacementsSchema.optional()}).strict()).min(1).max(100),confirmed:z.literal(true)}).strict();
  const parseConfirmation=(value:unknown)=>{const b=parse(confirm,value),{digest,placements,confirmed,...selection}=b;return {digest,placements,selection:parse(input,selection)};};
  app.post('/api/v1/invoices/preview-page',{onRequest:writeGuard('INVOICE_CREATE',config)},async(request,reply)=>{

@@ -18,6 +18,8 @@
 
 **Font Invoice v0.6.100:** nhúng bộ chữ tương thích Arial, đủ regular/bold/tiếng Việt, thay Helvetica không nhúng của v0.6.99. [Bàn giao](handover/DGC_INVOICE_EMBEDDED_FONTS_20261111.md). Chờ triển khai và xem trước lại; PDF đã lưu giữ nguyên.
 
+**Tách Invoice v0.6.101:** tối ưu preview nhiều nhóm và sửa ngân sách chờ; bundle ba dịch vụ con vẫn một Invoice/ba dòng chi tiết. [Bàn giao](handover/DGC_SPLIT_INVOICE_PREVIEW_20261111.md). Chờ owner triển khai và xem trước lại.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |

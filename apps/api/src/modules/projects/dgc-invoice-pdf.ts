@@ -15,7 +15,7 @@ export type DgcPictures={logo:Picture;stamp:Picture;signature:Picture};
 
 // Owner reference: Movtv INV 08 2026.pdf (11 Nov 2026). Presentation only.
 // Retain pagination for long invoices; never clip source lines to fit one page.
-export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfile,pictures:DgcPictures,placement?:DgcPlacements,includeSigning=true,onLayout?:(value:DgcPlacements)=>void){
+export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfile,pictures:DgcPictures,placement?:DgcPlacements,includeSigning=true,onLayout?:(value:DgcPlacements)=>void,layoutOnly=false){
  if(data.companyCode!=='DGC'||!['USD','VND'].includes(data.currency??'USD'))throw new CommandError(409,'Mẫu Invoice DGC chỉ dùng cho DGC và USD/VND.');
  const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
  const unicode=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/NotoSans-Regular.ttf',import.meta.url))),{subset:true}),regular=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/LiberationSans-Regular.ttf',import.meta.url))),{subset:true}),bold=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/LiberationSans-Bold.ttf',import.meta.url))),{subset:true});
@@ -75,5 +75,5 @@ export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfil
  let captionY=bottom+10;for(const line of caption){text(line.s,right-measure(line.s,8.25,line.strong),captionY,8.25,line.strong);captionY+=9;}
  // Physical source PDFs remain immutable. This footer uses configured issuer fields.
  for(const p of doc.getPages()){page=p;rule(807);const footer=['Head Office: '+profile.address.replace(/\s+/g,' ')+'. Tel: '+profile.phone+'; Fax: '+profile.fax,'Email: '+profile.email+' Website: '+profile.website].flatMap(s=>wrap(s,span,6.75));if(footer.length>3)throw new CommandError(422,'Địa chỉ chân trang Invoice quá dài.');footer.forEach((s,i)=>text(s,left,813+i*7.5,6.75));}
- doc.setTitle('Digicom Invoice '+data.invoiceNumber);return Buffer.from(await doc.save({useObjectStreams:false}));
+ doc.setTitle('Digicom Invoice '+data.invoiceNumber);return layoutOnly?Buffer.alloc(0):Buffer.from(await doc.save({useObjectStreams:false}));
 }
