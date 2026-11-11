@@ -17,6 +17,7 @@ import {assertCapturedRevenue} from './captured-book-source.js';
 import {revenueAmounts,nativeAmount} from './revenue-money.js';
 import {invoiceParentLines} from './invoice-lines.js';
 import {dgcInvoiceLines,dgcInvoiceNumber} from './dgc-invoice-lines.js';
+import type {DgcSigningArea} from './dgc-invoice-pdf.js';
 import {invoiceResources,renderInvoice,invoiceWorkbook} from './invoice-rendering.js';
 
 const input=z.object({partnerId:z.uuid(),currency:z.enum(['USD','VND']).default('USD'),period:z.string().regex(/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/),invoiceMode:z.enum(['CONSOLIDATED','PER_SERVICE']),serviceId:z.uuid().optional(),invoiceDate:date,paymentTermDays:z.number().int().min(0).max(365).default(45)}).strict().refine(v=>v.invoiceMode==='PER_SERVICE'||!v.serviceId);
@@ -74,9 +75,9 @@ async function plan(tx:Prisma.TransactionClient,companyId:string,body:Input){
 }
 async function publicPlan(p:Awaited<ReturnType<typeof plan>>){
  const invoices:Record<string,unknown>[]=[];for(const i of p.invoices){
-  let suggestedPlacement:Placement={page:1,x:.56,y:.77,width:.28};
-  await renderInvoice(i.data,p.resources,{placement:suggestedPlacement},false,value=>{suggestedPlacement=value;},true);
-  invoices.push({businessKey:i.businessKey,serviceId:i.serviceId,serviceName:i.serviceId?i.fileServices.join(' · '):'Tất cả dịch vụ',invoice:i.data,previousDraft:i.old,suggestedPlacement});
+  let suggestedPlacement:Placement={page:1,x:.56,y:.77,width:.28},signingArea:DgcSigningArea|undefined;
+  await renderInvoice(i.data,p.resources,{placement:suggestedPlacement},false,(value,area)=>{suggestedPlacement=value;signingArea=area;},true);
+  invoices.push({businessKey:i.businessKey,serviceId:i.serviceId,serviceName:i.serviceId?i.fileServices.join(' · '):'Tất cả dịch vụ',invoice:i.data,previousDraft:i.old,suggestedPlacement,signingArea});
  }
  return {digest:p.digest,invoices,renderer:p.resources.kind,template:p.resources.metadata.template,signingAsset:p.resources.metadata.signing,warnings:['Invoice được lưu ở trạng thái Nháp; chưa phát hành hoặc ghi nhận công nợ.']};
 }

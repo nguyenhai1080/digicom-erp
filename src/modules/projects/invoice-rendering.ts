@@ -4,19 +4,19 @@ import {CommandError} from './commands.js';
 import {asset,type Placement} from './financial-documents.js';
 import {readGstTemplate,renderGstInvoice,fillGstWorkbook,type InvoiceData} from './invoice-template.js';
 import {readDgcInvoiceProfile} from './dgc-invoice-profile.js';
-import {renderDgcInvoice} from './dgc-invoice-pdf.js';
+import {renderDgcInvoice,type DgcSigningArea} from './dgc-invoice-pdf.js';
 const meta=(a:Awaited<ReturnType<typeof asset>>)=>({id:a.document.id,version:a.document.versionNo,checksum:a.document.attachment.checksumSha256});
 export async function invoiceResources(tx:Prisma.TransactionClient,company:{id:string;companyCode:string}){
  if(company.companyCode==='DGC'){
   const config=await readDgcInvoiceProfile(tx,company.id),logo=await asset(tx,company.id,'COMPANY_LOGO'),signing=await asset(tx,company.id,'SIGNING_COMPOSITE');
-  return {kind:'DGC' as const,config,logo,signing,metadata:{rendererRevision:'DGC_MOVTV_COMPOSITE_V4',template:config.metadata,logo:meta(logo),signing:meta(signing)},bank:config.profile.bank,layout:'DGC_V61_V1',workbookExtension:'xlsx' as const};
+  return {kind:'DGC' as const,config,logo,signing,metadata:{rendererRevision:'DGC_MOVTV_COMPOSITE_V5_SIGNING_AREA',template:config.metadata,logo:meta(logo),signing:meta(signing)},bank:config.profile.bank,layout:'DGC_V61_V1',workbookExtension:'xlsx' as const};
  }
  if(company.companyCode!=='GST')throw new CommandError(409,'Chưa có mẫu Invoice cho công ty này.');
  const template=await asset(tx,company.id,'INVOICE_TEMPLATE'),signing=await asset(tx,company.id,'SIGNING_COMPOSITE'),profile=readGstTemplate(template.bytes);
  return {kind:'GST' as const,template,signing,profile,metadata:{template:meta(template),signing:meta(signing)},bank:profile.bank,layout:profile.layout,workbookExtension:template.document.attachment.storedFilename.endsWith('.xlsm')?'xlsm' as const:'xlsx' as const};
 }
 type Resources=Awaited<ReturnType<typeof invoiceResources>>;
-export function renderInvoice(data:InvoiceData,res:Resources,positions:{placement:Placement;dgcPlacement?:unknown},includeSigning=true,onLayout?:(p:Placement)=>void,layoutOnly=false){
+export function renderInvoice(data:InvoiceData,res:Resources,positions:{placement:Placement;dgcPlacement?:unknown},includeSigning=true,onLayout?:(p:Placement,area?:DgcSigningArea)=>void,layoutOnly=false){
  if(res.kind==='GST')return renderGstInvoice(data,res.profile,{bytes:res.signing.bytes,mime:res.signing.document.attachment.mimeType},positions.placement,includeSigning,onLayout);
  if(positions.dgcPlacement)throw new CommandError(400,'Invoice dùng ảnh ghép dấu/chữ ký/chức danh. Mở lại Preview để lấy vị trí mới.');
  const picture=(a:typeof res.logo)=>({bytes:a.bytes,mime:a.document.attachment.mimeType});

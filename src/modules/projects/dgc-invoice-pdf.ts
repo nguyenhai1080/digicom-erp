@@ -9,10 +9,11 @@ import type {InvoiceData} from './invoice-template.js';
 import type {DgcInvoiceProfile} from './dgc-invoice-profile.js';
 type Picture={bytes:Buffer;mime:string|null};
 export type DgcPictures={logo:Picture;signing:Picture};
+export type DgcSigningArea={page:number;top:number;bottom:number;pageWidth:number;pageHeight:number;imageWidth:number;imageHeight:number};
 
 // Owner reference: Movtv INV 08 2026.pdf (11 Nov 2026). Presentation only.
 // Retain pagination for long invoices; never clip source lines to fit one page.
-export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfile,pictures:DgcPictures,placement?:Placement,includeSigning=true,onLayout?:(value:Placement)=>void,layoutOnly=false){
+export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfile,pictures:DgcPictures,placement?:Placement,includeSigning=true,onLayout?:(value:Placement,area?:DgcSigningArea)=>void,layoutOnly=false){
  if(data.companyCode!=='DGC'||!['USD','VND'].includes(data.currency??'USD'))throw new CommandError(409,'Mẫu Invoice DGC chỉ dùng cho DGC và USD/VND.');
  const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
  const unicode=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/NotoSans-Regular.ttf',import.meta.url))),{subset:true}),regular=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/LiberationSans-Regular.ttf',import.meta.url))),{subset:true}),bold=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/LiberationSans-Bold.ttf',import.meta.url))),{subset:true});
@@ -63,11 +64,17 @@ export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfil
  ensure(footerHeight);
  grid(y,y+20.25,1);center('Total ('+currency+')',cols[0],cols[2],y+7,8.25,true);
  [data.totals.revenue,data.totals.wht,data.totals.payable].forEach((v,n)=>{const m=money(v);if(measure(m,8.25,true)>cols[n+3]-cols[n+2]-10)throw new CommandError(422,'Tổng tiền Invoice vượt khổ cột.');text(m,cols[n+3]-5-measure(m,8.25,true),y+7,8.25,true);});y+=31.25;
- block(words,8.25,true);y+=11;bank.forEach((s,i)=>block(s,8.25,i===0));y+=24;
+ block(words,8.25,true);y+=11;bank.forEach((s,i)=>block(s,8.25,i===0));const paymentBottom=y;y+=24;
  text('Thank you for your business!',right-measure('Thank you for your business!'),y);const footerTop=y+15;
  const suggested:Placement={page:doc.getPageCount(),x:.92-signingWidth,y:footerTop/height,width:signingWidth};
- onLayout?.(suggested);const position=placement??suggested,top=position.y*height,bottom=top+position.width*width*signing.height/signing.width;
- if(position.page!==doc.getPageCount()||top<footerTop-.01||bottom>790||position.x+position.width>1)throw new CommandError(400,'Ảnh ghép dấu/chữ ký/chức danh phải ở trang cuối, dưới thông tin thanh toán và trong khổ trang.');
+ // The allowed area starts after the actual bank text, not after the
+ // decorative thank-you line and the extra default-placement spacing.
+ const signingArea:DgcSigningArea={page:doc.getPageCount(),top:paymentBottom/height,bottom:790/height,pageWidth:width,pageHeight:height,imageWidth:signing.width,imageHeight:signing.height};
+ onLayout?.(suggested,signingArea);const position=placement??suggested,top=position.y*height,bottom=top+position.width*width*signing.height/signing.width;
+ if(position.page!==doc.getPageCount())throw new CommandError(400,'Ảnh ghép cần nằm ở trang cuối của Invoice. Mở lại Preview để chọn đúng trang ký.');
+ if(top<paymentBottom-.01)throw new CommandError(400,'Ảnh ghép đang lấn lên thông tin thanh toán. Di chuyển ảnh xuống vùng ký.');
+ if(bottom>790+.01)throw new CommandError(400,'Ảnh ghép vượt quá vùng ký cuối trang. Di chuyển ảnh lên hoặc giảm kích thước.');
+ if(position.x<0||(position.x+position.width)*width>width+.001)throw new CommandError(400,'Ảnh ghép vượt ra ngoài lề trang Invoice.');
  if(includeSigning)drawPlacement(page,signing,position);
  // Physical source PDFs remain immutable. This footer uses configured issuer fields.
  for(const p of doc.getPages()){page=p;rule(807);const footer=['Head Office: '+profile.address.replace(/\s+/g,' ')+'. Tel: '+profile.phone+'; Fax: '+profile.fax,'Email: '+profile.email+' Website: '+profile.website].flatMap(s=>wrap(s,span,6.75));if(footer.length>3)throw new CommandError(422,'Địa chỉ chân trang Invoice quá dài.');footer.forEach((s,i)=>text(s,left,813+i*7.5,6.75));}
