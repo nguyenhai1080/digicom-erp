@@ -1,3 +1,5 @@
+**11/11 — v0.6.100:** sửa font Invoice sau phản hồi owner: nhúng Liberation Sans Regular/Bold tương thích Arial thay cho Helvetica chuẩn không nhúng; tiếng Việt/chữ đậm và bố cục tám dịch vụ đã kiểm. [Bàn giao](docs/handover/DGC_INVOICE_EMBEDDED_FONTS_20261111.md). Không đổi PDF đã lưu; triển khai rồi tạo lại preview.
+
 **11/11 — v0.6.99 chuẩn bị:** dựng lại Invoice theo PDF MOVTV chuẩn owner gửi: metadata hai cột, khung From/To, bảng viền và vùng ký/chân trang; sửa CSP chặn ảnh trang xem trước. [Bàn giao](docs/handover/DGC_INVOICE_OWNER_FORM_20261111.md). 153 Linux API / 69 web/API / 16 browser và kiểm PDF đạt. PDF cũ giữ nguyên; owner triển khai rồi Xem trước Invoice lại, không dùng digest/vị trí cũ. Không thao tác Invoice thật.
 
 **10/11 — v0.6.98 chuẩn bị:** sửa chốt MEUBEAT/CRBT: hai dòng PDF cùng một dịch vụ chỉ ghi một doanh thu khi toàn bộ tiền và hợp đồng khớp; giữ nguyên bằng chứng. [Bàn giao](docs/handover/DGC_RECON_ALIAS_POSTING_20261110.md). 20 planner / 85 financial / 132 Linux API / 7 browser đạt. Chờ owner triển khai rồi mở lại RUP0006, xem PDF và tự chốt; không upload lại, không sửa sổ thật.

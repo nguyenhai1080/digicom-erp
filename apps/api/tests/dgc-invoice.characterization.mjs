@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import sharp from 'sharp';
-import {PDFDocument} from 'pdf-lib';
+import {PDFDocument,PDFDict,PDFName} from 'pdf-lib';
 import {Prisma} from '@erp/db';
 import {dgcInvoiceLines,dgcInvoiceNumber} from '../dist/modules/projects/dgc-invoice-lines.js';
 import {renderDgcInvoice} from '../dist/modules/projects/dgc-invoice-pdf.js';
@@ -18,6 +18,7 @@ const profile={issuerName:'Synthetic DGC Issuer',address:'Synthetic address only
 const data={currency:'USD',companyCode:'DGC',companyName:profile.issuerName,invoiceNumber:'01/02/2026/DGC-INV',invoiceDate:'2026-02-01',dueDate:'2026-03-18',period:'2026-01',paymentTermDays:45,partner:{name:'Synthetic partner',address:'Synthetic partner address',registration:'SYNTHETIC',tax:'SYNTHETIC',attn:'Synthetic recipient',email:'recipient@example.test'},lines,totals:{revenue:'20.01',wht:'2.00',payable:'18.01'},amountInWords:usdWords('18.01'),agreementNumbers:['SYNTHETIC-001']};
 let positions;await renderDgcInvoice(data,profile,pictures,undefined,false,p=>positions=p);
 const pdf=await renderDgcInvoice(data,profile,pictures,positions);assert.ok((await PDFDocument.load(pdf)).getPageCount()>=1);
+const fontDoc=await PDFDocument.load(pdf),fontNames=fontDoc.context.enumerateIndirectObjects().filter(([,v])=>v instanceof PDFDict).map(([,v])=>v.get(PDFName.of('BaseFont'))?.toString()??'');assert.ok(fontNames.some(n=>n.includes('LiberationSans-')));assert.ok(fontNames.some(n=>n.includes('LiberationSans-Bold')));assert.equal(fontNames.some(n=>n.includes('Helvetica')),false);assert.ok(fontDoc.context.enumerateIndirectObjects().some(([,v])=>v instanceof PDFDict&&v.get(PDFName.of('FontFile2'))));
 await assert.rejects(renderDgcInvoice(data,profile,pictures,{...positions,stamp:{...positions.stamp,y:.1}}),e=>e.statusCode===400);
 await assert.rejects(renderDgcInvoice({...data,companyCode:'GST'},profile,pictures,positions),e=>e.statusCode===409);
 const many={...data,lines:Array.from({length:45},(_,i)=>({...lines[i%2],description:'Synthetic service line '+(i+1)}))};many.totals=Object.fromEntries(['revenue','wht','payable'].map(k=>[k,many.lines.reduce((s,l)=>s.plus(l[k]),new Prisma.Decimal(0)).toFixed(2)]));many.amountInWords=usdWords(many.totals.payable);let manyPositions;await renderDgcInvoice(many,profile,pictures,undefined,false,p=>manyPositions=p);const manyPdf=await renderDgcInvoice(many,profile,pictures,manyPositions);assert.ok((await PDFDocument.load(manyPdf)).getPageCount()>1);assert.equal(manyPositions.stamp.page,(await PDFDocument.load(manyPdf)).getPageCount());

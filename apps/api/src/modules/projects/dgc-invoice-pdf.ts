@@ -1,4 +1,4 @@
-import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
+import {PDFDocument,rgb} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
@@ -18,7 +18,7 @@ export type DgcPictures={logo:Picture;stamp:Picture;signature:Picture};
 export async function renderDgcInvoice(data:InvoiceData,profile:DgcInvoiceProfile,pictures:DgcPictures,placement?:DgcPlacements,includeSigning=true,onLayout?:(value:DgcPlacements)=>void){
  if(data.companyCode!=='DGC'||!['USD','VND'].includes(data.currency??'USD'))throw new CommandError(409,'Mẫu Invoice DGC chỉ dùng cho DGC và USD/VND.');
  const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
- const unicode=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/NotoSans-Regular.ttf',import.meta.url))),{subset:true}),regular=await doc.embedFont(StandardFonts.Helvetica),bold=await doc.embedFont(StandardFonts.HelveticaBold);
+ const unicode=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/NotoSans-Regular.ttf',import.meta.url))),{subset:true}),regular=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/LiberationSans-Regular.ttf',import.meta.url))),{subset:true}),bold=await doc.embedFont(await readFile(fileURLToPath(new URL('../../../assets/fonts/LiberationSans-Bold.ttf',import.meta.url))),{subset:true});
  const black=rgb(.067,.067,.067),blue=rgb(.09,.23,.40),grey=rgb(.83,.83,.83),width=595.28,height=841.89,left=39.7,right=555.6,span=right-left;
  let page=doc.addPage([width,height]),y=0;
  const pick=(s:string,strong=false)=>{const f=strong?bold:regular;try{f.encodeText(s);return f;}catch{return unicode;}};

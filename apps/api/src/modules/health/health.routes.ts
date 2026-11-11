@@ -3,7 +3,7 @@ import { prisma } from '../../plugins/prisma.js';
 export async function healthRoutes(app: FastifyInstance,options:{rootHealth?:boolean}={}) {
   const checkHealth = async () => {
     await prisma.$queryRaw`SELECT 1`;
-    return { status: 'ok', service: 'erp-core-api', release: '0.6.99', database: 'connected' };
+    return { status: 'ok', service: 'erp-core-api', release: '0.6.100', database: 'connected' };
   };
   if(options.rootHealth!==false)app.get('/', checkHealth);
   app.get('/api/v1/health', checkHealth);

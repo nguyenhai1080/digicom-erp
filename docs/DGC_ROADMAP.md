@@ -16,6 +16,8 @@
 
 **Mẫu Invoice v0.6.99 — 11/11:** chuẩn bị đúng form MOVTV owner xác nhận, sửa ảnh trang xem trước bị CSP chặn. [Bàn giao](handover/DGC_INVOICE_OWNER_FORM_20261111.md). Mẫu GST/REGISTAR đã được owner rút lại. Chờ triển khai và tạo lại preview; giữ nguyên PDF đã lưu.
 
+**Font Invoice v0.6.100:** nhúng bộ chữ tương thích Arial, đủ regular/bold/tiếng Việt, thay Helvetica không nhúng của v0.6.99. [Bàn giao](handover/DGC_INVOICE_EMBEDDED_FONTS_20261111.md). Chờ triển khai và xem trước lại; PDF đã lưu giữ nguyên.
+
 ## Đã hoàn thành và có bằng chứng
 
 | Hạng mục | Trạng thái xác nhận | Bàn giao |
