@@ -1,3 +1,5 @@
+**12/11 — v0.6.107:** kế toán chủ động bấm lấy USD/VND Vietcombank theo (Mua chuyển khoản + Bán)/2, xem ngày công bố, chọn kỳ và xác nhận lưu. Cache nguồn5phút theo giới hạn ngân hàng; không tự chạy/ghi đè kỳ cũ. [Bàn giao](docs/handover/DGC_VIETCOMBANK_FX_20261112.md). 41 parser +48 API (Windows/Linux),20 browser,69 web đạt; chưa thao tác FX host thật. Owner triển khai.
+
 **12/11 — v0.6.106:** sửa email lấy nhầm đối soát gốc: lấy bản ký trong hồ sơ phê duyệt nguồn, khớp đối soát/doanh thu hiện hành/đối tác/kỳ; link xem và bytes gửi cùng một bản. Không ký lại hoặc sửa PDF/sổ, không tự gửi email. [Bàn giao](docs/handover/DGC_EMAIL_SIGNED_RECON_20261112.md). Owner triển khai rồi mở màn Gửi email mới.
 
 **11/11 — v0.6.105:** thêm gửi email Invoice và đối soát đã chốt theo kỳ từ info@digicomjsc.com: chọn Invoice/người nhận, kiểm tệp rồi xác nhận gửi; lịch sử và chống gửi lặp. [Bàn giao](docs/handover/DGC_INVOICE_EMAIL_20261111.md), [cấu hình SMTP](docs/DGC_INVOICE_EMAIL_GUIDE.md). Không gửi thử email thật/ghi sổ. Owner triển khai; cần cấu hình nhà cung cấp email riêng trên host.

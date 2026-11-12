@@ -19,6 +19,8 @@
     "test:recon-financial": "node tests/recon-financial.characterization.mjs",
     "test:company-branding": "node tests/company-branding.mjs",
     "test:dgc-config": "node tests/dgc-config-preflight.mjs",
+    "test:vietcombank-source": "node tests/vietcombank-source.test.mjs",
+    "test:vietcombank-fx": "node tests/vietcombank-fx.integration.mjs",
     "test:invoice-email": "node tests/invoice-email.integration.mjs",
     "test:dgc-invoice": "node tests/dgc-invoice.characterization.mjs",
     "test:dgc-invoice:integration": "node tests/dgc-invoice.integration.mjs",
