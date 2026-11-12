@@ -5,7 +5,7 @@ import {z} from 'zod';
 import {requirePermission,type AuthConfig,type Identity} from '../auth/access.js';
 import {audit,CommandError,parse,writeGuard} from './commands.js';
 import {checkedFile,sha} from './financial-documents.js';
-import {capturedReconDocument} from './output-recon-history.js';
+import {capturedSignedReconDocument} from './captured-recon-signed.js';
 import {financialFilename,invoiceServices} from './document-filename.js';
 import {deliverInvoiceMail,emailAddress,mailConfiguration,type InvoiceMail,type MailResult} from './invoice-mail-transport.js';
 
@@ -21,6 +21,13 @@ export async function invoiceEmailPackage(tx:Prisma.TransactionClient,companyId:
  if(invoices.length!==ids.length)throw new CommandError(404,'Không tìm thấy đủ Invoice của công ty.');
  const first=invoices[0];
  requireStatus(invoices.every(i=>i.isCurrent&&['DRAFT','ISSUED','OVERDUE','PARTIALLY_PAID','PAID'].includes(i.status)&&i.partnerId===first.partnerId&&i.period===first.period&&i.partner.companyId===companyId),'Chỉ gửi các Invoice đang hiệu lực của cùng đối tác và kỳ.');
+ const selectedReconIds=[...new Set(invoices.flatMap(i=>i.scopes.filter(s=>s.isCurrent).flatMap(s=>s.items.filter(v=>v.isCurrent).map(v=>String((v.revenue.reconciliation.ocrRawJson as any)?.documentSource?.legacyId??'').toUpperCase()))).filter(Boolean))];
+ const capturedReconIds=[...new Set(invoices.flatMap(i=>i.scopes.filter(s=>s.isCurrent).flatMap(s=>s.items.filter(v=>v.isCurrent&&(v.revenue.calculationJson as any)?.sourceKind==='DGC_CAPTURED_BOOK_V1').map(v=>v.revenue.reconciliationId))))];
+ const capturedSources=capturedReconIds.length?await tx.revenue.findMany({where:{companyId,partnerId:first.partnerId,isCurrent:true,reconciliationId:{in:capturedReconIds},calculationJson:{path:['sourceKind'],equals:'DGC_CAPTURED_BOOK_V1'}},select:{reconciliationId:true,calculationJson:true},take:5001}):[];
+ requireStatus(capturedSources.length<=5000,'Nguồn đối soát vượt giới hạn tra cứu bản ký.');
+ const sourceLegacy=(r:{calculationJson:unknown})=>String((r.calculationJson as any)?.source?.legacyId??'').toUpperCase();
+ const selectedRevenueIds=[...new Set(capturedSources.map(sourceLegacy).filter(Boolean))];
+ const selectedInvoiceIds=invoices.map(i=>String((i.snapshot as any)?.source?.legacyId??'').toUpperCase()).filter(Boolean);
  const files=new Map<string,{id:string;filename:string;kind:string;checksum:string;size:number;downloadUrl:string;content:Buffer}>(),warnings:string[]=[];
  async function add(d:typeof first.document,filename:string,kind:string,expected:string,downloadUrl:string){
   if(files.has(d.id))return;
@@ -42,15 +49,14 @@ export async function invoiceEmailPackage(tx:Prisma.TransactionClient,companyId:
     requireStatus(item.companyId===companyId&&r.companyId===companyId&&recon.companyId===companyId&&r.partnerId===i.partnerId&&recon.partnerId===i.partnerId&&r.periodStart.toISOString().slice(0,7)===i.period&&recon.periodStart.toISOString().slice(0,7)===i.period&&recon.status==='APPROVED'&&recon.isCurrent&&r.isCurrent,'Nguồn đối soát đã đổi phạm vi hoặc không còn hiệu lực.');
     if(j?.sourceKind==='MANUAL_PERIOD'){warnings.push(recon.reconCode+': doanh thu nhập tay, không có PDF đối soát.');continue;}
     if(j?.sourceKind==='DGC_CAPTURED_BOOK_V1'){
-     const d=await capturedReconDocument(tx,companyId,recon.ocrRawJson);
-     if(!d){warnings.push(recon.reconCode+': chưa có PDF gốc liên kết, không đính kèm tệp thay thế.');continue;}
-     await add(d,`Doi-soat-${recon.reconCode}.pdf`,'Đối soát',`dgc-history/${companyId}/${d.attachment.id}.pdf`,`/api/v1/output-recon/history/${recon.id}/pdf`);continue;
+     const signed=await capturedSignedReconDocument(tx,companyId,{id:recon.id,partnerId:i.partnerId,period:i.period,raw:recon.ocrRawJson,selectedReconIds,selectedInvoiceIds,selectedRevenueIds,revenueIds:capturedSources.filter(v=>v.reconciliationId===recon.id).map(sourceLegacy)}),d=signed.document;
+     await add(d,`Doi-soat-da-ky-${signed.source}-${i.period}.pdf`,'Đối soát đã ký',`dgc-history/${companyId}/${d.attachment.id}.pdf`,`/api/v1/invoice-email/recon/${recon.id}/signed-pdf?invoiceIds=${ids.join(',')}`);continue;
     }
     const u=typeof j?.uploadId==='string'?await tx.outputReconUpload.findFirst({where:{id:j.uploadId,companyId,partnerId:i.partnerId,period:i.period,status:'APPROVED'}}):null,f=(u?.extractionData as any)?.finalization;
     requireStatus(!!u&&f?.reconciliationId===recon.id&&!!f?.documentId&&(recon.approvedSnapshot as any)?.uploadId===u?.id,'Chưa tìm thấy PDF đối soát đã chốt đúng nguồn Invoice.');
     const d=await tx.document.findFirst({where:{id:f.documentId,companyId,documentType:'RECON_SIGNED',entityType:'OutputReconUpload',entityId:u!.id,status:'ACTIVE'},include:{attachment:true}});
     requireStatus(!!d,'PDF đối soát đã chốt không còn hiệu lực.');
-    await add(d!,`Doi-soat-${u!.uploadCode}-${i.period}.pdf`,'Đối soát',`signed-recon/${companyId}/${d!.attachment.id}.pdf`,`/api/v1/output-recon/uploads/${u!.id}/signed-download`);
+    await add(d!,`Doi-soat-${u!.uploadCode}-${i.period}.pdf`,'Đối soát đã chốt',`signed-recon/${companyId}/${d!.attachment.id}.pdf`,`/api/v1/output-recon/uploads/${u!.id}/signed-download`);
    }
   }
  }
@@ -61,6 +67,12 @@ export async function invoiceEmailPackage(tx:Prisma.TransactionClient,companyId:
 }
 function digest(p:Awaited<ReturnType<typeof invoiceEmailPackage>>,body:z.infer<typeof compose>){return sha(JSON.stringify({metadata:p.metadata,body:{...body,invoiceIds:[...new Set(body.invoiceIds)].sort()},from:mailConfiguration().from}));}
 export async function invoiceEmailRoutes(app:FastifyInstance,config:AuthConfig & {emailTransport?:(mail:InvoiceMail)=>Promise<MailResult>}){
+ app.get('/api/v1/invoice-email/recon/:id/signed-pdf',{preHandler:requirePermission('INVOICE_ISSUE')},async(request,reply)=>{
+  const user=request.auth!;access(user);const {id}=parse(z.object({id:z.uuid()}).strict(),request.params),q=parse(z.object({invoiceIds:z.string().max(2000).transform(v=>v.split(',')).pipe(z.array(z.uuid()).min(1).max(50))}).strict(),request.query);
+  const p=await prisma.$transaction(tx=>invoiceEmailPackage(tx,user.companyId,q.invoiceIds),{isolationLevel:'RepeatableRead',timeout:20000});
+  const suffix=`/api/v1/invoice-email/recon/${id}/signed-pdf?`,file=p.files.find(f=>f.downloadUrl.startsWith(suffix));if(!file)throw new CommandError(404,'Không tìm thấy bản đối soát đã ký trong lựa chọn.');
+  return reply.header('Cache-Control','no-store').header('X-Content-Type-Options','nosniff').header('Content-Disposition',`inline; filename="${file.filename}"`).type('application/pdf').send(file.content);
+ });
  app.post('/api/v1/invoice-email/prepare',{onRequest:writeGuard('INVOICE_ISSUE',config)},async request=>{
   const user=request.auth!;access(user);const b=parse(selection,request.body),p=await prisma.$transaction(tx=>invoiceEmailPackage(tx,user.companyId,b.invoiceIds),{isolationLevel:'RepeatableRead',timeout:20000});
   const availableInvoices=await prisma.invoice.findMany({where:{companyId:user.companyId,partnerId:p.metadata.partnerId,period:p.metadata.period,isCurrent:true,status:{in:['DRAFT','ISSUED','OVERDUE','PARTIALLY_PAID','PAID']}},select:{id:true,invoiceNumber:true,status:true},orderBy:{invoiceNumber:'asc'},take:100});
