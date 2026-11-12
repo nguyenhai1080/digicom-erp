@@ -13,7 +13,7 @@ Sau khi triển khai v0.6.105, người có INVOICE_VIEW + RECON_VIEW + INVOICE_
 - Dùng chính PDF Invoice đã lưu và PDF đối soát đầu ra đã chốt được liên kết qua doanh thu/phạm vi Invoice. Không tạo lại PDF hoặc tính lại số tiền.
 - Chỉ cùng một công ty, đối tác và kỳ. Một PDF liên kết với nhiều dòng dịch vụ chỉ đính kèm một lần.
 - Không tự lấy đối soát đầu vào của nhà cung cấp khác để gửi cho khách hàng. Các tài liệu đó có thể chứa chi phí/tỷ lệ chia sẻ riêng.
-- Với nguồn nhập tay không có PDF hoặc nguồn lịch sử thiếu tệp đã liên kết, có cảnh báo rõ; không thay bằng tệp đoán theo tên. Người gửi cần kiểm tra cảnh báo trước khi xác nhận.
+- Với nguồn nhập tay không có PDF, có cảnh báo rõ. Từ v0.6.106, nguồn lịch sử chỉ lấy bản ký đã phê duyệt có liên kết đúng đối soát và doanh thu hiện hành trong hồ sơ nguồn; không lấy PDF gốc thay thế. Thiếu bản ký hoặc còn nhiều ứng viên phù hợp sẽ chặn gói email để kiểm tra. Không ký lại hoặc suy đoán từ tên tệp.
 - Tối đa 50 Invoice và 18 MB tổng PDF mỗi email, để chừa phần mã hóa cho giới hạn thư thường gặp. Nhà cung cấp có thể áp dụng giới hạn thấp hơn.
 
 ## Cấu hình trên Vibe Host

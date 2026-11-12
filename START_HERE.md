@@ -1,3 +1,5 @@
+**12/11 — v0.6.106:** sửa email lấy nhầm đối soát gốc: lấy bản ký trong hồ sơ phê duyệt nguồn, khớp đối soát/doanh thu hiện hành/đối tác/kỳ; link xem và bytes gửi cùng một bản. Không ký lại hoặc sửa PDF/sổ, không tự gửi email. [Bàn giao](docs/handover/DGC_EMAIL_SIGNED_RECON_20261112.md). Owner triển khai rồi mở màn Gửi email mới.
+
 **11/11 — v0.6.105:** thêm gửi email Invoice và đối soát đã chốt theo kỳ từ info@digicomjsc.com: chọn Invoice/người nhận, kiểm tệp rồi xác nhận gửi; lịch sử và chống gửi lặp. [Bàn giao](docs/handover/DGC_INVOICE_EMAIL_20261111.md), [cấu hình SMTP](docs/DGC_INVOICE_EMAIL_GUIDE.md). Không gửi thử email thật/ghi sổ. Owner triển khai; cần cấu hình nhà cung cấp email riêng trên host.
 
 **11/11 — v0.6.104:** sửa chặn nhầm ảnh ký: dùng đúng đáy thanh toán, Preview kéo/resize trong vùng ký và quy đổi theo phần trong viền. [Bàn giao](docs/handover/DGC_INVOICE_SIGNING_AREA_20261111.md). 246 Linux API/15 geometry/53 browser/69 web và PDF regression đạt; không bỏ kiểm server hoặc sửa hồ sơ thật. Owner triển khai rồi mở Preview mới.

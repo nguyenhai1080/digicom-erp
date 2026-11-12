@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
-import {mkdtemp,writeFile,readFile} from 'node:fs/promises';
+import {mkdtemp,writeFile,readFile,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {resolve} from 'node:path';
 import Fastify from 'fastify';
@@ -40,7 +40,7 @@ try{
  eq((await post('prepare',{invoiceIds:ids},{'x-csrf-token':'bad'})).statusCode,403);
  eq((await post('prepare',{invoiceIds:ids,companyId:randomUUID()})).statusCode,400);
  eq((await post('prepare',{invoiceIds:[randomUUID()]})).statusCode,404);
- const prepared=await post('prepare',{invoiceIds:ids});eq(prepared.statusCode,200);const p=prepared.json();eq(p.files.length,3);eq(p.files.filter(f=>f.kind==='Đối soát').length,1);eq(p.from,'info@digicomjsc.com');eq(p.warnings.length,2);eq(p.availableInvoices.length,2);eq(p.recipients.some(r=>r.email==='partner@example.test'),true);eq('content' in p.files[0],false);eq('host' in p,false);eq(p.configured,false);
+ const prepared=await post('prepare',{invoiceIds:ids});eq(prepared.statusCode,200);const p=prepared.json();eq(p.files.length,3);eq(p.files.filter(f=>f.kind==='Đối soát đã chốt').length,1);eq(p.from,'info@digicomjsc.com');eq(p.warnings.length,2);eq(p.availableInvoices.length,2);eq(p.recipients.some(r=>r.email==='partner@example.test'),true);eq('content' in p.files[0],false);eq('host' in p,false);eq(p.configured,false);
  const preview=await post('preview',body);eq(preview.statusCode,200);const digest=preview.json().digest,sendBody={...body,requestId:p.requestId,digest,confirmed:true};
  eq((await post('send',sendBody)).statusCode,409);eq(sent.length,0);
  process.env.DGC_SMTP_HOST='synthetic.example.invalid';process.env.DGC_SMTP_USER='synthetic';process.env.DGC_SMTP_PASSWORD='synthetic-never-connect';
@@ -68,5 +68,41 @@ try{
  // Exactly the finance fields remain unchanged; updatedAt changed above only by the deliberate fixture status tests.
  const after=JSON.parse(await finance()),orig=JSON.parse(before);for(const i of [...after.invoices,...orig.invoices])delete i.updatedAt;eq(after,orig);
  eq(await prisma.auditLog.count({where:{companyId,entityType:'InvoiceEmail',action:'INVOICE_EMAIL_ATTEMPT',newValue:{path:['invoiceIds'],array_contains:[a.i.id]}}}),5);
+// Regression: captured originals and approved signed copies coexist. Email must
+// use only the latter, through source row/link metadata, never a filename guess.
+const snapshotHash='1'.repeat(64),appendixHash='2'.repeat(64),rowHash='3'.repeat(64),packageHash='4'.repeat(64),sourceSpreadsheetId='synthetic-source',source={sheetId:43,sourceRow:2,rowHash,legacyId:'RPD-SYN',snapshotHash};
+for(const hash of [snapshotHash,appendixHash])await prisma.dgcImportSnapshot.create({data:{companyId,snapshotHash:hash,sourceSpreadsheetId,sourceMetadata:{synthetic:true},rowCount:2}});
+await prisma.auditLog.create({data:{companyId,action:'DGC_CAPTURED_BOOK_TRANSFER',entityType:'Configuration',newValue:{sourceSnapshotHash:snapshotHash,sourceAppendixHash:appendixHash}}});
+await prisma.dgcImportRow.create({data:{companyId,snapshotHash,sheetId:43,sourceRow:2,rowHash,legacyId:'RPD-SYN',sheetName:'43_RECON_PDF_HEADER',payload:{values:{Recon_Doc_ID:'RPD-SYN',Partner_ID:'PARTNER-SYN',Period_Month:46296}}}});
+await prisma.dgcImportRow.create({data:{companyId,snapshotHash,sheetId:20,sourceRow:2,rowHash:'5'.repeat(64),legacyId:'PARTNER-SYN',sheetName:'20_PARTNERS',payload:{values:{}}}});
+await prisma.dgcImportLink.create({data:{companyId,snapshotHash,sourceSpreadsheetId,sheetId:20,sourceRow:2,rowHash:'5'.repeat(64),legacyId:'PARTNER-SYN',targetModel:'partner',targetId:partner.id,targetHash:'6'.repeat(64)}});
+const packageValues={Approval_ID:'APP-SYN',Partner_ID:'PARTNER-SYN',Period:46296,Approval_Status:'Approved',Related_Recon_Doc_IDs:'RPD-SYN',Related_Invoice_IDs:null,Related_Revenue_IDs:'REV-SYN',File_ID:'synthetic-signed-file'};
+const packageRow={companyId,snapshotHash:appendixHash,sheetId:55,sourceRow:2,rowHash:packageHash,legacyId:'APP-SYN',sheetName:'55_APPROVAL_PACKAGE',payload:{values:packageValues}};
+await prisma.dgcImportRow.create({data:packageRow});
+async function historyDoc(code,bytes,type){const aid=randomUUID(),storagePath=`dgc-history/${companyId}/${aid}.pdf`;await mkdir(resolve(process.env.STORAGE_ROOT,'dgc-history',companyId),{recursive:true});await writeFile(resolve(process.env.STORAGE_ROOT,storagePath),bytes);const att=await prisma.attachment.create({data:{id:aid,companyId,originalFilename:'do-not-infer-signed-from-name.pdf',storedFilename:aid+'.pdf',storageProvider:'local',storagePath,mimeType:'application/pdf',fileSize:BigInt(bytes.length),checksumSha256:sha(bytes)}});return prisma.document.create({data:{companyId,documentCode:code,documentType:type,entityType:type==='DGC_SOURCE_RECON'?type:'DGC_SOURCE_REFERENCE',entityId:randomUUID(),attachmentId:att.id}});}
+const originalBytes=Buffer.from('%PDF-1.4 Synthetic ORIGINAL UNSIGNED'),signedBytes=Buffer.from('%PDF-1.4 Synthetic SAVED SIGNED COMPOSITE'),originalDoc=await historyDoc(tag+'-original',originalBytes,'DGC_SOURCE_RECON'),signedDoc=await historyDoc(tag+'-signed',signedBytes,'APPROVAL_PACKAGE');
+await prisma.dgcImportLink.create({data:{companyId,snapshotHash,sourceSpreadsheetId,...source,targetModel:'document',targetId:originalDoc.id,targetHash:'7'.repeat(64)}});
+await prisma.dgcImportLink.create({data:{companyId,snapshotHash:appendixHash,sourceSpreadsheetId,sheetId:55,sourceRow:2,rowHash:packageHash,legacyId:'APP-SYN',targetModel:'document',targetId:signedDoc.id,targetHash:'8'.repeat(64)}});
+const originalCalcs=[revenue.calculationJson,revenue2.calculationJson];for(const rv of [revenue,revenue2])await prisma.revenue.update({where:{id:rv.id},data:{calculationJson:{sourceKind:'DGC_CAPTURED_BOOK_V1',source:{legacyId:'REV-SYN'}}}});
+await prisma.reconciliation.update({where:{id:recon.id},data:{ocrRawJson:{sourceKind:'DGC_CAPTURED_BOOK_V1',snapshotHash:'9'.repeat(64),documentSource:source}}});
+// Old approved copy refers to the previous revenue revision; it must not win.
+await prisma.dgcImportRow.create({data:{...packageRow,sourceRow:4,legacyId:'APP-OLD',payload:{values:{...packageValues,Related_Revenue_IDs:'REV-OLD'}}}});
+const capBefore=await finance();
+const cap=await post('prepare',{invoiceIds:ids});eq(cap.statusCode,200);const capData=cap.json();eq(capData.files.length,3);const sf=capData.files.find(f=>f.kind==='Đối soát đã ký');eq(sf.id,signedDoc.id);eq(sf.checksum,sha(signedBytes));eq(capData.files.some(f=>f.id===originalDoc.id),false);eq(sf.filename.includes('APP-SYN'),true);
+const downloaded=await app.inject({url:sf.downloadUrl,headers});eq(downloaded.statusCode,200);eq(downloaded.rawPayload.equals(signedBytes),true);eq(downloaded.rawPayload.equals(originalBytes),false);eq(downloaded.headers['cache-control'],'no-store');
+eq((await app.inject({url:sf.downloadUrl,headers:{...headers,cookie:''}})).statusCode,401);
+eq((await app.inject({url:'/api/v1/invoice-email/recon/'+randomUUID()+'/signed-pdf?invoiceIds='+ids.join(','),headers})).statusCode,404);
+const previewCap=await post('preview',body);eq(previewCap.statusCode,200);
+// No original PDF is acceptable as a fallback when the signed source is absent.
+await prisma.document.update({where:{id:signedDoc.id},data:{status:'SUPERSEDED'}});let blocked=await post('prepare',{invoiceIds:ids});eq(blocked.statusCode,409);eq(blocked.body.includes('không còn hiệu lực'),true);await prisma.document.update({where:{id:signedDoc.id},data:{status:'ACTIVE'}});
+const whereRow={companyId_snapshotHash_sheetId_sourceRow:{companyId,snapshotHash:appendixHash,sheetId:55,sourceRow:2}};
+async function values(changes){await prisma.dgcImportRow.update({where:whereRow,data:{payload:{values:{...packageValues,...changes}}}});}
+for(const delta of [{Approval_Status:'Draft'},{Period:46266},{Partner_ID:'OTHER'},{Related_Recon_Doc_IDs:'RPD-OTHER'},{File_ID:null},{Related_Recon_Doc_IDs:'RPD-SYN,RPD-OTHER'},{Related_Invoice_IDs:'INV-UNSELECTED'},{Related_Revenue_IDs:'REV-OLD'},{Related_Revenue_IDs:'REV-SYN,REV-OLD'}]){await values(delta);eq((await post('prepare',{invoiceIds:ids})).statusCode,409);}await values({});
+await prisma.dgcImportRow.create({data:{...packageRow,sourceRow:3,legacyId:'APP-AMBIGUOUS'}});eq((await post('prepare',{invoiceIds:ids})).statusCode,409);await prisma.dgcImportRow.delete({where:{companyId_snapshotHash_sheetId_sourceRow:{companyId,snapshotHash:appendixHash,sheetId:55,sourceRow:3}}});
+const signedAtt=await prisma.attachment.findUniqueOrThrow({where:{id:signedDoc.attachmentId}}),signedPath=resolve(process.env.STORAGE_ROOT,signedAtt.storagePath);await writeFile(signedPath,Buffer.alloc(signedBytes.length,63));eq((await post('prepare',{invoiceIds:ids})).statusCode,409);await writeFile(signedPath,signedBytes);
+// A package may not be repointed to a foreign tenant's attachment.
+await prisma.document.update({where:{id:signedDoc.id},data:{companyId:foreign.id}});eq((await post('prepare',{invoiceIds:ids})).statusCode,409);await prisma.document.update({where:{id:signedDoc.id},data:{companyId}});
+eq(await finance(),capBefore);
+
  console.log('PASS: '+checks+' Invoice email assertions; synthetic transport only, no real email or ledger writes.');
 }finally{await app.close();await prisma.$disconnect();}

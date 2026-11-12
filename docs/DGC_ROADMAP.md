@@ -1,3 +1,5 @@
+**12/11 — v0.6.106:** email dùng đúng bản đối soát đã ký trong hồ sơ phê duyệt nguồn, không lấy PDF gốc; bản ký phải khớp doanh thu hiện hành và lựa chọn. [Bàn giao](handover/DGC_EMAIL_SIGNED_RECON_20261112.md). Chờ owner triển khai/mở lại màn gửi email; không tự gửi lại email hoặc sửa chứng từ thật.
+
 **11/11 — v0.6.105:** Gửi email Invoice + đối soát đầu ra: giao diện/luồng kiểm tệp và lịch sử đã chuẩn bị; gửi từ info@digicomjsc.com. Còn owner triển khai, cấu hình SMTP riêng và gửi email nghiệp vụ đầu tiên. Chưa gửi email thật, không tự phát hành Invoice. [Bàn giao](handover/DGC_INVOICE_EMAIL_20261111.md).
 
 # Roadmap Digicom ERP — rà soát 10/11/2026
