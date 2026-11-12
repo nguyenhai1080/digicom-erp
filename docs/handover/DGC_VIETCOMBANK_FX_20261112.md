@@ -35,3 +35,7 @@ API/web builds đạt. 41 kiểm tra parser/transport: đúng Transfer thay Buy,
 Đẩy source dgc/main và generated single-site codex/dgc-deploy. Owner triển khai rồi kế toán mở Cấu hình chung → Tỷ giá báo cáo và chủ động lấy/kiểm tra/lưu kỳ mới. Không tự bấm lưu tỷ giá tài chính thật thay owner.
 
 Owner cũng đã báo gửi email từ info@digicomjsc.com thành công, ảnh Gmail Inbox có Invoice và đối soát có dấu/chữ ký tháng10/2026. Đây là bằng chứng người nhận cụ thể trong ảnh, không xác nhận mọi người nhận hoặc phát hành Invoice/AR.
+
+## v0.6.108 — căn cột tỷ giá
+
+Owner xác nhận lấy nguồn trên host đã hoạt động, ảnh hiển thị giá tham khảo nhưng chưa lưu kỳ. Sửa CSS riêng bảng Vietcombank: ba cột rộng bằng nhau, tiêu đề và giá trị cùng căn giữa. Không đổi số, công thức, nguồn, cache hoặc hành vi lưu. Web build và22 browser checks đạt (gồm hình học căn cột, desktop/mobile); không ghi FX hoặc gọi bank trong kiểm thử này. Owner triển khai lại codex/dgc-deploy để nhận UI mới.

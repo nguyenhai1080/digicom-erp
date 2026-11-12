@@ -1,3 +1,5 @@
+**12/11 — UI v0.6.108:** căn giữa tiêu đề và giá trị bảng Vietcombank, chia đều ba cột. Owner đã xác nhận lấy nguồn thật hoạt động; chưa suy ra đã lưu tỷ giá kỳ. [Bàn giao](docs/handover/DGC_VIETCOMBANK_FX_20261112.md). Chỉ CSS/nhãn phiên bản; không đổi số/công thức hoặc thao tác FX thật. Owner triển khai UI mới.
+
 **12/11 — v0.6.107:** kế toán chủ động bấm lấy USD/VND Vietcombank theo (Mua chuyển khoản + Bán)/2, xem ngày công bố, chọn kỳ và xác nhận lưu. Cache nguồn5phút theo giới hạn ngân hàng; không tự chạy/ghi đè kỳ cũ. [Bàn giao](docs/handover/DGC_VIETCOMBANK_FX_20261112.md). 41 parser +48 API (Windows/Linux),20 browser,69 web đạt; chưa thao tác FX host thật. Owner triển khai.
 
 **12/11 — v0.6.106:** sửa email lấy nhầm đối soát gốc: lấy bản ký trong hồ sơ phê duyệt nguồn, khớp đối soát/doanh thu hiện hành/đối tác/kỳ; link xem và bytes gửi cùng một bản. Không ký lại hoặc sửa PDF/sổ, không tự gửi email. [Bàn giao](docs/handover/DGC_EMAIL_SIGNED_RECON_20261112.md). Owner triển khai rồi mở màn Gửi email mới.
