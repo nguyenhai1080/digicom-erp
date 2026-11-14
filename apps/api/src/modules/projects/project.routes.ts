@@ -1,3 +1,4 @@
+import {inputContractApprovalRoutes} from './input-contract-approval.js';
 import {invoiceEmailRoutes} from './invoice-email.js';
 import {cashAccountRoutes} from './cash-accounts.js';
 import {cashTransferRoutes} from './cash-transfers.js';
@@ -70,6 +71,7 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   await app.register(manualRevenueRoutes, config);
   await app.register(inputReconRoutes, config);
   await app.register(inputStatementRoutes, config);
+  await app.register(inputContractApprovalRoutes, config);
   await app.register(soaCutoffReviewRoutes, config);
   await app.register(soaRoutes, config);
   await app.register(invoiceHistoryRoutes, config);

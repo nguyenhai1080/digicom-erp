@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {randomBytes,randomUUID} from 'node:crypto';
-import {mkdtemp,mkdir,readdir,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,readdir,writeFile,readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {PDFDocument} from 'pdf-lib';
@@ -260,5 +260,37 @@ try{
  unlinked=await ok(url+'/contract-preview',contractSelection);eq(unlinked.items.length,3);eq(unlinked.excludedServices,['BATCH_TOTAL']);
  eq((await ok(url+'/statement-preview',bs)).data.lines.length,3);eq(await prisma.inputReconciliation.findUniqueOrThrow({where:{id:parentDraft.id}}),parentDraft);
  eq(await prisma.accountPayable.count(),beforeBatch.ap);eq(await prisma.cashEntry.count(),beforeBatch.cash);
+ // Complete contract workflow: saved full PDF -> preview -> atomic AP approval.
+ const approvalScope={period:'2026-10',inputContractId:batchServices[0].inp.id,outputPartnerId:batchRows[0].partnerId};
+ eq((await post(url+'/contract-approve-preview',approvalScope,{cookie:''})).statusCode,401);
+ eq((await post(url+'/contract-approve-preview',approvalScope,{'x-csrf-token':'bad'})).statusCode,403);
+ eq((await post(url+'/contract-approve-preview',approvalScope,foreignHeaders)).statusCode,404);
+ eq((await post(url+'/contract-approve-preview',{...approvalScope,rowIds:[partial.id]})).statusCode,400);
+ await capability('INPUT_RECON_APPROVE',false);eq((await post(url+'/contract-approve-preview',approvalScope)).statusCode,403);await capability('INPUT_RECON_APPROVE',true);
+ let apPlan=await ok(url+'/contract-approve-preview',approvalScope);eq(apPlan.items.length,3);eq(apPlan.pendingCount,3);eq(apPlan.excludedServices,['BATCH_TOTAL']);eq(apPlan.document.id,unlinkedSave.documentId);eq(apPlan.totalPayable,bp.payableAmount);
+ const nativeRows=await prisma.inputReconciliation.findMany({where:{companyId:company.id,sourceRevenueId:{in:ids}},orderBy:{id:'asc'}}),nativeSources=await prisma.revenue.findMany({where:{id:{in:ids}},orderBy:{id:'asc'}}),nativePdf=await prisma.document.findUniqueOrThrow({where:{id:unlinkedSave.documentId}});
+ const noPdf=nativeRows[0];await prisma.inputReconciliation.update({where:{id:noPdf.id},data:{documentId:null,status:'DRAFT'}});eq((await post(url+'/contract-approve-preview',approvalScope)).statusCode,409);await prisma.inputReconciliation.update({where:{id:noPdf.id},data:{documentId:noPdf.documentId,status:noPdf.status}});
+ await prisma.document.update({where:{id:nativePdf.id},data:{status:'SUPERSEDED'}});eq((await post(url+'/contract-approve-preview',approvalScope)).statusCode,409);await prisma.document.update({where:{id:nativePdf.id},data:{status:'ACTIVE'}});
+ const pdfAtt=await prisma.attachment.findUniqueOrThrow({where:{id:nativePdf.attachmentId}}),pdfPath=resolve(storage,pdfAtt.storagePath),pdfBefore=await readFile(pdfPath);await writeFile(pdfPath,Buffer.alloc(pdfBefore.length,46));eq((await post(url+'/contract-approve-preview',approvalScope)).statusCode,409);await writeFile(pdfPath,pdfBefore);
+ const printAudit=await prisma.auditLog.findFirstOrThrow({where:{companyId:company.id,action:'INPUT_RECON_PDF',entityId:nativePdf.id}}),printSnapshot=printAudit.newValue;await prisma.auditLog.update({where:{id:printAudit.id},data:{newValue:{...printSnapshot,rowIds:[nativeRows[0].id]}}});eq((await post(url+'/contract-approve-preview',approvalScope)).statusCode,409);await prisma.auditLog.update({where:{id:printAudit.id},data:{newValue:printSnapshot}});
+ apPlan=await ok(url+'/contract-approve-preview',approvalScope);let approvalBody={...approvalScope,digest:apPlan.digest,requestId:apPlan.requestId,confirmed:true};
+ eq((await post(url+'/contract-approve',{...approvalBody,digest:'a'.repeat(64)})).statusCode,409);eq((await post(url+'/contract-approve',{...approvalBody,confirmed:false})).statusCode,400);
+ const fxRow=await prisma.configuration.findUniqueOrThrow({where:{companyId_configKey:{companyId:company.id,configKey:'REVENUE_FX:2026-10'}}});await prisma.configuration.update({where:{id:fxRow.id},data:{configValue:JSON.stringify({rate:'27000',source:'Synthetic change only'})}});eq((await post(url+'/contract-approve-preview',approvalScope)).statusCode,409);eq((await post(url+'/contract-approve',approvalBody)).statusCode,409);await prisma.configuration.update({where:{id:fxRow.id},data:{configValue:fxRow.configValue}});
+ apPlan=await ok(url+'/contract-approve-preview',approvalScope);approvalBody={...approvalScope,digest:apPlan.digest,requestId:apPlan.requestId,confirmed:true};
+ const beforeApproveRows=await prisma.inputReconciliation.findMany({where:{id:{in:nativeRows.map(r=>r.id)}},orderBy:{id:'asc'}}),beforeApproveAudits=await prisma.auditLog.count();
+ const failureId=apPlan.items[1].id;assert(/^[a-f0-9-]{36}$/.test(failureId));
+ await prisma.$executeRawUnsafe(`CREATE FUNCTION input_contract_approve_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.input_recon_id='${failureId}'::uuid THEN RAISE EXCEPTION 'synthetic second AP failure'; END IF; RETURN NEW; END $$`);
+ await prisma.$executeRawUnsafe('CREATE TRIGGER input_contract_approve_failure BEFORE INSERT ON account_payables FOR EACH ROW EXECUTE FUNCTION input_contract_approve_failure()');
+ try{eq((await post(url+'/contract-approve',approvalBody)).statusCode,500);eq(await prisma.accountPayable.count(),beforeBatch.ap);eq(await prisma.inputReconciliation.findMany({where:{id:{in:nativeRows.map(r=>r.id)}},orderBy:{id:'asc'}}),beforeApproveRows);eq(await prisma.auditLog.count(),beforeApproveAudits);}finally{await prisma.$executeRawUnsafe('DROP TRIGGER input_contract_approve_failure ON account_payables');await prisma.$executeRawUnsafe('DROP FUNCTION input_contract_approve_failure()');}
+ // Retain an existing row-level approval and its exact AP; approve only missing members.
+ const firstRow=await prisma.inputReconciliation.findUniqueOrThrow({where:{id:apPlan.items[0].id}});await ok(url+'/'+firstRow.id+'/approve',{expectedUpdatedAt:firstRow.updatedAt.toISOString(),confirmed:true});const existingAp=await prisma.accountPayable.findUniqueOrThrow({where:{companyId_inputReconId:{companyId:company.id,inputReconId:firstRow.id}}});
+ eq((await post(url+'/contract-approve',approvalBody)).statusCode,409);
+ apPlan=await ok(url+'/contract-approve-preview',approvalScope);eq(apPlan.pendingCount,2);eq(apPlan.items.filter(r=>r.status==='APPROVED').length,1);approvalBody={...approvalScope,digest:apPlan.digest,requestId:apPlan.requestId,confirmed:true};
+ const approvals=await Promise.all([post(url+'/contract-approve',approvalBody),post(url+'/contract-approve',approvalBody)]);eq(approvals.map(r=>r.statusCode),[200,200]);eq(approvals.map(r=>r.json().replayed).sort(),[false,true]);eq(approvals[0].json().created,2);eq(approvals[0].json().existing,1);eq(await prisma.accountPayable.count(),beforeBatch.ap+3);eq(await prisma.accountPayable.findUniqueOrThrow({where:{id:existingAp.id}}),existingAp);
+ eq((await post(url+'/contract-approve',{...approvalBody,digest:'b'.repeat(64)})).statusCode,409);
+ const complete=await ok(url+'/contract-approve-preview',approvalScope);eq(complete.pendingCount,0);eq((await ok(url+'/contract-approve',{...approvalScope,digest:complete.digest,requestId:complete.requestId,confirmed:true})).created,0);eq(await prisma.accountPayable.count(),beforeBatch.ap+3);
+ eq(await prisma.inputReconciliation.findUniqueOrThrow({where:{id:parentDraft.id}}),parentDraft);eq(await prisma.cashEntry.count(),beforeBatch.cash);eq(await prisma.revenue.findMany({where:{id:{in:ids}},orderBy:{id:'asc'}}),nativeSources);eq((await readFile(pdfPath)).equals(pdfBefore),true);
+ for(const old of nativeRows){const latest=await prisma.inputReconciliation.findUniqueOrThrow({where:{id:old.id}});eq(latest.payableAmount.toFixed(),old.payableAmount.toFixed());eq(latest.sourceSnapshot,old.sourceSnapshot);eq(latest.documentId,old.documentId);eq(latest.status,'APPROVED');}
+
  console.log('PASS: '+checks+' InputRecon/AP assertions including aggregate/child deduplication, contract-driven preview, immutable legacy total, AP conflict protection, complete scopes and no cash.');
 }finally{await app.close();await prisma.$disconnect();}

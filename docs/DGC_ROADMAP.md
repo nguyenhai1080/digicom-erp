@@ -1,3 +1,5 @@
+**14/11 — v0.6.109:** hoàn thiện đối soát đầu vào theo hợp đồng: lưu PDF → kiểm tra và xác nhận duyệt toàn hợp đồng → xem kết quả AP. Giữ khoản đã duyệt, chỉ tạo phần thiếu trong một giao dịch; không cộng dòng tổng hoặc chi tiền. [Bàn giao](handover/DGC_INPUT_CONTRACT_APPROVAL_20261114.md). 418 API Windows/Linux,41 browser,69 web đạt. Chờ owner triển khai và thao tác thật.
+
 **12/11 — UI v0.6.108:** owner xác nhận lấy nguồn Vietcombank hoạt động; căn lại ba cột giá/tiêu đề đồng nhất. Chờ triển khai UI; không thay đổi tỷ giá hoặc xác nhận lưu kỳ thật.
 
 **12/11 — v0.6.107:** lấy tỷ giá Vietcombank theo nút kế toán, công thức (Mua chuyển khoản+Bán)/2; xác nhận ngày/kỳ trước tạo tỷ giá mới. Không lịch chạy/ghi đè/cập nhật hồi tố. [Bàn giao](handover/DGC_VIETCOMBANK_FX_20261112.md). Chờ owner triển khai và tự áp dụng kỳ thực tế. Email đã được owner xác nhận nhận tại Gmail cùng hai PDF; chưa tự suy trạng thái phát hành/AR.
