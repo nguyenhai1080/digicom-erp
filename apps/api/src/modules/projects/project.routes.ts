@@ -1,3 +1,5 @@
+import {documentDossierRoutes} from './document-dossier.js';
+import {dossierEmailRoutes} from './document-dossier-email.js';
 import {inputContractApprovalRoutes} from './input-contract-approval.js';
 import {invoiceEmailRoutes} from './invoice-email.js';
 import {cashAccountRoutes} from './cash-accounts.js';
@@ -60,6 +62,8 @@ export async function projectRoutes(app: FastifyInstance, config: AuthConfig) {
   await app.register(reconFinalizeRoutes, config);
   await app.register(invoiceRoutes, config);
   await app.register(invoiceEmailRoutes, config);
+  await app.register(documentDossierRoutes, config);
+  await app.register(dossierEmailRoutes, config);
   await app.register(invoiceCancelRoutes, config);
   await app.register(dgcInvoiceProfileRoutes, config);
   await app.register(financeLedgerRoutes, config);

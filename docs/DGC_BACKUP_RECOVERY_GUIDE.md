@@ -24,3 +24,5 @@ Khi tải website để thử, bỏ chọn **Kèm tệp .env**. Cấu hình bí 
 Owner cần xác định sự cố, thời điểm muốn phục hồi và các chứng từ phát sinh sau mốc đó trước khi thay hệ thống thật. Chuẩn bị/kiểm bản phục hồi trên môi trường riêng và sao lưu trạng thái hiện tại trước; xác định cách xử lý phát sinh mới để tránh mất hoặc nhập trùng. Việc đổi traffic hoặc ghi đè DB thật là một thao tác riêng, không được thực hiện tự động bởi các công cụ diễn tập trên.
 
 Quỹ/ngân hàng chưa áp dụng; không thêm tài khoản hoặc số dư trong quá trình phục hồi. Không mở lại bộ nhập lịch sử để thay thế restore.
+
+Từ v0.6.112, sao lưu toàn bộ kho còn bao gồm `dossiers/` (bản ký đầu vào, Invoice đầu vào và PDF Invoice đầu ra chưa chèn dấu/chữ ký) cùng bảng `input_document_receipts`. Đường dẫn và checksum được giữ trong DB; cần bộ DB/kho đồng bộ đủ mới. Công cụ khôi phục kho hiện có lấy toàn bộ cây đệ quy, không chỉ các thư mục cũ. Baseline 06/11 không phải kỳ vọng số lượng cho dữ liệu phát sinh sau này.

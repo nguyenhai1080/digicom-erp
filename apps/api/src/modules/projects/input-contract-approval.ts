@@ -1,3 +1,4 @@
+import {requireSignedInput} from './input-signed-evidence.js';
 import {randomUUID} from 'node:crypto';
 import type {FastifyInstance} from 'fastify';
 import {prisma,Prisma} from '@erp/db';
@@ -36,8 +37,9 @@ async function approvalPlan(tx:Prisma.TransactionClient,companyId:string,selecti
  if(document.status!=='ACTIVE'||document.entityType!=='InputReconStatement'||document.entityId!==contract.id||document.documentNumber!==selection.period||document.attachment.mimeType!=='application/pdf')fail('Biên bản PDF không còn hiệu lực hoặc không khớp hợp đồng/kỳ.');
  const receipt=await tx.auditLog.findFirst({where:{companyId,action:'INPUT_RECON_PDF',entityType:'Document',entityId:document.id},select:{newValue:true},orderBy:{createdAt:'desc'}}),snapshot=receipt?.newValue as any;
  if(snapshot?.data?.captured||!Array.isArray(snapshot?.rowIds)||!Array.isArray(snapshot?.sourceDigests)||snapshot.rowIds.length!==rows.length||new Set(snapshot.rowIds).size!==rows.length||rows.some(r=>{const i=snapshot.rowIds.indexOf(r.id);return i<0||snapshot.sourceDigests[i]!==r.sourceDigest;}))fail('Biên bản đã lưu chưa khớp đầy đủ dịch vụ hoặc nguồn hiện hành. Cần xem và lưu lại PDF.');
+ const signedDocument=rows.some(r=>r.status!=='APPROVED')?await requireSignedInput(tx,companyId,rows[0]):null;
  const total=rows.reduce((s,r)=>s.plus(r.payableAmount),new Prisma.Decimal(0)).toFixed(2),currency=rows[0].currency;
- const result={...selection,inputPartnerId:contract.partnerId,inputPartnerKey:contract.partner.partnerKey,inputPartnerName:contract.partner.legalName,contractNumber:contract.contractNumber??contract.contractCode,currency,totalPayable:total,printedPayable:snapshot.data?.totals?.partnerAmount??null,document:{id:document.id,version:document.versionNo,checksum:document.attachment.checksumSha256,bytes:bytes.length,pdfUrl:'/api/v1/input-recon/'+rows[0].id+'/pdf'},excludedServices:coverage.excludedServices,items:rows.map(r=>({id:r.id,code:r.inputReconCode,service:r.service.serviceName,status:r.status,payableAmount:r.payableAmount.toFixed(2),payableId:r.payable?.id??null,updatedAt:r.updatedAt.toISOString(),sourceDigest:r.sourceDigest})),pendingCount:rows.filter(r=>r.status!=='APPROVED').length};
+ const result={...selection,signedDocument,inputPartnerId:contract.partnerId,inputPartnerKey:contract.partner.partnerKey,inputPartnerName:contract.partner.legalName,contractNumber:contract.contractNumber??contract.contractCode,currency,totalPayable:total,printedPayable:snapshot.data?.totals?.partnerAmount??null,document:{id:document.id,version:document.versionNo,checksum:document.attachment.checksumSha256,bytes:bytes.length,pdfUrl:'/api/v1/input-recon/'+rows[0].id+'/pdf'},excludedServices:coverage.excludedServices,items:rows.map(r=>({id:r.id,code:r.inputReconCode,service:r.service.serviceName,status:r.status,payableAmount:r.payableAmount.toFixed(2),payableId:r.payable?.id??null,updatedAt:r.updatedAt.toISOString(),sourceDigest:r.sourceDigest})),pendingCount:rows.filter(r=>r.status!=='APPROVED').length};
  return {rows,result,digest:inputDigest(result)};
 }
 export async function inputContractApprovalRoutes(app:FastifyInstance,config:AuthConfig){
@@ -58,7 +60,7 @@ export async function inputContractApprovalRoutes(app:FastifyInstance,config:Aut
     await audit(tx,user,'INPUT_RECON_APPROVE','InputReconciliation',r.id,r,{item,payable,contractApprovalId:requestId});items.push({id:r.id,payableId:payable.id,created:true});created++;
    }
    const result={items,created,existing:items.length-created,documentId:p.result.document.id,totalPayable:p.result.totalPayable,currency:p.result.currency,message:`Đã duyệt hợp đồng: tạo ${created} khoản phải trả, giữ ${items.length-created} khoản đã có. Chưa phát sinh chi tiền.`};
-   await audit(tx,user,'INPUT_RECON_CONTRACT_APPROVE','InputReconContractApproval',requestId,null,{requestDigest,scope:selection,document:p.result.document,sourceDigests:p.rows.map(r=>({id:r.id,digest:r.sourceDigest})),result});return {...result,replayed:false};
+   await audit(tx,user,'INPUT_RECON_CONTRACT_APPROVE','InputReconContractApproval',requestId,null,{requestDigest,scope:selection,document:p.result.document,signedDocument:p.result.signedDocument,sourceDigests:p.rows.map(r=>({id:r.id,digest:r.sourceDigest})),result});return {...result,replayed:false};
   },{timeout:60000});
  });
 }

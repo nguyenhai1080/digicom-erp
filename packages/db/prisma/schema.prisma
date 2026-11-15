@@ -522,6 +522,7 @@ enum ValidationSeverity {
 }
 
 model Company {
+  inputDocumentReceipts InputDocumentReceipt[]
   statementsOfAccount StatementOfAccount[]
   inputReconciliations InputReconciliation[]
   accountPayables AccountPayable[]
@@ -814,6 +815,8 @@ model Attachment {
 }
 
 model Document {
+  inputDocumentReceipts InputDocumentReceipt[] @relation("InputDocumentFile")
+  inputDocumentSources InputDocumentReceipt[] @relation("InputDocumentSource")
   statementOfAccount StatementOfAccount?
   invoiceLinks InvoiceDocumentLink[]
   inputReconciliations InputReconciliation[]
@@ -870,6 +873,8 @@ model AuditLog {
 }
 
 model Partner {
+  inputDocumentReceipts InputDocumentReceipt[] @relation("InputDocumentSupplier")
+  outputDocumentReceipts InputDocumentReceipt[] @relation("InputDocumentNetwork")
   statementsOfAccount StatementOfAccount[]
   inputReconciliations InputReconciliation[] @relation("InputReconPartner")
   outputInputReconciliations InputReconciliation[] @relation("InputReconOutputPartner")
@@ -1065,6 +1070,7 @@ model ServiceRelationship {
 }
 
 model Contract {
+  inputDocumentReceipts InputDocumentReceipt[]
   inputReconciliations InputReconciliation[] @relation("InputReconContract")
   outputInputReconciliations InputReconciliation[] @relation("InputReconOutputContract")
   @@unique([companyId,id])
@@ -2273,4 +2279,32 @@ model AccountPayable {
  @@unique([companyId,inputReconId])
  @@index([companyId,status,currency])
  @@map("account_payables")
+}
+
+// Uploaded evidence only: never creates AP, Invoice ledger or cash postings.
+model InputDocumentReceipt {
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ documentId String @unique @map("document_id") @db.Uuid
+ sourceDocumentId String @map("source_document_id") @db.Uuid
+ inputContractId String @map("input_contract_id") @db.Uuid
+ inputPartnerId String @map("input_partner_id") @db.Uuid
+ outputPartnerId String @map("output_partner_id") @db.Uuid
+ period String @db.VarChar(7)
+ kind String @db.VarChar(24)
+ reference String @db.VarChar(120)
+ documentDate DateTime? @map("document_date") @db.Date
+ requestId String @map("request_id") @db.Uuid
+ requestDigest String @map("request_digest") @db.VarChar(64)
+ createdAt DateTime @default(now()) @map("created_at")
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict)
+ document Document @relation("InputDocumentFile",fields:[companyId,documentId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ sourceDocument Document @relation("InputDocumentSource",fields:[companyId,sourceDocumentId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ inputContract Contract @relation(fields:[companyId,inputContractId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ inputPartner Partner @relation("InputDocumentSupplier",fields:[companyId,inputPartnerId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ outputPartner Partner @relation("InputDocumentNetwork",fields:[companyId,outputPartnerId],references:[companyId,id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([companyId,requestId])
+ @@index([companyId,inputPartnerId,period])
+ @@index([companyId,sourceDocumentId,kind])
+ @@map("input_document_receipts")
 }

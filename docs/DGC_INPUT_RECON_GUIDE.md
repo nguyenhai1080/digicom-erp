@@ -6,7 +6,7 @@
 4. Xác nhận rồi **Lưu nháp và mở biên bản**. Nháp đã có được giữ nguyên, chỉ thêm phần thiếu; hệ thống tự mở biên bản chung. Nếu đã đủ nháp, chọn **Mở biên bản hợp đồng** để xem ngay.
 5. Bấm **Tạo PDF xem trước**, mở PDF, kiểm tra đủ chi tiết và không cộng dòng tổng. Xác nhận **Lưu biên bản PDF** để lưu phiên bản mới.
 6. Sau khi lưu, dùng **Mở biên bản PDF đã lưu** để kiểm tra bản chính thức. Người có quyền duyệt chọn **Kiểm tra duyệt công nợ hợp đồng** (hoặc **Kiểm tra duyệt hợp đồng** trong danh sách). Hệ thống kiểm tra đủ dịch vụ chi tiết, nguồn và cùng một PDF đã lưu.
-7. Khi đối tác đã chốt biên bản, kiểm tra tổng theo sổ, tổng in PDF và những khoản đã duyệt; tích xác nhận rồi bấm **Duyệt công nợ toàn hợp đồng**. Khoản đã có được giữ nguyên, chỉ tạo phần còn thiếu; nếu một dòng lỗi thì toàn bộ lần duyệt được hoàn tác.
+7. Chọn **Nhận bản ký hai bên / Invoice đầu vào**, nhập PDF đã được cả hai công ty ký và xác nhận đúng bản gốc/hợp đồng/kỳ. Quay lại kiểm tra duyệt: thiếu bản ký phù hợp thì chưa lên AP. Khi đã đủ bản ký, kiểm tra tổng theo sổ, tổng in PDF và những khoản đã duyệt; tích xác nhận rồi bấm **Duyệt công nợ toàn hợp đồng**. Khoản đã có được giữ nguyên, chỉ tạo phần còn thiếu; nếu một dòng lỗi thì toàn bộ lần duyệt được hoàn tác.
 8. Kết quả cho biết số khoản mới/sẵn có. Tra cứu tại **Quản lý Công nợ → Công nợ phải trả**. Tạo nháp hoặc lưu PDF không tự duyệt; duyệt công nợ chưa phát sinh chi tiền.
 
 Dòng tổng và tệp cũ vẫn được giữ trong hồ sơ, không cần xóa để lập lại PDF. Nếu dòng tổng đã có công nợ, hệ thống báo xung đột để xử lý riêng, không tự sửa số tiền thật. Nguồn thay đổi cần xem lại; hồ sơ đã chuyển và bản đã duyệt không tự tính lại.
@@ -18,3 +18,5 @@ Từ v0.6.97, nháp tổng cũ vẫn được nhận diện là tham chiếu dù
 Từ v0.6.109, luồng duyệt theo hợp đồng áp dụng cho hồ sơ mới. Hồ sơ đã chuyển từ hệ thống cũ vẫn dùng luồng lịch sử riêng, không đưa vào lần duyệt nhóm này. Khi nguồn hoặc PDF thay đổi, cần mở kiểm tra lại; gửi lại cùng lần xác nhận không tạo thêm công nợ.
 
 Từ v0.6.111, biên bản native đối soát trong nước dùng tên **Công ty Cổ Phần Đầu Tư và Truyền Thông Số (DIGICOM)**, độc lập với tên tiếng Anh của Invoice. Vùng đại diện hai bên để trống để các công ty tự ký; không chèn dấu/chữ ký số từ tài liệu tham khảo. Mở preview và lưu phiên bản mới để nhận thay đổi; PDF đã lưu trước đó giữ nguyên. Font nhúng Liberation Serif tương thích Times New Roman.
+
+Từ v0.6.112, quy tắc cần bản ký hai bên áp dụng cho cả duyệt theo hợp đồng và API duyệt từng dòng (kể cả hồ sơ captured chưa có AP). AP đã tồn tại giữ nguyên. Nhận Invoice đầu vào và email các loại chứng từ tại [Hồ sơ chứng từ](DGC_DOCUMENT_DOSSIER_GUIDE.md); không tự tạo thêm AP từ Invoice nhận.

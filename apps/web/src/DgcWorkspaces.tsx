@@ -1,3 +1,4 @@
+import {DocumentDossier} from './DocumentDossier';
 import {DgcInvoiceSettings} from './DgcInvoiceSettings';
 import {StatementsOfAccount} from './StatementsOfAccount';
 import {SoaCutoffReview} from './SoaCutoffReview';
@@ -23,6 +24,7 @@ export function DgcReconciliation(props:Props){
  if(has('RECON_VIEW'))tabs.push({id:'output',label:'Đối soát đầu ra',content:<OutputRecon {...props} includeTransferred/>});
  if(has('INVOICE_VIEW')&&has('INVOICE_CREATE'))tabs.push({id:'create',label:'Tạo Invoice',content:<Invoices {...props} creationOnly initialTab="unissued"/>});
  if(has('INPUT_RECON_VIEW'))tabs.push({id:'input',label:'Đối soát đầu vào',content:<InputRecon {...props}/>});
+ if(['RECON_VIEW','INPUT_RECON_VIEW','INVOICE_VIEW'].some(p=>has(p)))tabs.push({id:'documents',label:'Hồ sơ chứng từ',content:<DocumentDossier {...props}/>});
  return <WorkspaceTabs label="Quản lý đối soát" tabs={tabs} initialTab={props.initialTab}/>;
 }
 export function DgcDebt(props:Props){
@@ -39,6 +41,7 @@ export function DgcInvoices(props:Props){
   {id:'history',label:'Invoice lịch sử',content:<><p><a href="/operations/restart-october">Hồ sơ tháng 10/2026 trước khi nhập lại</a></p><InvoiceHistory request={props.request}/></>}
  ];
  if(['AR_VIEW','INVOICE_VIEW','INVOICE_PAYMENT_VIEW'].every(p=>props.permissions.includes(p)))tabs.push({id:'soa',label:'Statement of Account',content:<><StatementsOfAccount {...props}/><details><summary>Đối chiếu chi tiết khoản thu theo ngày chốt</summary><SoaCutoffReview request={props.request}/></details></>});
+ tabs.push({id:'documents',label:'Hồ sơ chứng từ',content:<DocumentDossier {...props}/>});
  return <WorkspaceTabs label="Quản lý Invoice" tabs={tabs} initialTab={props.initialTab}/>;
 }
 export function DgcSettings(props:Props){
