@@ -1,3 +1,5 @@
+**15/11 — UI v0.6.110:** bỏ các đoạn chú thích Dashboard theo yêu cầu owner: mô tả đầu trang, giải thích bộ lọc/KPI/biểu đồ/công việc/phải trả và dòng thời gian tải. Giữ nhãn, đơn vị, giá trị cùng kỳ, trạng thái thiếu dữ liệu/tỷ giá, lỗi và nút thao tác. Không đổi tính toán/API/quyền hoặc GST. Owner triển khai codex/dgc-deploy.
+
 **14/11 — v0.6.109:** hoàn thiện đối soát đầu vào theo hợp đồng: lưu PDF → kiểm tra và xác nhận duyệt toàn hợp đồng → xem kết quả AP. Giữ khoản đã duyệt, chỉ tạo phần thiếu trong một giao dịch; không cộng dòng tổng hoặc chi tiền. [Bàn giao](docs/handover/DGC_INPUT_CONTRACT_APPROVAL_20261114.md). 418 API Windows/Linux,41 browser,69 web đạt. Chờ owner triển khai và thao tác thật.
 
 **12/11 — UI v0.6.108:** căn giữa tiêu đề và giá trị bảng Vietcombank, chia đều ba cột. Owner đã xác nhận lấy nguồn thật hoạt động; chưa suy ra đã lưu tỷ giá kỳ. [Bàn giao](docs/handover/DGC_VIETCOMBANK_FX_20261112.md). Chỉ CSS/nhãn phiên bản; không đổi số/công thức hoặc thao tác FX thật. Owner triển khai UI mới.
