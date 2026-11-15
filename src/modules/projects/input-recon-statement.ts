@@ -7,7 +7,7 @@ import {audit,CommandError,date,parse,writeGuard} from './commands.js';
 import {assertInputSnapshot,assertCapturedInputSource,isCapturedInput,inputDigest,inputReconPlan,requireDgc} from './input-recon.js';
 import {derivedBytes,persistPdf,rollbackFiles} from './financial-documents.js';
 import {readDgcInvoiceProfile} from './dgc-invoice-profile.js';
-import {renderInputStatement,type InputStatement} from './input-recon-pdf.js';
+import {domesticInputIssuer,inputStatementRendererRevision,renderInputStatement,type InputStatement} from './input-recon-pdf.js';
 import {usdWords} from './invoice-template.js';
 import {renderCapturedInputStatement,type CapturedInputStatement} from './input-recon-captured-pdf.js';
 
@@ -62,10 +62,10 @@ async function statementPlan(tx:Prisma.TransactionClient,companyId:string,body:z
  const config=await readDgcInvoiceProfile(tx,companyId),lines=[...groups.values()],sum=(k:'baseUsd'|'cooperation'|'companyAmount'|'partnerAmount')=>lines.reduce((s,l)=>s.plus(l[k]),D('0')).toFixed(k==='baseUsd'||currency==='USD'?2:0);
  const totals={baseUsd:sum('baseUsd'),cooperation:sum('cooperation'),companyAmount:sum('companyAmount'),partnerAmount:sum('partnerAmount')};
  const toDate=new Date(Date.UTC(Number(body.period.slice(0,4)),Number(body.period.slice(5,7)),0)).toISOString().slice(0,10);
- const data:InputStatement={period:body.period,reconDate:body.reconDate,fromDate:body.period+'-01',toDate,issuer:config.profile.issuerName,partner:first.inputPartner.legalName,partnerKey:first.inputPartner.partnerKey,contractNumber:first.inputContract.contractNumber??first.inputContract.contractCode,outputPartners:[...new Set(rows.map(r=>r.outputPartner.partnerKey))],outputNetworks:[...new Set(rows.map(r=>r.outputPartner.partnerKey+(r.outputPartner.countryName?' - '+r.outputPartner.countryName:'')))],currency,fxRate:first.fxRate.toFixed(),deductions:rows.reduce((sum,r)=>sum.plus(r.taxAmount).plus(r.whtAmount),D('0')).toFixed(2),lines,totals,amountInWords:currency==='VND'?inputVndWords(totals.partnerAmount):usdWords(totals.partnerAmount)};
+ const data:InputStatement={period:body.period,reconDate:body.reconDate,fromDate:body.period+'-01',toDate,issuer:domesticInputIssuer,partner:first.inputPartner.legalName,partnerKey:first.inputPartner.partnerKey,contractNumber:first.inputContract.contractNumber??first.inputContract.contractCode,outputPartners:[...new Set(rows.map(r=>r.outputPartner.partnerKey))],outputNetworks:[...new Set(rows.map(r=>r.outputPartner.partnerKey+(r.outputPartner.countryName?' - '+r.outputPartner.countryName:'')))],currency,fxRate:first.fxRate.toFixed(),deductions:rows.reduce((sum,r)=>sum.plus(r.taxAmount).plus(r.whtAmount),D('0')).toFixed(2),lines,totals,amountInWords:currency==='VND'?inputVndWords(totals.partnerAmount):usdWords(totals.partnerAmount)};
  const latest=await tx.document.aggregate({where:{companyId,entityType:'InputReconStatement',entityId:first.inputContractId,documentType:'INPUT_RECON',documentNumber:body.period},_max:{versionNo:true}});
  const version=(latest._max.versionNo??0)+1;
- return {rows,data,version,excludedServices,digest:inputDigest({selection:body,data,profile:config.metadata,rows:rows.map(r=>({id:r.id,updatedAt:r.updatedAt,sourceDigest:r.sourceDigest})),version})};
+ return {rows,data,version,excludedServices,digest:inputDigest({selection:body,data,rendererRevision:inputStatementRendererRevision,profile:config.metadata,rows:rows.map(r=>({id:r.id,updatedAt:r.updatedAt,sourceDigest:r.sourceDigest})),version})};
 }
 let producing=false;
 export async function inputStatementRoutes(app:FastifyInstance,config:AuthConfig){
@@ -87,7 +87,7 @@ export async function inputStatementRoutes(app:FastifyInstance,config:AuthConfig
     await tx.inputReconciliation.updateMany({where:{companyId:user.companyId,id:{in:p.rows.map(r=>r.id)},status:'APPROVED'},data:{documentId:doc.id}});
     }
     for(const id of oldIds)if(!await tx.inputReconciliation.count({where:{companyId:user.companyId,documentId:id}}))await tx.document.updateMany({where:{companyId:user.companyId,id},data:{status:'SUPERSEDED'}});
-    await audit(tx,user,'INPUT_RECON_PDF','Document',doc.id,null,{data:p.data,rowIds:p.rows.map(r=>r.id),sourceDigests:p.rows.map(r=>r.sourceDigest),version:p.version});
+    await audit(tx,user,'INPUT_RECON_PDF','Document',doc.id,null,{data:p.data,rowIds:p.rows.map(r=>r.id),sourceDigests:p.rows.map(r=>r.sourceDigest),version:p.version,...(input.sourceMode==='CURRENT'?{rendererRevision:inputStatementRendererRevision}:{})});
     return {documentId:doc.id,version:p.version,filename};
    },{timeout:60000});
    return 'bytes'in result?reply.type('application/pdf').header('Cache-Control','no-store').send(result.bytes):reply.code(201).send(result);

@@ -5,6 +5,11 @@ import fontkit from '@pdf-lib/fontkit';
 import {Prisma} from '@erp/db';
 import {CommandError} from './commands.js';
 
+// Owner-confirmed Vietnamese legal identity for domestic InputRecon only.
+// Invoice's international issuer profile and transferred documents stay unchanged.
+export const domesticInputIssuer='Công ty Cổ Phần Đầu Tư và Truyền Thông Số';
+export const inputStatementRendererRevision='DGC_DOMESTIC_INPUT_V2';
+
 export type InputStatement={period:string;reconDate:string;fromDate:string;toDate:string;issuer:string;partner:string;partnerKey:string;contractNumber:string;outputPartners:string[];outputNetworks?:string[];currency:string;fxRate:string;lines:{service:string;baseUsd:string;shareRate:string;cooperation:string;companyAmount:string;partnerAmount:string}[];totals:{baseUsd:string;cooperation:string;companyAmount:string;partnerAmount:string};amountInWords:string;deductions?:string};
 
 // Owner's supplied form: US Letter landscape, eight columns, merged group headings.
