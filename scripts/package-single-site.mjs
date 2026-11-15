@@ -9,8 +9,8 @@ try{await access(out);throw Error('Refuse to overwrite existing deployment outpu
 const json=async p=>JSON.parse(await readFile(resolve(root,p),'utf8')),api=await json('apps/api/package.json'),db=await json('packages/db/package.json');
 await access(resolve(root,'apps/web/dist/index.html'));await mkdir(out,{recursive:true});
 // Type-check and emit before publication, away from the small production server.
-execFileSync(process.execPath,['--max-old-space-size=2048',resolve(root,'node_modules/typescript/bin/tsc'),'-p',resolve(root,'packages/db/tsconfig.json')],{cwd:root,stdio:'inherit'});
-execFileSync(process.execPath,['--max-old-space-size=2048',resolve(root,'node_modules/typescript/bin/tsc'),'-p',resolve(root,'apps/api/tsconfig.json'),'--outDir',resolve(out,'dist')],{cwd:root,stdio:'inherit'});
+execFileSync(process.execPath,['--max-old-space-size=2048',resolve(root,'apps/api/node_modules/typescript/bin/tsc'),'-p',resolve(root,'packages/db/tsconfig.json')],{cwd:root,stdio:'inherit'});
+execFileSync(process.execPath,['--max-old-space-size=2048',resolve(root,'apps/api/node_modules/typescript/bin/tsc'),'-p',resolve(root,'apps/api/tsconfig.json'),'--outDir',resolve(out,'dist')],{cwd:root,stdio:'inherit'});
 for(const [source,target] of [['apps/api/src','src'],['apps/api/assets','assets'],['apps/web/dist','public'],['packages/db/src','database/src'],['packages/db/dist','database/dist'],['packages/db/prisma','database/prisma'],['tsconfig.base.json','tsconfig.base.json'],['deploy/api/storage-probe.mjs','storage-probe.mjs']])await cp(resolve(root,source),resolve(out,target),{recursive:true});
 const pkg={name:'dgc-erp',version:api.version,private:true,type:'module',engines:{node:'22.x'},scripts:{build:'node build.mjs',start:'npm run db:migrate:deploy && node start.mjs','db:migrate:deploy':'prisma migrate deploy --schema database/prisma/schema.prisma','db:seed':'tsx database/prisma/seed.ts'},dependencies:{...api.dependencies,...api.devDependencies,'@erp/db':'file:./database','@prisma/client':'6.19.3',prisma:'6.19.3',tsx:'^4.20.6',typescript:'^5.9.3'}};
 // Publish the versions tested in this checkout, not new registry resolutions.
