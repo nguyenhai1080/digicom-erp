@@ -25,6 +25,10 @@ Kiểm thử dùng DB/kho/mail giả lập, không tệp thật hoặc SMTP th�
 
 Không đổi mẫu/form/công thức/FX/tiền lịch sử/importer; không tự nhập/duyệt/gửi mail trên host. Cash vẫn deferred. Kho chứng từ là phân loại logic cho tệp cũ và cấu trúc mới cho tệp mới, không tuyên bố mọi blob cũ đã được chuyển thư mục vật lý. Không tuyên bố xác thực pháp lý chữ ký.
 
+## Gói triển khai cho host nhỏ
+
+Kiểm tra kiểu và biên dịch API/DB được bắt buộc trong `package-single-site.mjs` trước khi tạo gói phát hành. Gói chứa cả nguồn và JavaScript đã kiểm, cùng BUILD_MANIFEST.json gắn sourceCommit/hash nguồn/build/schema. `build.mjs` trên host kiểm manifest rồi tạo Prisma client, không lặp lại trình kiểm kiểu TypeScript nặng. Sai hash hoặc thiếu mã đã biên dịch sẽ dừng build. Đây là thay đổi cách đóng gói, không bỏ kiểm mã nguồn hoặc tăng tài nguyên chạy: CPU0.3/RAM512MB/heap192 vẫn giữ. Dependency pins giữ nguyên. Compiled dist phải được đưa vào Git và Docker context của nhánh deploy, khác với source checkout vẫn để dist trong ignore.
+
 ## Owner
 
 Triển khai lại nhánh `codex/dgc-deploy`; startup chạy migration thêm bảng qua luồng hiện hữu. Không thêm biến môi trường hoặc seed. Sau đó mở mới trang, theo [hướng dẫn](../DGC_DOCUMENT_DOSSIER_GUIDE.md), tự lập PDF gốc và nhập bản ký đúng hai bên; kiểm AP gate/nhận Invoice đầu vào và gửi email nghiệp vụ sau khi review. Chưa có UAT hoặc thao tác tài chính thật cho bản112.

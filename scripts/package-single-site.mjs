@@ -1,4 +1,5 @@
 import {cp,mkdir,readFile,writeFile,readdir,access} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {resolve,relative,isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -7,8 +8,11 @@ if(!rel||rel==='..'||rel.startsWith('..')||isAbsolute(rel))throw Error('Deployme
 try{await access(out);throw Error('Refuse to overwrite existing deployment output');}catch(e){if(e.code!=='ENOENT')throw e;}
 const json=async p=>JSON.parse(await readFile(resolve(root,p),'utf8')),api=await json('apps/api/package.json'),db=await json('packages/db/package.json');
 await access(resolve(root,'apps/web/dist/index.html'));await mkdir(out,{recursive:true});
-for(const [source,target] of [['apps/api/src','src'],['apps/api/assets','assets'],['apps/web/dist','public'],['packages/db/src','database/src'],['packages/db/prisma','database/prisma'],['tsconfig.base.json','tsconfig.base.json'],['deploy/api/storage-probe.mjs','storage-probe.mjs']])await cp(resolve(root,source),resolve(out,target),{recursive:true});
-const pkg={name:'dgc-erp',version:api.version,private:true,type:'module',engines:{node:'22.x'},scripts:{build:'prisma generate --schema database/prisma/schema.prisma && tsc -p database/tsconfig.json && tsc -p tsconfig.json',start:'npm run db:migrate:deploy && node start.mjs','db:migrate:deploy':'prisma migrate deploy --schema database/prisma/schema.prisma','db:seed':'tsx database/prisma/seed.ts'},dependencies:{...api.dependencies,...api.devDependencies,'@erp/db':'file:./database','@prisma/client':'6.19.3',prisma:'6.19.3',tsx:'^4.20.6',typescript:'^5.9.3'}};
+// Type-check and emit before publication, away from the small production server.
+execFileSync(process.execPath,['--max-old-space-size=2048',resolve(root,'node_modules/typescript/bin/tsc'),'-p',resolve(root,'packages/db/tsconfig.json')],{cwd:root,stdio:'inherit'});
+execFileSync(process.execPath,['--max-old-space-size=2048',resolve(root,'node_modules/typescript/bin/tsc'),'-p',resolve(root,'apps/api/tsconfig.json'),'--outDir',resolve(out,'dist')],{cwd:root,stdio:'inherit'});
+for(const [source,target] of [['apps/api/src','src'],['apps/api/assets','assets'],['apps/web/dist','public'],['packages/db/src','database/src'],['packages/db/dist','database/dist'],['packages/db/prisma','database/prisma'],['tsconfig.base.json','tsconfig.base.json'],['deploy/api/storage-probe.mjs','storage-probe.mjs']])await cp(resolve(root,source),resolve(out,target),{recursive:true});
+const pkg={name:'dgc-erp',version:api.version,private:true,type:'module',engines:{node:'22.x'},scripts:{build:'node build.mjs',start:'npm run db:migrate:deploy && node start.mjs','db:migrate:deploy':'prisma migrate deploy --schema database/prisma/schema.prisma','db:seed':'tsx database/prisma/seed.ts'},dependencies:{...api.dependencies,...api.devDependencies,'@erp/db':'file:./database','@prisma/client':'6.19.3',prisma:'6.19.3',tsx:'^4.20.6',typescript:'^5.9.3'}};
 // Publish the versions tested in this checkout, not new registry resolutions.
 for(const name of Object.keys(pkg.dependencies).filter(n=>n!=='@erp/db')){
  let installed;for(const base of ['apps/api','packages/db','.']){try{installed=JSON.parse(await readFile(resolve(root,base,'node_modules',name,'package.json'),'utf8'));break;}catch(e){if(e.code!=='ENOENT')throw e;}}
@@ -16,6 +20,7 @@ for(const name of Object.keys(pkg.dependencies).filter(n=>n!=='@erp/db')){
 }
 db.dependencies['@prisma/client']='6.19.3';delete db.devDependencies;delete db.scripts;
 for(const [name,data] of [['package.json',pkg],['database/package.json',db],['tsconfig.json',{extends:'./tsconfig.base.json',compilerOptions:{outDir:'dist',rootDir:'src'},include:['src/**/*.ts']}],['database/tsconfig.json',{extends:'../tsconfig.base.json',compilerOptions:{outDir:'dist',rootDir:'src',declaration:true},include:['src/**/*.ts']}]])await writeFile(resolve(out,name),JSON.stringify(data,null,2)+'\n');
+await cp(resolve(root,'deploy/api/build.mjs'),resolve(out,'build.mjs'));
 const start=(await readFile(resolve(root,'deploy/api/start.mjs'),'utf8')).replaceAll('./packages/db','./database');await writeFile(resolve(out,'start.mjs'),"import {resolve} from 'node:path';\nprocess.env.ERP_WEB_ROOT ||= resolve('public');\n"+start);
 await writeFile(resolve(out,'Dockerfile'),`FROM node:22-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd && rm -rf /var/lib/apt/lists/*
@@ -28,11 +33,15 @@ ENV ERP_WEB_ROOT=/app/public
 EXPOSE 3000
 CMD ["sh", "-c", "npm run db:migrate:deploy && exec node start.mjs"]
 `);
-await writeFile(resolve(out,'.dockerignore'),'node_modules\ndist\ndatabase/dist\n.git\n.env\n.env.*\n!.env.example\nstorage\n');
-await writeFile(resolve(out,'.gitignore'),'node_modules/\ndist/\ndatabase/dist/\n.env\n.env.*\n!.env.example\nstorage/\n');
+await writeFile(resolve(out,'.dockerignore'),'node_modules\n.git\n.env\n.env.*\n!.env.example\nstorage\n');
+await writeFile(resolve(out,'.gitignore'),'node_modules/\n.env\n.env.*\n!.env.example\nstorage/\n');
 const env=(await readFile(resolve(root,'deploy/dgc.env.example'),'utf8')).replace('/app/apps/web/dist','/app/public');await writeFile(resolve(out,'.env.example'),env);
 const sourceCommit=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
 await writeFile(resolve(out,'DEPLOYMENT.json'),JSON.stringify({format:'dgc-single-site-release-v1',sourceCommit,sourceBranch:'dgc/main',deploymentBranch:'codex/dgc-deploy',applicationCount:1,entry:'start.mjs',webRoot:'/app/public',port:3000,sourceFinancialDataIncluded:false},null,2)+'\n');
-await writeFile(resolve(out,'README.md'),'# ERP DGC — one website\n\nGenerated by scripts/package-single-site.mjs from source commit '+sourceCommit+'.\n\nDeploy branch codex/dgc-deploy at repository root using Dockerfile, port 3000. Web and API run in one Node process. Set DGC-only DATABASE_URL, SESSION_SECRET, APP_URL, company configuration and persistent /app/storage. Use Asia/Ho_Chi_Minh reporting timezone. Do not enable seed/bootstrap automatically. This bundle contains application code and built UI, no donor records or secrets. ERP_WEB_ROOT is /app/public.\n');
+const files={};
+async function record(folder){for(const item of await readdir(resolve(out,folder),{withFileTypes:true})){const name=folder+'/'+item.name;if(item.isDirectory())await record(name);else if(item.isFile())files[name]=createHash('sha256').update(await readFile(resolve(out,name))).digest('hex');else throw Error('Only regular release files are allowed');}}
+for(const folder of ['src','dist','database/src','database/dist','database/prisma'])await record(folder);
+await writeFile(resolve(out,'BUILD_MANIFEST.json'),JSON.stringify({format:'dgc-checked-build-v1',sourceCommit,files},null,2)+'\n');
+await writeFile(resolve(out,'README.md'),'# ERP DGC — one website\n\nGenerated by scripts/package-single-site.mjs from source commit '+sourceCommit+'.\n\nDeploy branch codex/dgc-deploy at repository root using Dockerfile, port 3000. Web and API run in one Node process. Set DGC-only DATABASE_URL, SESSION_SECRET, APP_URL, company configuration and persistent /app/storage. Use Asia/Ho_Chi_Minh reporting timezone. Do not enable seed/bootstrap automatically. This bundle contains type-checked compiled API/database code, matching sources and built UI, no donor records or secrets. Host build verifies BUILD_MANIFEST.json and generates the Prisma client; it does not repeat TypeScript checking. ERP_WEB_ROOT is /app/public.\n');
 if((await readdir(out)).includes('apps')||pkg.workspaces||pkg.dependencies.vite)throw Error('Split-app source leaked into deployment bundle');
 console.log(JSON.stringify({output:out,sourceCommit,applicationCount:1,webBundled:true,lockfileRequired:true}));
