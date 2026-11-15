@@ -7,7 +7,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "prisma generate --schema database/prisma/schema.prisma && tsc -p database/tsconfig.json && tsc -p tsconfig.json",
+    "build": "node build.mjs",
     "start": "npm run db:migrate:deploy && node start.mjs",
     "db:migrate:deploy": "prisma migrate deploy --schema database/prisma/schema.prisma",
     "db:seed": "tsx database/prisma/seed.ts"

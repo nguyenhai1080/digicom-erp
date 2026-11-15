@@ -1,0 +1,245 @@
+import { createHash } from 'node:crypto';
+import { Prisma } from '@erp/db';
+import { CommandError } from './commands.js';
+import { readHistoricalRevenueSource } from './historical-revenue-source.js';
+import { historicalOwnerApprovedRevenueLink } from './historical-owner-links.js';
+import { historicalInvoice4Authority } from './historical-invoice4-authority.js';
+import { historicalLedgerVarianceAuthority } from './historical-ledger-variance.js';
+import { historicalInvoiceBalanceGroup } from './historical-invoice-balancing.js';
+const sourceId = '1xDrNhKbLTSSidbX6R1Ajo-7AkX2QY2AcSPBDefeaF6A', hex = /^[a-f0-9]{64}$/;
+const sorted = (v) => Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, sorted(v[k])])) : v;
+const canonical = (v) => JSON.stringify(sorted(v)), digest = (v) => createHash('sha256').update(canonical(v)).digest('hex');
+const value = (v) => v instanceof Date ? v.toISOString() : v?.toFixed ? v.toFixed() : v;
+const project = (row, fields) => digest(Object.fromEntries(fields.map(k => [k, value(row[k])])));
+const invoiceFields = ['id', 'companyId', 'invoiceNumber', 'businessKey', 'revisionNo', 'isCurrent', 'status', 'partnerId', 'period', 'invoiceMode', 'serviceId', 'invoiceDate', 'dueDate', 'currency', 'revenueAmount', 'whtAmount', 'payableAmount', 'paidAmount', 'issuedAt', 'issuedById', 'snapshot', 'documentId', 'createdById'];
+const arFields = ['id', 'companyId', 'invoiceId', 'originalAmount', 'paidAmount', 'outstandingAmount', 'status'];
+export const historicalInvoiceTrialHash = (row) => project(row, invoiceFields);
+export const historicalArTrialHash = (row) => project(row, arFields);
+const addr = (sheet, sheetId, row) => ({ sheet, sheetId, sourceRow: row.sourceRow, legacyId: row.legacyId, rowHash: row.rowHash });
+function invalid() { throw new CommandError(409, 'Invoice/AR thử nghiệm hoặc bằng chứng ngoại lệ lịch sử không khớp.'); }
+function captured(v) { try {
+    if (typeof v !== 'string' || Buffer.byteLength(v) > 8 * 1024 * 1024)
+        invalid();
+    const r = JSON.parse(v);
+    if (canonical(r) !== v)
+        invalid();
+    return r;
+}
+catch {
+    invalid();
+} }
+function rowHash(r) { if (!r?.values || !r?.cells || !hex.test(r.rowHash ?? '') || digest({ values: r.values, cells: r.cells }) !== r.rowHash)
+    invalid(); return r.rowHash; }
+const D = (v) => { if (!['string', 'number'].includes(typeof v) || !/^\d+(?:\.\d+)?$/.test(String(v)))
+    invalid(); const n = new Prisma.Decimal(v); if (!n.isFinite() || n.gte('10000000000000000') || n.decimalPlaces() > 4)
+    invalid(); return n; };
+const components = (r, fields) => Object.fromEntries(['revenue', 'wht', 'payable'].map((k, i) => [k, D(r[fields[i]]).toFixed()]));
+// Internal technical reader only; no route or acceptance/activation command.
+// Source dates/actors and original-PDF semantics remain separate review gates.
+export async function readHistoricalInvoiceAmounts(tx, companyId, id, snapshotHash) {
+    if (!hex.test(snapshotHash))
+        invalid();
+    const company = await tx.company.findUnique({ where: { id: companyId } });
+    if (company?.companyCode !== 'DGC')
+        throw new CommandError(404, 'Không tìm thấy nguồn DGC.');
+    const found = await tx.invoice.findFirst({ where: { companyId, id }, include: { receivable: true, scopes: { include: { items: { include: { revenue: true } } } }, document: { include: { attachment: true } } } });
+    if (!found)
+        throw new CommandError(404, 'Không tìm thấy Invoice thử nghiệm.');
+    const invoice = found;
+    const j = invoice.snapshot, x = j?.roundingException, ar = invoice.receivable, doc = invoice.document;
+    if (j?.sourceKind !== 'DGC_INVOICE_REHEARSAL_ONLY' || j.snapshotHash !== snapshotHash || j.noApprovalOrPosting !== true || j.historicalCashPosting !== false || invoice.status !== 'CANCELLED' || invoice.isCurrent || invoice.issuedAt || invoice.issuedById || invoice.currency !== 'USD' || !ar || ar.companyId !== companyId || ar.status !== 'CANCELLED' || !doc || doc.companyId !== companyId || doc.status !== 'DRAFT' || doc.documentType !== 'DGC_REHEARSAL_EVIDENCE' || doc.entityType !== 'DGC_INVOICE_REHEARSAL' || doc.entityId !== id || doc.attachment.companyId !== companyId || doc.attachment.storageProvider !== 'DGC_REHEARSAL_EVIDENCE' || !x)
+        invalid();
+    async function linked(model, targetId) { const l = await tx.dgcImportLink.findFirst({ where: { companyId, targetModel: model, targetId }, include: { source: { include: { snapshot: true } } } }); if (!l || l.companyId !== companyId || l.snapshotHash !== snapshotHash || l.sourceSpreadsheetId !== sourceId || l.source.companyId !== companyId || l.source.snapshotHash !== snapshotHash || l.source.snapshot.companyId !== companyId || l.source.snapshot.snapshotHash !== snapshotHash || l.source.snapshot.sourceSpreadsheetId !== sourceId)
+        invalid(); return l; }
+    async function bound(a, sheet, raw) { if (a?.sheet !== sheet || !Number.isSafeInteger(a.sheetId) || !Number.isSafeInteger(a.sourceRow) || a.sourceRow < 2)
+        invalid(); const s = await tx.dgcImportRow.findUnique({ where: { companyId_snapshotHash_sheetId_sourceRow: { companyId, snapshotHash, sheetId: a.sheetId, sourceRow: a.sourceRow } } }); if (!s || s.sheetName !== sheet || s.companyId !== companyId || s.snapshotHash !== snapshotHash || s.sheetId !== a.sheetId || s.sourceRow !== a.sourceRow || s.legacyId !== a.legacyId || s.rowHash !== a.rowHash || rowHash(s.payload) !== a.rowHash)
+        invalid(); const p = s.payload; if (raw && (rowHash(raw) !== a.rowHash || raw.sourceRow !== a.sourceRow || raw.legacyId !== a.legacyId))
+        invalid(); return p; }
+    const il = await linked('invoice', id), al = await linked('accountReceivable', ar.id), raw = captured(j.capturedHeaderJson), ars = captured(j.capturedReceivablesJson), details = captured(j.capturedDetailsJson);
+    if (il.targetHash !== historicalInvoiceTrialHash(invoice) || al.targetHash !== historicalArTrialHash(ar) || canonical(j.source) !== canonical(addr('48_INVOICE_HEADER', il.sheetId, il)) || j.sourceStatus !== raw.values.Status)
+        invalid();
+    await bound(j.source, '48_INVOICE_HEADER', raw);
+    if (!Array.isArray(ars) || !Array.isArray(details) || !details.length)
+        invalid();
+    // Rehashing a target cannot conceal a removed source line, AR or receipt.
+    async function complete(sheet, rows) { if (!Array.isArray(rows))
+        invalid(); const staged = await tx.dgcImportRow.findMany({ where: { companyId, snapshotHash, sheetName: sheet } }), expected = staged.filter(s => s.payload?.values?.Invoice_ID === raw.values.Invoice_ID); for (const r of rows)
+        rowHash(r); for (const s of expected)
+        if (rowHash(s.payload) !== s.rowHash)
+            invalid(); const keys = (rs) => rs.map(r => r.sourceRow + '|' + r.legacyId + '|' + r.rowHash).sort(); if (canonical(keys(rows)) !== canonical(keys(expected)))
+        invalid(); }
+    await complete('49_INVOICE_DETAIL', details);
+    await complete('50_AR_AP', ars);
+    await complete('52_INVOICE_PAYMENT', captured(j.capturedPaymentsJson));
+    const sourceAr = ars.filter((r) => r.sourceRow === al.sourceRow && r.rowHash === al.rowHash && r.values.ARAP_Type === 'AR' && String(r.values.Is_Current).toUpperCase() === 'TRUE' && !['CANCELLED', 'SUPERSEDED'].includes(String(r.values.Status).toUpperCase()));
+    if (sourceAr.length !== 1)
+        invalid();
+    const a = sourceAr[0];
+    await bound(addr('50_AR_AP', al.sheetId, a), '50_AR_AP', a);
+    if (a.values.Invoice_ID !== raw.values.Invoice_ID || ar.invoiceId !== id || invoice.invoiceNumber !== raw.values.Invoice_Number || invoice.revisionNo !== raw.values.Revision_No)
+        invalid();
+    const header = components(raw.values, ['Total_Revenue_USD', 'Total_WHT_USD', 'Total_Payable_USD']);
+    for (const [field, k] of [['revenueAmount', 'revenue'], ['whtAmount', 'wht'], ['payableAmount', 'payable']])
+        if (!invoice[field].eq(header[k]))
+            invalid();
+    if (!ar.originalAmount.eq(D(a.values.Original_Amount)) || !ar.paidAmount.eq(D(a.values.Paid_Amount)) || !ar.outstandingAmount.eq(D(a.values.Outstanding_Amount)) || !ar.originalAmount.eq(invoice.payableAmount) || !ar.paidAmount.eq(invoice.paidAmount) || !invoice.paidAmount.eq(D(raw.values.Paid_Amount_USD)) || !ar.outstandingAmount.eq(D(raw.values.Outstanding_Amount_USD)) || !ar.paidAmount.plus(ar.outstandingAmount).eq(ar.originalAmount))
+        invalid();
+    const ledgerVariance = x.format === 'DGC_CAPTURED_INVOICE_ROUNDING_V5' && x.headerArithmetic === 'OWNER_APPROVED_HEADER_LINE_COMPONENT_VARIANCE';
+    let ledgerAuthority = null;
+    if (ledgerVariance || j.ownerLedger14DecisionJson !== undefined) {
+        if (!ledgerVariance)
+            invalid();
+        ledgerAuthority = historicalLedgerVarianceAuthority(j.ownerLedger14DecisionJson, snapshotHash, j.source, { '48_INVOICE_HEADER': [raw], '49_INVOICE_DETAIL': details, '50_AR_AP': ars, '52_INVOICE_PAYMENT': captured(j.capturedPaymentsJson) }, { fileId: raw.values.Pdf_File_ID, sha256: doc.attachment.checksumSha256 });
+        if (x.ledgerAuthorityDecisionHash !== ledgerAuthority.decisionHash || canonical(header) !== canonical({ revenue: ledgerAuthority.ledger.revenue, wht: ledgerAuthority.ledger.wht, payable: ledgerAuthority.ledger.payable }))
+            invalid();
+    }
+    const cache = new Map();
+    async function revenue(a) { const source = await bound(a, '40_MONTHLY_REVENUE'), l = await tx.dgcImportLink.findFirst({ where: { companyId, snapshotHash, sheetId: a.sheetId, sourceRow: a.sourceRow, rowHash: a.rowHash, targetModel: 'revenue' } }); if (!l)
+        invalid(); let rv = cache.get(l.targetId); if (!rv) {
+        const evidence = await readHistoricalRevenueSource(tx, companyId, l.targetId, snapshotHash), target = await tx.revenue.findFirst({ where: { companyId, id: l.targetId } });
+        if (!target || target.partnerId !== invoice.partnerId)
+            invalid();
+        rv = { id: l.targetId, source, target, evidence };
+        cache.set(l.targetId, rv);
+    } return rv; }
+    const scopeIds = new Set(), roots = new Map();
+    let total = new Prisma.Decimal(0);
+    for (const s of invoice.scopes) {
+        if (s.companyId !== companyId || s.partnerId !== invoice.partnerId || s.status !== 'BLOCKED' || s.isCurrent || s.currency !== 'USD' || !s.items.length)
+            invalid();
+        let amount = new Prisma.Decimal(0);
+        for (const item of s.items) {
+            if (item.companyId !== companyId || item.isCurrent || scopeIds.has(item.revenueId))
+                invalid();
+            scopeIds.add(item.revenueId);
+            const a = item.revenue.calculationJson.source, r = await revenue(a);
+            if (r.id !== item.revenueId || r.target.contractId !== s.contractId || r.evidence.source.rowType !== 'TOTAL' || !r.evidence.source.includeInMonthlyTotal || !item.amount.eq(D(r.evidence.capturedAmounts.invoiceUsd.payable)))
+                invalid();
+            roots.set(canonical(a), r);
+            amount = amount.plus(item.amount);
+        }
+        if (!s.totalAmount.eq(amount))
+            invalid();
+        total = total.plus(amount);
+    }
+    if ((ledgerVariance ? !total.eq(D(x.presentedComponents?.payable)) : !total.eq(invoice.payableAmount)) || !scopeIds.size || canonical([...scopeIds].sort()) !== canonical([...(j.sourceRevenueIds ?? [])].sort()))
+        invalid();
+    const balancing = x.format === 'DGC_CAPTURED_INVOICE_ROUNDING_V4' && x.headerArithmetic === 'DONOR_GROUP_LAST_CHILD_BALANCING', balanceLines = [];
+    if (!Array.isArray(x.lines) || x.lines.length !== details.length)
+        invalid();
+    const seen = new Set(), lines = [];
+    let lineDelta = new Prisma.Decimal(0);
+    const sums = { revenue: new Prisma.Decimal(0), wht: new Prisma.Decimal(0), payable: new Prisma.Decimal(0) };
+    for (const d of details) {
+        const source = addr('49_INVOICE_DETAIL', d.sheetId, d), k = canonical(source), ls = x.lines.filter((l) => canonical(l.source) === k);
+        if (ls.length !== 1 || seen.has(k) || d.values.Invoice_ID !== raw.values.Invoice_ID)
+            invalid();
+        seen.add(k);
+        await bound(source, '49_INVOICE_DETAIL', d);
+        const l = ls[0], r = await revenue(l.revenueSource), root = roots.get(canonical(l.totalSource));
+        const ownerLink = historicalOwnerApprovedRevenueLink({ envelopeJson: j.financialLinkDecisionsJson, snapshotHash, invoiceId: raw.values.Invoice_ID, source, capturedRevenueId: d.values.Revenue_ID, target: l.revenueSource, pdfFileId: raw.values.Pdf_File_ID, pdfSha256: doc.attachment.checksumSha256 });
+        if (!root || (r.source.values.Revenue_ID !== d.values.Revenue_ID && !ownerLink) || r.target.reconciliationId !== root.target.reconciliationId || r.target.contractId !== root.target.contractId)
+            invalid();
+        const row = r.target.calculationJson;
+        if (r.id !== root.id && (row.rowType !== 'CHILD' || row.parentServiceId !== root.target.serviceId))
+            invalid();
+        const c = components(d.values, ['Revenue_USD', 'WHT_USD', 'Payable_USD']);
+        if (!balancing && canonical(c) !== canonical(r.evidence.capturedAmounts.invoiceUsd))
+            invalid();
+        if (balancing)
+            balanceLines.push({ r, root, d, components: c });
+        const delta = D(c.payable).minus(D(c.revenue).minus(c.wht));
+        for (const f of ['revenue', 'wht', 'payable'])
+            sums[f] = sums[f].plus(c[f]);
+        lineDelta = lineDelta.plus(delta);
+        lines.push({ source, revenueSource: l.revenueSource, totalSource: l.totalSource, components: c, ...(balancing ? { sourceComponents: r.evidence.capturedAmounts.invoiceUsd } : {}), identityDelta: delta.toFixed() });
+    }
+    const offsetting = x.format === 'DGC_CAPTURED_INVOICE_ROUNDING_V2' && x.headerArithmetic === 'OFFSETTING_CHARACTERIZED_LINE_DELTAS';
+    const sourceOnly = x.format === 'DGC_CAPTURED_INVOICE_ROUNDING_V3' && x.headerArithmetic === 'EXACT_PRESENTED_LINES_WITH_SOURCE_ROUNDING';
+    if (!balancing && !offsetting && !sourceOnly && !ledgerVariance && x.format !== 'DGC_CAPTURED_INVOICE_ROUNDING_V1')
+        invalid();
+    const delta = D(header.payable).minus(D(header.revenue).minus(header.wht));
+    if (ledgerVariance) {
+        const presented = Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, v.toFixed()])), management = [...roots.values()].reduce((n, r) => n.plus(D(r.evidence.capturedAmounts.management.companyShare)), new Prisma.Decimal(0));
+        if (!delta.isZero() || !lineDelta.eq('0.01') || !total.eq(sums.payable) || !management.eq(invoice.payableAmount) || canonical(presented) !== canonical(ledgerAuthority.presented) || Object.entries(sums).some(([k, v]) => !v.minus(header[k]).eq('0.01')))
+            invalid();
+    }
+    else if ((balancing ? !delta.isZero() : sourceOnly ? (!delta.isZero() || lines.some(l => !new Prisma.Decimal(l.identityDelta).isZero())) : offsetting ? (!delta.isZero() || !lines.some(l => new Prisma.Decimal(l.identityDelta).gt(0)) || !lines.some(l => new Prisma.Decimal(l.identityDelta).lt(0))) : delta.isZero()) || !delta.eq(lineDelta) || Object.entries(sums).some(([k, v]) => !v.eq(header[k])))
+        invalid();
+    let sourceRevenueSet = [];
+    if (sourceOnly || balancing || ledgerVariance) {
+        // Invoice presentation can omit siblings. Rebuild complete source groups
+        // from staged rows, then validate every materialized row with its reader.
+        const staged = await tx.dgcImportRow.findMany({ where: { companyId, snapshotHash, sheetName: '40_MONTHLY_REVENUE' } }), expected = new Map();
+        const period = (r) => [r.values.Revenue_Month, r.cells.Revenue_Month?.formattedValue].find(v => typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v));
+        const group = (r) => { if (!r?.values || !r?.cells)
+            invalid(); return canonical([r.values.Source_Recon_Doc_ID, r.values.Partner_ID, r.values.Contract_ID, period(r), r.values.Currency]); };
+        for (const root of roots.values())
+            for (const stored of staged) {
+                const raw = stored.payload;
+                if (group(raw) !== group(root.source))
+                    continue;
+                if (rowHash(raw) !== stored.rowHash)
+                    invalid();
+                const source = addr('40_MONTHLY_REVENUE', stored.sheetId, stored), k = canonical(source);
+                if (expected.has(k) && expected.get(k).root.target.reconciliationId !== root.target.reconciliationId)
+                    invalid();
+                expected.set(k, { source, root });
+            }
+        sourceRevenueSet = [...expected.values()].map(v => v.source).sort((a, b) => a.sheetId - b.sheetId || a.sourceRow - b.sourceRow);
+        if (!sourceRevenueSet.length || canonical(x.sourceRevenueSet) !== canonical(sourceRevenueSet))
+            invalid();
+        let exception = false;
+        const byRecon = new Map();
+        for (const { source, root } of expected.values()) {
+            const r = await revenue(source);
+            if (r.target.reconciliationId !== root.target.reconciliationId || r.target.contractId !== root.target.contractId)
+                invalid();
+            const ids = byRecon.get(r.target.reconciliationId) ?? new Set();
+            ids.add(r.id);
+            byRecon.set(r.target.reconciliationId, ids);
+            if (r.evidence.historicalArithmetic && (balancing || ledgerVariance || !lines.some(l => canonical(l.revenueSource) === canonical(source)))) {
+                if (r.evidence.historicalArithmetic.characterizationReviewHash !== x.characterizationReviewHash)
+                    invalid();
+                exception = true;
+            }
+        }
+        if (!exception)
+            invalid();
+        for (const [reconciliationId, ids] of byRecon) {
+            const targets = await tx.revenue.findMany({ where: { companyId, reconciliationId }, select: { id: true } }), recon = await tx.reconciliation.findFirst({ where: { companyId, id: reconciliationId } }), meta = recon?.ocrRawJson, addresses = [...expected.values()].filter(v => v.root.target.reconciliationId === reconciliationId).map(v => v.source);
+            const order = (a, b) => a.sheetId - b.sheetId || a.sourceRow - b.sourceRow;
+            if (targets.length !== ids.size || targets.some(r => !ids.has(r.id)) || !Array.isArray(meta?.sourceLifecycles) || canonical(meta.sourceLifecycles.map((s) => s.source).sort(order)) !== canonical(addresses.sort(order)))
+                invalid();
+        }
+    }
+    if (balancing) {
+        let adjusted = false;
+        for (const root of roots.values()) {
+            const children = [...cache.values()].filter(r => r.target.calculationJson?.parentServiceId === root.target.serviceId && r.target.reconciliationId === root.target.reconciliationId && ['CHILD', 'DETAIL'].includes(String(r.source.values.Revenue_Row_Type).toUpperCase()) && r.source.values.Status === 'Approved' && D(r.evidence.capturedAmounts.invoiceUsd.payable).gt(0));
+            const own = balanceLines.filter(l => l.root.id === root.id).sort((a, b) => Number(a.d.values.Line_No) - Number(b.d.values.Line_No));
+            const proof = historicalInvoiceBalanceGroup({ id: root.id, components: root.evidence.capturedAmounts.invoiceUsd }, children.map(r => ({ id: r.id, components: r.evidence.capturedAmounts.invoiceUsd, orderKey: String(r.source.values.Source_Recon_Detail_ID || r.source.values.Revenue_ID || '') })), own.map(l => ({ revenueId: l.r.id, lineNo: l.d.values.Line_No, orderKey: String(l.r.source.values.Source_Recon_Detail_ID || l.r.source.values.Revenue_ID || ''), components: l.components })));
+            if (proof.changed)
+                adjusted = true;
+        }
+        if (!adjusted || !hex.test(x.balanceReviewHash ?? ''))
+            invalid();
+    }
+    let documentAuthority = null;
+    const legacySources = [...cache.values()].filter(r => r.evidence.legacyFileEvidence);
+    if (legacySources.length || j.legacySourceFileEvidence !== undefined || j.ownerInvoice4DecisionJson !== undefined) {
+        const evidence = j.legacySourceFileEvidence;
+        if (legacySources.length !== 1 || evidence?.format !== 'DGC_LEGACY_SOURCE_FILE_INVOICE_REHEARSAL_V1' || evidence.snapshotHash !== snapshotHash || canonical(evidence.source) !== canonical(j.source) || canonical(evidence.legacyReview) !== canonical(legacySources[0].evidence.legacyFileEvidence) || evidence.originalGraphReconstructed !== false || evidence.nativeIdentityAccepted !== false || evidence.acceptance !== false)
+            invalid();
+        documentAuthority = historicalInvoice4Authority(j.ownerInvoice4DecisionJson, snapshotHash, j.source, { '48_INVOICE_HEADER': [raw], '49_INVOICE_DETAIL': details, '50_AR_AP': ars, '52_INVOICE_PAYMENT': captured(j.capturedPaymentsJson) }, { fileId: raw.values.Pdf_File_ID, sha256: doc.attachment.checksumSha256 });
+        if (evidence.ownerDecisionHash !== documentAuthority.decisionHash)
+            invalid();
+    }
+    for (const h of [x.sourceRestorePlanHash, x.characterizationReviewHash, x.revenueExceptionPlanHash])
+        if (!hex.test(h ?? ''))
+            invalid();
+    const expected = { format: ledgerVariance ? 'DGC_CAPTURED_INVOICE_ROUNDING_V5' : balancing ? 'DGC_CAPTURED_INVOICE_ROUNDING_V4' : sourceOnly ? 'DGC_CAPTURED_INVOICE_ROUNDING_V3' : offsetting ? 'DGC_CAPTURED_INVOICE_ROUNDING_V2' : 'DGC_CAPTURED_INVOICE_ROUNDING_V1', ...(ledgerVariance ? { headerArithmetic: 'OWNER_APPROVED_HEADER_LINE_COMPONENT_VARIANCE', ledgerAuthorityDecisionHash: ledgerAuthority.decisionHash, presentedComponents: Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, v.toFixed()])), headerMinusPresented: Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, D(header[k]).minus(v).toFixed()])) } : balancing ? { headerArithmetic: 'DONOR_GROUP_LAST_CHILD_BALANCING' } : sourceOnly ? { headerArithmetic: 'EXACT_PRESENTED_LINES_WITH_SOURCE_ROUNDING' } : offsetting ? { headerArithmetic: 'OFFSETTING_CHARACTERIZED_LINE_DELTAS' } : {}), mode: 'BLOCKED_SHAPE_TRIAL_ONLY', snapshotHash, source: j.source, sourceRestorePlanHash: x.sourceRestorePlanHash, characterizationReviewHash: x.characterizationReviewHash, revenueExceptionPlanHash: x.revenueExceptionPlanHash, ...(balancing ? { balanceReviewHash: x.balanceReviewHash } : {}), amountPolicy: 'PRESERVE_INDEPENDENT_CAPTURED_COMPONENTS', currency: 'USD', components: header, identityDelta: delta.toFixed(), characterizedLineDelta: lineDelta.toFixed(), lines, ...(sourceOnly || balancing || ledgerVariance ? { sourceRevenueSet } : {}), sourceReceivable: addr('50_AR_AP', al.sheetId, a), sourceValuesChanged: false, historicalCashPosting: false, localApprovalCreated: false, acceptance: false };
+    if (canonical(x) !== canonical(expected))
+        invalid();
+    return { ...(ledgerAuthority ? { ledgerAuthority } : {}), ...(documentAuthority ? { documentAuthority } : {}), readOnly: true, operationalUseAllowed: false, postingAllowed: false, acceptance: false, historicalCashPosting: false, localApprovalCreated: false, originalPdfVerified: false, datesAndActorsMapped: false, source: j.source, sourceStatus: raw.values.Status, components: header, ar: { original: ar.originalAmount.toFixed(), paid: ar.paidAmount.toFixed(), outstanding: ar.outstandingAmount.toFixed(), sourceStatus: a.values.Status }, roundingException: expected, scopeItems: scopeIds.size, sourceRevenueRowsRead: cache.size };
+}

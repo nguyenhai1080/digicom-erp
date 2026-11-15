@@ -1,6 +1,4 @@
 node_modules
-dist
-database/dist
 .git
 .env
 .env.*

@@ -1,3 +1,4 @@
+import {requireSignedInput} from './input-signed-evidence.js';
 import {inputContractSources,inputContractCoverage} from './input-recon-coverage.js';
 import type {FastifyInstance} from 'fastify';
 import {prisma,Prisma} from '@erp/db';
@@ -157,8 +158,9 @@ export async function inputReconRoutes(app:FastifyInstance,config:AuthConfig){
    if(r.status==='APPROVED'){if(!r.payable||!r.payable.originalAmount.eq(r.payableAmount)||r.payable.currency!==r.currency||!r.payable.outstandingAmount.eq(r.payable.originalAmount.minus(r.payable.paidAmount)))fail('AP không khớp bản đã duyệt; cần đối chiếu.');return {item:r,payable:r.payable,created:false};}
    unchanged(r,b.expectedUpdatedAt);if(!['DRAFT','GENERATED'].includes(r.status)||r.payable)fail('Trạng thái đối soát không cho phép duyệt.');
    if(isCapturedInput(r)){await assertCapturedInputSource(tx,user.companyId,r);}else{const p=await inputReconPlan(tx,user.companyId,r.sourceRevenueId);if(p.sourceDigest!==r.sourceDigest)fail('Nguồn hoặc số liệu nháp đã thay đổi. Cần xem lại/cập nhật trước khi duyệt.');}
+   const signedDocument=await requireSignedInput(tx,user.companyId,r);
    const payable=await tx.accountPayable.create({data:{companyId:user.companyId,inputReconId:r.id,currency:r.currency,originalAmount:r.payableAmount,outstandingAmount:r.payableAmount}});
-   const item=await tx.inputReconciliation.update({where:{id:r.id},data:{status:'APPROVED',approvedById:user.userId,approvedAt:new Date()}});await audit(tx,user,'INPUT_RECON_APPROVE','InputReconciliation',r.id,r,{item,payable});return {item,payable,created:true};
+   const item=await tx.inputReconciliation.update({where:{id:r.id},data:{status:'APPROVED',approvedById:user.userId,approvedAt:new Date()}});await audit(tx,user,'INPUT_RECON_APPROVE','InputReconciliation',r.id,r,{item,payable,signedDocument});return {item,payable,created:true};
   },{timeout:30000});
  });
  app.get('/api/v1/payables',{preHandler:requirePermission('AP_VIEW')},async req=>{
