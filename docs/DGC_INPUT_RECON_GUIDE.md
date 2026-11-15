@@ -1,17 +1,17 @@
 # Lập đối soát đầu vào theo hợp đồng
 
-1. Vào **Quản lý đối soát → Đối soát đầu vào**, chọn **Kỳ**, **Hợp đồng đầu vào** và **Ngày biên bản**. Nếu hợp đồng có nhiều mạng đầu ra, chọn đúng mạng.
+1. Vào **Quản lý đối soát → Đối soát đầu vào → 1. Tạo ĐS đầu vào**, chọn **Kỳ**, **Hợp đồng đầu vào** và **Ngày biên bản**. Nếu hợp đồng có nhiều mạng đầu ra, chọn đúng mạng.
 2. Bấm **Lập biên bản theo hợp đồng**. Không cần đánh dấu từng dịch vụ con. Hệ thống tự lấy đủ các dịch vụ chi tiết và báo rõ dòng tổng chỉ để tham chiếu, không cộng lần nữa.
 3. Kiểm tra danh sách dịch vụ, cơ sở, tỷ lệ, thuế, tỷ giá và phải trả. Thiếu nguồn đã chốt của một dịch vụ thì chưa lập được; không dùng dòng tổng thay thế hoặc tự điền số 0. Nếu thiếu tỷ giá, kế toán nhập đúng kỳ tại **Cấu hình chung → Tỷ giá báo cáo**, rồi quay lại lập.
 4. Xác nhận rồi **Lưu nháp và mở biên bản**. Nháp đã có được giữ nguyên, chỉ thêm phần thiếu; hệ thống tự mở biên bản chung. Nếu đã đủ nháp, chọn **Mở biên bản hợp đồng** để xem ngay.
 5. Bấm **Tạo PDF xem trước**, mở PDF, kiểm tra đủ chi tiết và không cộng dòng tổng. Xác nhận **Lưu biên bản PDF** để lưu phiên bản mới.
 6. Sau khi lưu, dùng **Mở biên bản PDF đã lưu** để kiểm tra bản chính thức. Người có quyền duyệt chọn **Kiểm tra duyệt công nợ hợp đồng** (hoặc **Kiểm tra duyệt hợp đồng** trong danh sách). Hệ thống kiểm tra đủ dịch vụ chi tiết, nguồn và cùng một PDF đã lưu.
-7. Chọn **Nhận bản ký hai bên / Invoice đầu vào**, nhập PDF đã được cả hai công ty ký và xác nhận đúng bản gốc/hợp đồng/kỳ. Quay lại kiểm tra duyệt: thiếu bản ký phù hợp thì chưa lên AP. Khi đã đủ bản ký, kiểm tra tổng theo sổ, tổng in PDF và những khoản đã duyệt; tích xác nhận rồi bấm **Duyệt công nợ toàn hợp đồng**. Khoản đã có được giữ nguyên, chỉ tạo phần còn thiếu; nếu một dòng lỗi thì toàn bộ lần duyệt được hoàn tác.
+7. Chọn **2. Nhập ĐS bản ký**, nhập PDF đã được cả hai công ty ký và xác nhận đúng bản gốc/hợp đồng/kỳ. Quay lại kiểm tra duyệt: thiếu bản ký phù hợp thì chưa lên AP. Khi đã đủ bản ký, kiểm tra tổng theo sổ, tổng in PDF và những khoản đã duyệt; tích xác nhận rồi bấm **Duyệt công nợ toàn hợp đồng**. Khoản đã có được giữ nguyên, chỉ tạo phần còn thiếu; nếu một dòng lỗi thì toàn bộ lần duyệt được hoàn tác.
 8. Kết quả cho biết số khoản mới/sẵn có. Tra cứu tại **Quản lý Công nợ → Công nợ phải trả**. Tạo nháp hoặc lưu PDF không tự duyệt; duyệt công nợ chưa phát sinh chi tiền.
 
 Dòng tổng và tệp cũ vẫn được giữ trong hồ sơ, không cần xóa để lập lại PDF. Nếu dòng tổng đã có công nợ, hệ thống báo xung đột để xử lý riêng, không tự sửa số tiền thật. Nguồn thay đổi cần xem lại; hồ sơ đã chuyển và bản đã duyệt không tự tính lại.
 
-Form v0.6.94 trở đi dùng Letter ngang, bảng 8 cột ô gộp. Tên pháp nhân lấy từ cấu hình Invoice/hồ sơ đối tác. PDF VND làm tròn từng dòng rồi cộng; sổ giữ hai chữ số thập phân. PDF đã lưu trước đó giữ nguyên; chủ động lập phiên bản mới để nhận mẫu và phạm vi mới. Quỹ/ngân hàng vẫn chờ thiết lập riêng.
+Form v0.6.94 trở đi dùng Letter ngang, bảng 8 cột ô gộp. Tên pháp nhân Digicom dùng tên Việt được owner duyệt (v111); bên đối tác dùng hồ sơ đối tác. PDF VND làm tròn từng dòng rồi cộng; sổ giữ hai chữ số thập phân. PDF đã lưu trước đó giữ nguyên; chủ động lập phiên bản mới để nhận mẫu và phạm vi mới. Quỹ/ngân hàng vẫn chờ thiết lập riêng.
 
 Từ v0.6.97, nháp tổng cũ vẫn được nhận diện là tham chiếu dù dịch vụ tổng đã bỏ khỏi danh mục hợp đồng hiện hành. Không cần xóa nháp; mở lại Lập biên bản theo hợp đồng để lấy ba dòng chi tiết. Nếu còn lỗi về dòng khác, thông báo nêu mã hồ sơ/dịch vụ/nguồn cần kiểm tra.
 
@@ -20,3 +20,5 @@ Từ v0.6.109, luồng duyệt theo hợp đồng áp dụng cho hồ sơ mới.
 Từ v0.6.111, biên bản native đối soát trong nước dùng tên **Công ty Cổ Phần Đầu Tư và Truyền Thông Số (DIGICOM)**, độc lập với tên tiếng Anh của Invoice. Vùng đại diện hai bên để trống để các công ty tự ký; không chèn dấu/chữ ký số từ tài liệu tham khảo. Mở preview và lưu phiên bản mới để nhận thay đổi; PDF đã lưu trước đó giữ nguyên. Font nhúng Liberation Serif tương thích Times New Roman.
 
 Từ v0.6.112, quy tắc cần bản ký hai bên áp dụng cho cả duyệt theo hợp đồng và API duyệt từng dòng (kể cả hồ sơ captured chưa có AP). AP đã tồn tại giữ nguyên. Nhận Invoice đầu vào và email các loại chứng từ tại [Hồ sơ chứng từ](DGC_DOCUMENT_DOSSIER_GUIDE.md); không tự tạo thêm AP từ Invoice nhận.
+
+Từ v0.6.113, ba tab tách riêng tạo/nhập ký/danh sách. **3. Danh sách đối soát** mặc định hiện mọi kỳ từ mới đến cũ, lọc theo kỳ và hợp đồng, 10 biên bản/trang. Mỗi PDF gốc đã lưu là một dòng, không lặp theo dịch vụ con; nháp chưa có PDF vẫn xem tại bước tạo. Hai cột PDF gốc chưa ký và PDF đã ký hai bên mở đúng phiên bản đã lưu. Bấm **Nhập bản ký** ở dòng để chọn sẵn kỳ/đối tác/hợp đồng/bản gốc; tải xong quay về danh sách. **Chi tiết / duyệt** mở các dòng và bước duyệt có quyền, không tự duyệt khi tải tệp. Trường hợp nhiều bản ký hiện hành cần kiểm tra thì không đoán chọn một bản. Invoice đầu vào và email vẫn tại **Hồ sơ chứng từ**.

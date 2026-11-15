@@ -1,3 +1,4 @@
+import {InputReconWorkspace} from './InputReconWorkspace';
 import {DocumentDossier} from './DocumentDossier';
 import {DgcInvoiceSettings} from './DgcInvoiceSettings';
 import {StatementsOfAccount} from './StatementsOfAccount';
@@ -23,7 +24,7 @@ export function DgcReconciliation(props:Props){
  const has=(p:string)=>props.permissions.includes(p),tabs:Tab[]=[];
  if(has('RECON_VIEW'))tabs.push({id:'output',label:'Đối soát đầu ra',content:<OutputRecon {...props} includeTransferred/>});
  if(has('INVOICE_VIEW')&&has('INVOICE_CREATE'))tabs.push({id:'create',label:'Tạo Invoice',content:<Invoices {...props} creationOnly initialTab="unissued"/>});
- if(has('INPUT_RECON_VIEW'))tabs.push({id:'input',label:'Đối soát đầu vào',content:<InputRecon {...props}/>});
+ if(has('INPUT_RECON_VIEW'))tabs.push({id:'input',label:'Đối soát đầu vào',content:<InputReconWorkspace {...props}/>});
  if(['RECON_VIEW','INPUT_RECON_VIEW','INVOICE_VIEW'].some(p=>has(p)))tabs.push({id:'documents',label:'Hồ sơ chứng từ',content:<DocumentDossier {...props}/>});
  return <WorkspaceTabs label="Quản lý đối soát" tabs={tabs} initialTab={props.initialTab}/>;
 }

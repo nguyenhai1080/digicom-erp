@@ -52,3 +52,5 @@ Xem **Lịch sử gửi** khi cần. Máy chủ nhận thư không đồng nghĩ
 Các bản gốc/bản ký hiện có được tra cứu theo đúng liên kết nguồn; không đổi PDF hoặc nhập lại lịch sử. Invoice cũ chưa từng lưu PDF chưa chèn dấu/chữ ký sẽ có cảnh báo thiếu bản gốc; hệ thống không dùng cấu hình hiện tại để dựng lại rồi gọi đó là bản gốc lịch sử. Từ phiên bản này, mỗi Invoice native đầu ra mới tự lưu đồng thời hai PDF gốc/đã chèn.
 
 Sao lưu cần cả PostgreSQL và toàn bộ kho tài liệu, gồm nhánh `dossiers`; GitHub chỉ chứa mã nguồn. Không xóa phiên bản cũ hoặc sửa số liệu để khớp một baseline backup cũ.
+
+Từ v0.6.113, nhận riêng biên bản đầu vào ký hai bên tại **Đối soát đầu vào → 2. Nhập ĐS bản ký**. Có thể chọn **Nhập bản ký** trong danh sách kỳ để điền sẵn đúng bản gốc. Hồ sơ chứng từ chung vẫn nhận Invoice đầu vào, tra cứu phiên bản và gửi email. Không thay đổi quyền hay điều kiện AP.
