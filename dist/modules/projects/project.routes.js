@@ -1,3 +1,4 @@
+import { inputStatementListRoutes } from './input-statement-list.js';
 import { documentDossierRoutes } from './document-dossier.js';
 import { dossierEmailRoutes } from './document-dossier-email.js';
 import { inputContractApprovalRoutes } from './input-contract-approval.js';
@@ -76,6 +77,7 @@ export async function projectRoutes(app, config) {
     await app.register(manualRevenueRoutes, config);
     await app.register(inputReconRoutes, config);
     await app.register(inputStatementRoutes, config);
+    await app.register(inputStatementListRoutes);
     await app.register(inputContractApprovalRoutes, config);
     await app.register(soaCutoffReviewRoutes, config);
     await app.register(soaRoutes, config);
