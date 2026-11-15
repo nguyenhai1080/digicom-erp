@@ -16,3 +16,5 @@ Form v0.6.94 trở đi dùng Letter ngang, bảng 8 cột ô gộp. Tên pháp n
 Từ v0.6.97, nháp tổng cũ vẫn được nhận diện là tham chiếu dù dịch vụ tổng đã bỏ khỏi danh mục hợp đồng hiện hành. Không cần xóa nháp; mở lại Lập biên bản theo hợp đồng để lấy ba dòng chi tiết. Nếu còn lỗi về dòng khác, thông báo nêu mã hồ sơ/dịch vụ/nguồn cần kiểm tra.
 
 Từ v0.6.109, luồng duyệt theo hợp đồng áp dụng cho hồ sơ mới. Hồ sơ đã chuyển từ hệ thống cũ vẫn dùng luồng lịch sử riêng, không đưa vào lần duyệt nhóm này. Khi nguồn hoặc PDF thay đổi, cần mở kiểm tra lại; gửi lại cùng lần xác nhận không tạo thêm công nợ.
+
+Từ v0.6.111, biên bản native đối soát trong nước dùng tên **Công ty Cổ Phần Đầu Tư và Truyền Thông Số (DIGICOM)**, độc lập với tên tiếng Anh của Invoice. Vùng đại diện hai bên để trống để các công ty tự ký; không chèn dấu/chữ ký số từ tài liệu tham khảo. Mở preview và lưu phiên bản mới để nhận thay đổi; PDF đã lưu trước đó giữ nguyên. Font nhúng Liberation Serif tương thích Times New Roman.

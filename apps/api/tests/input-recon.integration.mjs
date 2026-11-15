@@ -196,7 +196,7 @@ try{
  eq((await request('GET',url+'?period=2026-10&inputContractId='+batchServices[0].inp.id)).json().total,3);
  eq((await request('GET',url+'/sources?period=2026-10&inputContractId='+batchServices[0].inp.id)).json().total,0);
  const bs={period:'2026-10',inputPartnerId:input.id,inputContractId:batchServices[0].inp.id,reconDate:'2026-11-03',includeApproved:true};
- const grouped=await ok(url+'/statement-preview',bs);eq(grouped.data.lines.length,3);eq(grouped.data.deductions,'309784.53');
+ const grouped=await ok(url+'/statement-preview',bs);eq(grouped.data.issuer,'Công ty Cổ Phần Đầu Tư và Truyền Thông Số');eq(grouped.data.lines.length,3);eq(grouped.data.deductions,'309784.53');
  const groupedPdf=await post(url+'/statement-pdf-preview',{...bs,digest:grouped.digest,confirmed:true});eq(groupedPdf.statusCode,200);eq((await PDFDocument.load(groupedPdf.rawPayload)).getPageCount(),1);
  if(process.env.FINANCE_PROOF_ROOT)await writeFile(resolve(process.env.FINANCE_PROOF_ROOT,'synthetic-contract-group.pdf'),groupedPdf.rawPayload);
  const extraPlan=await ok(url+'/preview',{revenueId:otherRow.id});
