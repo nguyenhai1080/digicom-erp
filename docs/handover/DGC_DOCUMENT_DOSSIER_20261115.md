@@ -27,7 +27,7 @@ Không đổi mẫu/form/công thức/FX/tiền lịch sử/importer; không t�
 
 ## Gói triển khai cho host nhỏ
 
-Kiểm tra kiểu và biên dịch API/DB được bắt buộc trong `package-single-site.mjs` trước khi tạo gói phát hành. Gói chứa cả nguồn và JavaScript đã kiểm, cùng BUILD_MANIFEST.json gắn sourceCommit/hash nguồn/build/schema. `build.mjs` trên host kiểm manifest rồi tạo Prisma client, không lặp lại trình kiểm kiểu TypeScript nặng. Sai hash hoặc thiếu mã đã biên dịch sẽ dừng build. Đây là thay đổi cách đóng gói, không bỏ kiểm mã nguồn hoặc tăng tài nguyên chạy: CPU0.3/RAM512MB/heap192 vẫn giữ. Dependency pins giữ nguyên. Compiled dist phải được đưa vào Git và Docker context của nhánh deploy, khác với source checkout vẫn để dist trong ignore.
+Kiểm tra kiểu và biên dịch API/DB được bắt buộc trong `package-single-site.mjs` trước khi tạo gói phát hành. Gói chứa cả nguồn và JavaScript đã kiểm, cùng BUILD_MANIFEST.json gắn sourceCommit/hash nguồn/build/schema. `build.mjs` trên host kiểm manifest rồi tạo Prisma client, không lặp lại trình kiểm kiểu TypeScript nặng. Sai hash hoặc thiếu mã đã biên dịch sẽ dừng build. Đây là thay đổi cách đóng gói, không bỏ kiểm mã nguồn hoặc tăng tài nguyên chạy: CPU0.3/RAM512MB/heap192 vẫn giữ. Dependency pins giữ nguyên. Gói checked đã build và chạy smoke trên Node22 Linux CPU0.3/RAM512MB/heap192:236 tệp hash và5 kiểm tra sửa nguồn/JS/static/API đạt, không kết nối DB/SMTP. Git attributes giữ nguyên bytes qua Windows/Linux để checksum không lệch do xuống dòng. Compiled dist phải được đưa vào Git và Docker context của nhánh deploy, khác với source checkout vẫn để dist trong ignore.
 
 ## Owner
 

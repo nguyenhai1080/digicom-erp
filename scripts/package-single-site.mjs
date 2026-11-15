@@ -35,6 +35,8 @@ CMD ["sh", "-c", "npm run db:migrate:deploy && exec node start.mjs"]
 `);
 await writeFile(resolve(out,'.dockerignore'),'node_modules\n.git\n.env\n.env.*\n!.env.example\nstorage\n');
 await writeFile(resolve(out,'.gitignore'),'node_modules/\n.env\n.env.*\n!.env.example\nstorage/\n');
+// Preserve the checked bytes when publishing from Windows and deploying on Linux.
+await writeFile(resolve(out,'.gitattributes'),'* -text\n');
 const env=(await readFile(resolve(root,'deploy/dgc.env.example'),'utf8')).replace('/app/apps/web/dist','/app/public');await writeFile(resolve(out,'.env.example'),env);
 const sourceCommit=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
 await writeFile(resolve(out,'DEPLOYMENT.json'),JSON.stringify({format:'dgc-single-site-release-v1',sourceCommit,sourceBranch:'dgc/main',deploymentBranch:'codex/dgc-deploy',applicationCount:1,entry:'start.mjs',webRoot:'/app/public',port:3000,sourceFinancialDataIncluded:false},null,2)+'\n');
