@@ -29,14 +29,14 @@ import {OctoberRestart} from './OctoberRestart';
 
 type Identity = { userId: string; companyId: string; companyCode: string; fullName: string; email: string; permissions: string[] };
 type Session = { user: Identity; csrfToken: string };
-const version = '0.6.114';
+const version = '0.6.115';
 async function api(path: string, body?: unknown, csrf?: string) {
   let response:Response;try{response = await fetch('/api/v1' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin',
     headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(path.startsWith('/dgc-migration/') ? 120000 : (path.startsWith('/revenue-fx/vietcombank/') || path.startsWith('/invoice-email/') || path === '/invoices/create' || path === '/invoices/preview' || path.endsWith('/finalize') || path.startsWith('/input-recon/')) ? 65000 : (path.endsWith('/documents') || path === '/company-assets' || path === '/output-recon/uploads' || path === '/output-recon/inspect' || path.endsWith('/read')) ? (path.endsWith('/read') || path === '/output-recon/inspect' ? 120000 : 60000) : 15000)
+    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(path.startsWith('/dgc-migration/') ? 120000 : (path.startsWith('/invoice-receipt-groups') || path.startsWith('/revenue-fx/vietcombank/') || path.startsWith('/invoice-email/') || path === '/invoices/create' || path === '/invoices/preview' || path.endsWith('/finalize') || path.startsWith('/input-recon/')) ? 65000 : (path.endsWith('/documents') || path === '/company-assets' || path === '/output-recon/uploads' || path === '/output-recon/inspect' || path.endsWith('/read')) ? (path.endsWith('/read') || path === '/output-recon/inspect' ? 120000 : 60000) : 15000)
   });
-  }catch(e){if(path==='/invoices/preview'&&e instanceof DOMException&&e.name==='TimeoutError')throw new Error('Xem trước Invoice quá thời gian. Chưa có Invoice được lưu. Hãy thử lại hoặc chọn phạm vi dịch vụ nhỏ hơn.');throw e;}
+  }catch(e){if(body!==undefined&&path.startsWith('/invoice-receipt-groups')&&(e instanceof TypeError||e instanceof DOMException&&e.name==='TimeoutError'))throw new Error(path==='/invoice-receipt-groups'?'Kết nối gián đoạn, chưa rõ kết quả ghi nhận. Kiểm tra lịch sử khoản thu; nếu thử lại hãy giữ nguyên nội dung và mã giao dịch để tránh ghi trùng.':'Kiểm tra phân bổ quá thời gian hoặc mất kết nối. Chưa gửi yêu cầu ghi nhận khoản thu; hãy thử kiểm tra lại.');if(path==='/invoices/preview'&&e instanceof DOMException&&e.name==='TimeoutError')throw new Error('Xem trước Invoice quá thời gian. Chưa có Invoice được lưu. Hãy thử lại hoặc chọn phạm vi dịch vụ nhỏ hơn.');throw e;}
   if (response.status === 401 && path === '/auth/me') return null;
   if (response.status === 401) window.dispatchEvent(new Event('erp-session-expired'));
   const result = await response.json();

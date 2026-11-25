@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
-import {mkdtemp,readFile} from 'node:fs/promises';
+import {mkdtemp,readFile,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {resolve} from 'node:path';
 import sharp from 'sharp';
@@ -27,8 +27,8 @@ template.addFile('xl/sharedStrings.xml',Buffer.from('<sst><si><t>GST Synthetic</
 const cells=['B1','C2','C3','C4','C6','C7','C8','C9','C10','C11','C12','C13','B14','C17','D17','D18','D19','C20','C22','C23','C24','C25','C26','C27','D27'];
 template.addFile('xl/worksheets/sheet1.xml',Buffer.from('<worksheet><sheetData><row r="1">'+cells.map(ref=>'<c r="'+ref+'" t="s"><v>0</v></c>').join('')+'</row></sheetData></worksheet>'));
 template.addFile('xl/media/image1.png',png);template.addFile('xl/vbaProject.bin',Buffer.from('synthetic-preserved-not-executed'));
-async function makeInvoice(currency,period,amount,suffix=''){
- const partner=await prisma.partner.create({data:{companyId:company.id,partnerCode:currency+suffix,partnerKey:currency+suffix,legalName:'Synthetic '+currency,partnerType:'CUSTOMER'}}),service=await prisma.service.create({data:{companyId:company.id,serviceCode:currency+suffix,serviceKey:currency+suffix,serviceName:currency,category:'OTHER',keyword:currency}});
+async function makeInvoice(currency,period,amount,suffix='',existingPartner=null){
+ const partner=existingPartner??await prisma.partner.create({data:{companyId:company.id,partnerCode:currency+suffix,partnerKey:currency+suffix,legalName:'Synthetic '+currency,partnerType:'CUSTOMER'}}),service=await prisma.service.create({data:{companyId:company.id,serviceCode:currency+suffix,serviceKey:currency+suffix,serviceName:currency,category:'OTHER',keyword:currency}});
  const contract=await prisma.contract.create({data:{companyId:company.id,partnerId:partner.id,contractCode:currency+suffix,contractName:'Synthetic agreement',currency,status:'ACTIVE',dgcDirection:'Output',businessType:'REVENUE_SHARE',contractType:'OTHER',valueType:'REVENUE_SHARE',services:{create:[{companyId:company.id,serviceId:service.id,dgcStatus:'ACTIVE',businessModel:'REVENUE_SHARE'}]}}});
  const draft=await post('/api/v1/manual-revenue/drafts',{partnerId:partner.id,rows:[{period,serviceId:service.id,contractId:contract.id,currency,amount,deduction:'0',note:'Synthetic historical source'}]});check(draft.statusCode,201);
  const rid=draft.json().items[0].id,recon=await prisma.reconciliation.findUniqueOrThrow({where:{id:rid}});check((await post('/api/v1/manual-revenue/'+rid+'/approve',{expectedUpdatedAt:recon.updatedAt.toISOString(),confirmed:true})).statusCode,200);
@@ -175,6 +175,9 @@ try{
  check((await prisma.invoice.findUniqueOrThrow({where:{id:fixInvoice.id}})).paidAmount.toString(),'123000');
  // DGC on-ledger fee receipts preserve gross AR vs net actual cash, with no cash activation.
  const feeInvoice=await makeInvoice('USD','2024-08','993.91','FEE'),usdFeeInvoice=await makeInvoice('USD','2024-09','100','USDFEE');
+ const groupFirst=await makeInvoice('USD','2025-01','1000','GROUP1'),groupPartner=await prisma.partner.findUniqueOrThrow({where:{id:groupFirst.partnerId}});
+ const groupInvoices=[groupFirst];for(const [period,amount,suffix] of [['2025-02','2000','GROUP2'],['2025-03','3000','GROUP3'],['2025-04','8430.23','GROUP4']])groupInvoices.push(await makeInvoice('USD',period,amount,suffix,groupPartner));
+ const groupPartial1=await makeInvoice('USD','2025-05','100','PART1',groupPartner),groupPartial2=await makeInvoice('USD','2025-06','100','PART2',groupPartner);
  const feeUrl='/api/v1/invoices/'+feeInvoice.id+'/payments',usdFeeUrl='/api/v1/invoices/'+usdFeeInvoice.id+'/payments';
  const feeBody={mode:'LEDGER_ONLY',requestId:randomUUID(),expectedUpdatedAt:feeInvoice.updatedAt.toISOString(),paymentDate:'2024-10-28',allocationAmount:'993.91',cashCurrency:'VND',cashAmount:'25227452',conversionRate:'25640',bankFeeUsd:'10',swiftFile:{filename:'synthetic-bank.png',base64:png.toString('base64')},confirmed:true};
  check((await post(feeUrl,feeBody)).statusCode,404); // Never extend GST with this DGC-only behavior.
@@ -211,5 +214,55 @@ try{
  check((await prisma.invoice.findUniqueOrThrow({where:{id:usdFeeInvoice.id}})).status,'PAID');
  check(await prisma.cashEntry.count(),cashEntriesBefore);check(JSON.stringify(await prisma.cashAccount.findMany({orderBy:{id:'asc'}})),accountBefore);
  check(JSON.stringify(await prisma.invoicePayment.findUniqueOrThrow({where:{id:receipt.id}})),preservedReceipt);
+ // One transfer, four cross-period invoices, one fee and one physical bank document.
+ const groupBase='/api/v1/invoice-receipt-groups',groupBody={requestId:randomUUID(),partnerId:groupPartner.id,paymentDate:'2026-11-13',bankReference:'S0663170F5A301',grossUsd:'14430.23',bankFeeUsd:'10',cashCurrency:'VND',cashAmount:'367715865',fxRate:'25500',swiftFile:{filename:'one-transfer.png',base64:png.toString('base64')},items:groupInvoices.map(i=>({invoiceId:i.id,expectedUpdatedAt:i.updatedAt.toISOString(),amount:i.payableAmount.toFixed(2)}))};
+ check((await app.inject({method:'GET',url:groupBase})).statusCode,401);
+ check((await get(groupBase+'/candidates?partnerId='+groupPartner.id)).json().total,6);
+ for(const bad of [{...groupBody,grossUsd:'14430.24'},{...groupBody,cashAmount:'367715864'},{...groupBody,partnerId:inv.partnerId},{...groupBody,items:[groupBody.items[0],groupBody.items[0]]},{...groupBody,items:groupBody.items.slice(0,1)}])check((await post(groupBase+'/preview',bad)).statusCode,bad.items.length===1||bad.items[0]===bad.items[1]?400:409);
+ check((await post(groupBase+'/preview',groupBody,{'x-csrf-token':'bad'})).statusCode,403);
+ check((await post(groupBase+'/preview',{...groupBody,items:[groupBody.items[0],{...groupBody.items[0],invoiceId:groupBody.items[0].invoiceId.toUpperCase()}]})).statusCode,400);
+ const gp=await post(groupBase+'/preview',groupBody);check(gp.statusCode,200);check(gp.json().items.length,4);check(gp.json().items.every(i=>i.afterOutstanding==='0.00'),true);
+ check(gp.json().items.reduce((a,i)=>a+Math.round(Number(i.feeShareUsd)*100),0),1000);check(gp.json().items.reduce((a,i)=>a+Number(i.cashShare),0),367715865);
+ const groupCreate={...groupBody,digest:gp.json().digest,confirmed:true};
+ check((await post(groupBase,{...groupCreate,confirmed:false})).statusCode,400);check((await post(groupBase,{...groupCreate,note:'changed'})).statusCode,409);
+ const sourceCount=await prisma.document.count(),attachmentCount=await prisma.attachment.count();
+ await prisma.$executeRawUnsafe('ALTER TABLE account_receivables ADD CONSTRAINT test_group_rollback CHECK(paid_amount=0) NOT VALID');
+ check((await post(groupBase,groupCreate)).statusCode,500);check(await prisma.invoiceReceiptGroup.count(),0);check(await prisma.invoicePayment.count({where:{receiptGroupId:{not:null}}}),0);check(await prisma.document.count(),sourceCount);check(await prisma.attachment.count(),attachmentCount);
+ await prisma.$executeRawUnsafe('ALTER TABLE account_receivables DROP CONSTRAINT test_group_rollback');
+ // Failure after the sole evidence file has been persisted must remove it too.
+ const bankFilesBefore=await readdir(resolve(process.env.STORAGE_ROOT,'payments',company.id));
+ await prisma.$executeRawUnsafe("ALTER TABLE audit_logs ADD CONSTRAINT test_group_evidence_rollback CHECK(action<>'INVOICE_RECEIPT_GROUP_POST') NOT VALID");
+ check((await post(groupBase,groupCreate)).statusCode,500);check(await prisma.document.count(),sourceCount);check(await prisma.attachment.count(),attachmentCount);check(await prisma.invoiceReceiptGroup.count(),0);
+ check((await readdir(resolve(process.env.STORAGE_ROOT,'payments',company.id))).sort(),bankFilesBefore.sort());
+ await prisma.$executeRawUnsafe('ALTER TABLE audit_logs DROP CONSTRAINT test_group_evidence_rollback');
+
+ const groupsRaced=await Promise.all([post(groupBase,groupCreate),post(groupBase,groupCreate)]);check(groupsRaced.map(r=>r.statusCode),[200,200]);check(groupsRaced[0].json().id,groupsRaced[1].json().id);
+ const groupId=groupsRaced[0].json().id,groupView=await get(groupBase+'/'+groupId);check(groupView.statusCode,200);const group=groupView.json();
+ check(group.grossUsd,'14430.23');check(group.bankFeeUsd,'10');check(group.cashAmount,'367715865');check(group.allocations.length,4);
+ check(await prisma.invoiceReceiptGroup.count(),1);check(await prisma.document.count(),sourceCount+1);check(await prisma.attachment.count(),attachmentCount+1);check(group.allocations.every(i=>!i.documentId),true);
+ const doc=await get(group.documentUrl);check(doc.statusCode,200);check(doc.rawPayload.equals(png),true);
+ for(const i of groupInvoices){const after=await prisma.invoice.findUniqueOrThrow({where:{id:i.id},include:{receivable:true}});check(after.status,'PAID');check(after.receivable.outstandingAmount.toString(),'0');const history=(await get('/api/v1/invoices/'+i.id+'/payments')).json();check(history.items[0].receiptGroup.id,groupId);check(history.items[0].receiptGroup.documentUrl,group.documentUrl);}
+ check((await post(groupBase,{...groupCreate,bankFeeUsd:'9'})).statusCode,409);
+ const duplicateRef={...groupBody,requestId:randomUUID()},duplicatePlan=await post(groupBase+'/preview',duplicateRef);check(duplicatePlan.statusCode,409); // settled invoices cannot be prepared again
+ check((await app.inject({method:'GET',url:groupBase+'/'+groupId,headers:{...headers,...foreignHeaders}})).statusCode,404);
+ check((await app.inject({method:'GET',url:group.documentUrl,headers:{...headers,...foreignHeaders}})).statusCode,404);
+ await prisma.rolePermission.delete({where:{roleId_permissionId:{roleId:role.id,permissionId:docPermission.id}}});check((await get(groupBase+'/'+groupId)).statusCode,403);await prisma.rolePermission.create({data:{roleId:role.id,permissionId:docPermission.id}});
+ await assert.rejects(()=>prisma.$executeRaw`UPDATE invoice_receipt_groups SET bank_fee_usd=9 WHERE id=${groupId}::uuid`);
+ await assert.rejects(()=>prisma.$executeRaw`UPDATE invoice_payments SET cash_amount=cash_amount+1,paid_vnd=paid_vnd+1 WHERE receipt_group_id=${groupId}::uuid`);
+ const partialBody={...groupBody,requestId:randomUUID(),bankReference:'PARTIAL-TRANSFER',grossUsd:'100',bankFeeUsd:'0',cashCurrency:'USD',cashAmount:'100',fxRate:undefined,swiftFile:undefined,items:[groupPartial1,groupPartial2].map(i=>({invoiceId:i.id,expectedUpdatedAt:i.updatedAt.toISOString(),amount:'50'}))};
+ const pp=await post(groupBase+'/preview',partialBody);check(pp.statusCode,200);check((await post(groupBase,{...partialBody,digest:pp.json().digest,confirmed:true})).statusCode,200);
+ for(const i of [groupPartial1,groupPartial2]){const after=await prisma.invoice.findUniqueOrThrow({where:{id:i.id},include:{receivable:true}});check(after.status,'PARTIALLY_PAID');check(after.receivable.outstandingAmount.toString(),'50');}
+ // Same bank reference with a new request cannot create another transfer even if invoices remain eligible.
+ const freshPartial={...partialBody,requestId:randomUUID(),items:await Promise.all([groupPartial1,groupPartial2].map(async i=>({invoiceId:i.id,expectedUpdatedAt:(await prisma.invoice.findUniqueOrThrow({where:{id:i.id}})).updatedAt.toISOString(),amount:'50'})))};
+ const freshP=await post(groupBase+'/preview',freshPartial);check(freshP.statusCode,200);check((await post(groupBase,{...freshPartial,digest:freshP.json().digest,confirmed:true})).statusCode,409);
+ // A single-Invoice receipt racing the grouped transfer must win wholly or lose wholly.
+ const raceBody={...freshPartial,requestId:randomUUID(),bankReference:'RACE-TRANSFER'},raceP=await post(groupBase+'/preview',raceBody);check(raceP.statusCode,200);
+ const raceSingle={mode:'LEDGER_ONLY',requestId:randomUUID(),expectedUpdatedAt:raceBody.items[0].expectedUpdatedAt,paymentDate:raceBody.paymentDate,allocationAmount:'50',cashCurrency:'USD',cashAmount:'50',confirmed:true};
+ const mixedRace=await Promise.all([post(groupBase,{...raceBody,digest:raceP.json().digest,confirmed:true}),post('/api/v1/invoices/'+groupPartial1.id+'/payments',raceSingle)]);check(mixedRace.map(r=>r.statusCode).sort(),[200,409]);
+ const allGroups=await prisma.invoiceReceiptGroup.count();check(allGroups,mixedRace[0].statusCode===200?3:2);
+ const secondAfter=await prisma.invoice.findUniqueOrThrow({where:{id:groupPartial2.id},include:{receivable:true}});check(secondAfter.receivable.outstandingAmount.toString(),mixedRace[0].statusCode===200?'0':'50');
+ check((await get(groupBase)).json().total,allGroups);
+ const groupPermission=permissions.find(p=>p.code==='PAYMENT_CREATE');await prisma.rolePermission.delete({where:{roleId_permissionId:{roleId:role.id,permissionId:groupPermission.id}}});check((await post(groupBase+'/preview',groupBody)).statusCode,403);check((await get(groupBase+'/'+groupId)).statusCode,200);await prisma.rolePermission.create({data:{roleId:role.id,permissionId:groupPermission.id}});
+ check(await prisma.cashEntry.count(),cashEntriesBefore);check(JSON.stringify(await prisma.cashAccount.findMany({orderBy:{id:'asc'}})),accountBefore);check(JSON.stringify(await prisma.invoicePayment.findUniqueOrThrow({where:{id:receipt.id}})),preservedReceipt);
  console.log('PASS: '+checks+' historical issue/payment, real currency, missing VND/bank, tenant/CSRF/permissions, rollback, duplicate race, Invoice/revenue/AR and stable pagination checks.');
 }finally{await app.close();await prisma.$disconnect();}

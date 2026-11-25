@@ -522,6 +522,8 @@ enum ValidationSeverity {
 }
 
 model Company {
+  invoiceReceiptGroups InvoiceReceiptGroup[]
+
   inputDocumentReceipts InputDocumentReceipt[]
   statementsOfAccount StatementOfAccount[]
   inputReconciliations InputReconciliation[]
@@ -643,6 +645,8 @@ model DgcImportLink {
 }
 
 model User {
+  invoiceReceiptGroups InvoiceReceiptGroup[]
+
   approvedInvoicePayments InvoicePayment[] @relation("PaymentApprovedBy")
   invoices Invoice[]
   outputReconUploads OutputReconUpload[]
@@ -815,6 +819,8 @@ model Attachment {
 }
 
 model Document {
+  invoiceReceiptGroups InvoiceReceiptGroup[]
+
   inputDocumentReceipts InputDocumentReceipt[] @relation("InputDocumentFile")
   inputDocumentSources InputDocumentReceipt[] @relation("InputDocumentSource")
   statementOfAccount StatementOfAccount?
@@ -873,6 +879,8 @@ model AuditLog {
 }
 
 model Partner {
+  invoiceReceiptGroups InvoiceReceiptGroup[]
+
   inputDocumentReceipts InputDocumentReceipt[] @relation("InputDocumentSupplier")
   outputDocumentReceipts InputDocumentReceipt[] @relation("InputDocumentNetwork")
   statementsOfAccount StatementOfAccount[]
@@ -2045,6 +2053,10 @@ model InvoiceScopeItem {
 
 // Live receipts have a local approver. Imported source receipts preserve donor evidence without cash posting or a fabricated local approval.
 model InvoicePayment {
+  receiptGroupId String? @map("receipt_group_id") @db.Uuid
+  receiptGroup InvoiceReceiptGroup? @relation(fields:[companyId,receiptGroupId],references:[companyId,id],onDelete:Restrict,map:"invoice_payments_group_fk")
+  @@unique([receiptGroupId,invoiceId],map:"invoice_payments_group_invoice_key")
+
   cashAccountId String? @map("cash_account_id") @db.Uuid
   cashAccount CashAccount? @relation(fields:[companyId,cashAccountId],references:[companyId,id],onDelete:Restrict)
   allocationCurrency String @default("USD") @map("allocation_currency") @db.VarChar(3)
@@ -2307,4 +2319,38 @@ model InputDocumentReceipt {
  @@index([companyId,inputPartnerId,period])
  @@index([companyId,sourceDocumentId,kind])
  @@map("input_document_receipts")
+}
+
+// One actual bank transfer, many immutable InvoicePayment AR allocations.
+model InvoiceReceiptGroup {
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @map("company_id") @db.Uuid
+ partnerId String @map("partner_id") @db.Uuid
+ receiptCode String @map("receipt_code")
+ requestId String @map("request_id") @db.Uuid
+ requestDigest String @map("request_digest")
+ bankReference String @map("bank_reference")
+ paymentDate DateTime @map("payment_date") @db.Date
+ grossUsd Decimal @map("gross_usd") @db.Decimal(20,2)
+ bankFeeUsd Decimal @map("bank_fee_usd") @db.Decimal(20,2)
+ cashCurrency String @map("cash_currency") @db.VarChar(3)
+ cashAmount Decimal @map("cash_amount") @db.Decimal(20,2)
+ fxRate Decimal? @map("fx_rate") @db.Decimal(20,4)
+ bankAccount String @map("bank_account")
+ note String
+ snapshot Json
+ documentId String? @map("document_id") @db.Uuid
+ createdById String @map("created_by_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at")
+ company Company @relation(fields:[companyId],references:[id],onDelete:Restrict)
+ partner Partner @relation(fields:[companyId,partnerId],references:[companyId,id],onDelete:Restrict)
+ document Document? @relation(fields:[companyId,documentId],references:[companyId,id],onDelete:Restrict)
+ createdBy User @relation(fields:[companyId,createdById],references:[companyId,id],onDelete:Restrict)
+ allocations InvoicePayment[]
+ @@unique([companyId,id])
+ @@unique([companyId,requestId])
+ @@unique([companyId,bankReference])
+ @@unique([companyId,receiptCode])
+ @@index([companyId,partnerId,paymentDate],map:"invoice_receipt_groups_partner_date")
+ @@map("invoice_receipt_groups")
 }

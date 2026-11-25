@@ -1,3 +1,16 @@
+# Nhận thanh toán nhiều Invoice — v0.6.115
+
+**Quản lý Invoice → Invoice đã phát hành → Nhận thanh toán nhiều Invoice**.
+
+1. Chọn đối tác, nhập ngày nhận tiền và mã giao dịch ngân hàng. Mã này dùng kiểm tra trùng khoản thu; nhập đúng mã trên chứng từ.
+2. Nhập tổngUSD đối tác thanh toán trước phí, phíUSD của **cả lần chuyển**, số thực nhậnUSD/VND và tỷ giá nếu nhậnVND. Tải **một chứng từ ngân hàng chung** (PDF/PNG/JPG≤5MB). Không tự mặc định phí10USD.
+3. Chọn2–50 Invoice USD còn phải thu của cùng đối tác. Có thể khác kỳ, chọn qua nhiều trang/tìm số Invoice. Mặc định lấy số còn phải thu; sửa số phân bổ nếu chỉ trả một phần.
+4. Bấm **Kiểm tra phân bổ khoản thu**. TổngUSD phân bổ phải bằng tổng thanh toán trước phí. NhậnVND=(tổngUSD−phíUSD)×tỷ giá, làm tròn đến đồng. Kiểm tra phần phí/tiền thực nhận phân bổ và công nợ còn lại từng Invoice; mở kiểm tra tệp chung.
+5. Xác nhận và **Ghi nhận khoản thu cho N Invoice**. Tất cả cùng thành công hoặc cùng hoàn tác; không ghi một phần khi có lỗi. Ghi nhận chỉ giảm công nợ theoUSD trước phí, không tự cộng số dư quỹ/ngân hàng.
+6. Xem tại **Lịch sử khoản thu nhiều Invoice**, hoặc trong lịch sử từng Invoice bấm **Xem khoản thu THU-…**. Các Invoice liên kết cùng một chứng từ ngân hàng; phí phân bổ trong dòng chỉ là phần của phí chung.
+
+Ví dụ14430,23USD trước phí, phí10USD, tỷ giá25500, thực nhận367.715.865VND. Phí chỉ ghi một lần. Hệ thống chia phí/tiền thực nhận theo tỷ trọng USD bằng đơn vị cent/đồng và xử lý phần lẻ để tổng luôn khớp; đây không phải các giao dịch ngân hàng riêng. Chưa có tạo nhóm cho InvoiceVND, chỉnh/xóa khoản thu, nhập lại/bổ sung tệp cho khoản thu đã lưu hoặc ghi chi phí ngân hàng vào sổ chi phí ở bản này. Luồng thanh toán từng Invoice bên dưới vẫn dùng như trước.
+
 # Digicom — thanh toán có phí ngân hàng (v0.6.114)
 
 Luồng hiện tại khi quỹ/ngân hàng vẫn tạm hoãn: vào **Quản lý Invoice → Invoice đã phát hành → Thanh toán / lịch sử**.
