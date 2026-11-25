@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {historicalPaymentAmounts,historicalPaymentSchema,historicalPaymentDate} from '../dist/modules/projects/historical-payment.js';
+import {historicalPaymentAmounts,ledgerOnlyPaymentAmounts,ledgerOnlyPaymentSchema,historicalPaymentSchema,historicalPaymentDate} from '../dist/modules/projects/historical-payment.js';
 import {paymentAmounts,nativeVndPayment} from '../dist/modules/projects/invoice-payments.js';
 import {invoiceIssueConfirmation} from '../dist/modules/projects/finance-ledger.js';
 
@@ -38,3 +38,20 @@ assert.equal(invoiceIssueConfirmation.safeParse({digest,confirmedHistorical:true
 assert.equal(invoiceIssueConfirmation.safeParse({digest,confirmedHistorical:false,historicalReason:'History source'}).success,false);
 assert.equal(invoiceIssueConfirmation.safeParse({digest,confirmedHistorical:true,confirmedSent:true,historicalReason:'History source'}).success,false);
 console.log('Historical payment/issue arithmetic and explicit confirmation checks passed.');
+
+const fee=ledgerOnlyPaymentAmounts('993.91','0','993.91','USD','25227452','VND','25640','10');
+assert.equal(fee.status,'PAID');assert.equal(fee.outstanding.toString(),'0');assert.equal(fee.paidAfter.toString(),'993.91');
+assert.equal(fee.bankFee.netUsd,'983.91');assert.equal(fee.bankFee.netCashAmount,'25227452');assert.equal(fee.rate.toString(),'25640');
+assert.equal(ledgerOnlyPaymentAmounts('100','0','50','USD','40','USD',undefined,'10').outstanding.toString(),'50');
+assert.equal(ledgerOnlyPaymentAmounts('100','50','50','USD','40','USD',undefined,'10').status,'PAID');
+for(const [cash,rate,feeAmount] of [['25227453','25640','10'],['25227452',undefined,'10'],['25227452','25640','993.91'],['25227452','25640','-10'],['25227452','25640','10.001'],['0','1','993.90']])assert.throws(()=>ledgerOnlyPaymentAmounts('993.91','0','993.91','USD',cash,'VND',rate,feeAmount));
+assert.throws(()=>ledgerOnlyPaymentAmounts('100','0','100','VND','90','VND',undefined,'10'));
+assert.throws(()=>ledgerOnlyPaymentAmounts('100','0','101','USD','91','USD',undefined,'10'));
+assert.throws(()=>ledgerOnlyPaymentAmounts('100','0','50','USD','50','USD',undefined,'10'));
+assert.equal(ledgerOnlyPaymentAmounts('100','0','50','USD','50','USD').bankFee,undefined);
+assert.equal(ledgerOnlyPaymentAmounts('100','0','50','USD','50','USD',undefined,'0').paidAfter.toString(),'50');
+const feeBody={...payment,mode:'LEDGER_ONLY',dateBasis:'SOURCE',bankFeeUsd:'10'};
+assert.equal(ledgerOnlyPaymentSchema.safeParse(feeBody).success,true);
+assert.equal(historicalPaymentSchema.safeParse({...payment,bankFeeUsd:'10'}).success,false);
+for(const bad of ['-1','10.001','NaN','1e2'])assert.equal(ledgerOnlyPaymentSchema.safeParse({...feeBody,bankFeeUsd:bad}).success,false);
+console.log('PASS: bank fee gross/net, exact VND rounding, partial/full settlement, invalid currency/fee/overpayment, no-fee compatibility and strict schemas.');

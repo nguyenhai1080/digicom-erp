@@ -1,3 +1,19 @@
+# Digicom — thanh toán có phí ngân hàng (v0.6.114)
+
+Luồng hiện tại khi quỹ/ngân hàng vẫn tạm hoãn: vào **Quản lý Invoice → Invoice đã phát hành → Thanh toán / lịch sử**.
+
+1. Nhập **Số tiền đối tác thanh toán USD (giảm công nợ)** theo chứng từ trước khi ngân hàng khấu trừ phí.
+2. Nhập **Phí ngân hàng khấu trừ (USD / lần thanh toán)**. Để trống/0 nếu không có phí; không tự mặc định 10 USD. Nếu một lần chuyển trả nhiều Invoice, chỉ nhập phần phí thực tế phân bổ cho khoản đang ghi, không lặp toàn bộ phí ở từng Invoice.
+3. Chọn tiền tệ nhận, nhập **Số tiền thực nhận** và tỷ giá thực tế nếu nhận VND. Khi có phí: nhận USD = USD thanh toán − phí; nhận VND = (USD thanh toán − phí) × tỷ giá, làm tròn đến đồng. Hệ thống kiểm tra đúng công thức, không hạ tỷ giá để giấu phí. Khoản thiếu chưa có căn cứ là phí không tự xóa công nợ.
+4. Ô **Chứng từ ngân hàng** nhận PDF/PNG/JPG tối đa5MB (PDF không khóa, tối đa30trang; ảnh20triệu điểm ảnh). Tệp không bắt buộc để giữ tương thích khoản thu chưa có chứng từ. Đổi tệp hoặc số tiền phải xác nhận lại trước lưu.
+5. Kiểm tra và xác nhận ghi nhận thanh toán. Lịch sử tách số giảm công nợ, tiền thực nhận, phí, tỷ giá và **Mở chứng từ**. Mỗi lần ghi nhận là bất biến, gửi lại cùng mã/nội dung không tạo thêm khoản thu.
+
+Ví dụ owner: thanh toán993,91USD, phí10USD, tỷ giá25.640 → thực nhận25.227.452VND; nếu thanh toán hết thì giảm AR993,91USD, còn0USD. Phí giữ riêng trong hồ sơ khoản thu/audit; chưa ghi sổ chi phí hay cộng số dư tài khoản khi cash vẫn hoãn. Không đổi doanh thu/Invoice/biên bản hoặc thanh toán đã lưu. Chỉ hỗ trợ phí USD cho khoản thu LEDGER_ONLY của Digicom/InvoiceUSD; luồng lịch sử GST và native cash giữ số liệu/quy tắc hiện hữu.
+
+Quyền đọc khoản thu và chứng từ: DGC dùng INVOICE_PAYMENT_VIEW, GST PAYMENT_VIEW. Ghi vẫn cần PAYMENT_POST+PAYMENT_CREATE+PAYMENT_APPROVE, xác nhận, khóa nguồn và chống trùng. Không cấp thêm quyền. Không có sửa/xóa khoản thu hay đính kèm hồi tố ở bản này.
+
+## Tài liệu hành vi nền trước v114
+
 # Invoice payment adaptation — DGC deployed v61
 
 Source: `51_Payment_Transaction.js` recordInvoicePayment, runtime guards, summary, transaction upsert, invoice status; `Index.html` openInvoicePaymentModal / recalcInvoicePaymentUi.

@@ -12,7 +12,7 @@ import {csrfToken,tokenHash} from '../dist/modules/auth/access.js';
 if(!new URL(process.env.DATABASE_URL).pathname.startsWith('/erp_execution_acceptance_finance_history_'))throw Error('Use a fresh disposable historical finance acceptance database');
 process.env.STORAGE_ROOT=await mkdtemp(resolve(tmpdir(),'erp-history-test-'));
 const company=await prisma.company.create({data:{companyCode:'GST',companyName:'Synthetic historical finance test'}}),other=await prisma.company.create({data:{companyCode:'OTHER',companyName:'Other synthetic tenant'}}),marker=randomUUID();
-const codes=['PAYMENT_VIEW','PAYMENT_CREATE','PAYMENT_APPROVE','PAYMENT_POST','RECON_VIEW','RECON_UPLOAD','RECON_REVIEW','RECON_APPROVE','INVOICE_VIEW','INVOICE_CREATE','INVOICE_ISSUE','REVENUE_VIEW','AR_VIEW','SYSTEM_CONFIG_EDIT'];
+const codes=['INVOICE_PAYMENT_VIEW','PAYMENT_VIEW','PAYMENT_CREATE','PAYMENT_APPROVE','PAYMENT_POST','RECON_VIEW','RECON_UPLOAD','RECON_REVIEW','RECON_APPROVE','INVOICE_VIEW','INVOICE_CREATE','INVOICE_ISSUE','REVENUE_VIEW','AR_VIEW','SYSTEM_CONFIG_EDIT'];
 const permissions=await Promise.all(codes.map(code=>prisma.permission.create({data:{code,name:code,module:'TEST'}})));
 const user=await prisma.user.create({data:{companyId:company.id,email:marker+'@example.test',fullName:'Synthetic user',passwordHash:'unused-test-fixture'}});
 const role=await prisma.role.create({data:{companyId:company.id,code:'TEST',name:'Synthetic test role',permissions:{create:permissions.map(p=>({permissionId:p.id}))}}});await prisma.userRole.create({data:{userId:user.id,roleId:role.id}});
@@ -173,5 +173,43 @@ try{
  check((await post('/api/v1/cash-accounts/'+fixBank.id+'/update',openingBody)).statusCode,409);
  const badOpening={...openingBody,expectedUpdatedAt:adjusted.updatedAt.toISOString(),openingBalance:'1.5'};check((await post('/api/v1/cash-accounts/'+fixBank.id+'/update',badOpening)).statusCode,400);
  check((await prisma.invoice.findUniqueOrThrow({where:{id:fixInvoice.id}})).paidAmount.toString(),'123000');
+ // DGC on-ledger fee receipts preserve gross AR vs net actual cash, with no cash activation.
+ const feeInvoice=await makeInvoice('USD','2024-08','993.91','FEE'),usdFeeInvoice=await makeInvoice('USD','2024-09','100','USDFEE');
+ const feeUrl='/api/v1/invoices/'+feeInvoice.id+'/payments',usdFeeUrl='/api/v1/invoices/'+usdFeeInvoice.id+'/payments';
+ const feeBody={mode:'LEDGER_ONLY',requestId:randomUUID(),expectedUpdatedAt:feeInvoice.updatedAt.toISOString(),paymentDate:'2024-10-28',allocationAmount:'993.91',cashCurrency:'VND',cashAmount:'25227452',conversionRate:'25640',bankFeeUsd:'10',swiftFile:{filename:'synthetic-bank.png',base64:png.toString('base64')},confirmed:true};
+ check((await post(feeUrl,feeBody)).statusCode,404); // Never extend GST with this DGC-only behavior.
+ const preservedReceipt=JSON.stringify(await prisma.invoicePayment.findUniqueOrThrow({where:{id:receipt.id}}));
+ await prisma.company.update({where:{id:company.id},data:{companyCode:'DGC'}});delete process.env.DGC_CASH_ENABLED;
+ const cashEntriesBefore=await prisma.cashEntry.count(),accountBefore=JSON.stringify(await prisma.cashAccount.findMany({orderBy:{id:'asc'}}));
+ check((await get(feeUrl)).json().cashEnabled,false);
+ check((await post(feeUrl,{...feeBody,confirmed:false})).statusCode,400);
+ check((await post(feeUrl,feeBody,{'x-csrf-token':'bad'})).statusCode,403);
+ check((await post(feeUrl,{...feeBody,cashAmount:'25227453'})).statusCode,409);
+ check((await post(feeUrl,{...feeBody,bankFeeUsd:'-10'})).statusCode,400);
+ check((await post(feeUrl,{...feeBody,swiftFile:{filename:'bad.pdf',base64:Buffer.from('not a bank PDF').toString('base64')}})).statusCode,400);
+ check((await post(feeUrl,{...feeBody,allocationAmount:'994.91',cashAmount:'25253092'})).statusCode,409);
+ await prisma.rolePermission.delete({where:{roleId_permissionId:{roleId:role.id,permissionId:permission.id}}});check((await post(feeUrl,feeBody)).statusCode,403);await prisma.rolePermission.create({data:{roleId:role.id,permissionId:permission.id}});
+ await prisma.$executeRawUnsafe('ALTER TABLE account_receivables ADD CONSTRAINT test_fee_rollback CHECK (paid_amount=0) NOT VALID');
+ check((await post(feeUrl,feeBody)).statusCode,500);check(await prisma.invoicePayment.count({where:{invoiceId:feeInvoice.id}}),0);check((await prisma.invoice.findUniqueOrThrow({where:{id:feeInvoice.id}})).paidAmount.toString(),'0');
+ await prisma.$executeRawUnsafe('ALTER TABLE account_receivables DROP CONSTRAINT test_fee_rollback');
+ const feeRace=await Promise.all([post(feeUrl,feeBody),post(feeUrl,feeBody)]);check(feeRace.map(r=>r.statusCode),[200,200]);check(feeRace[0].json().paymentId,feeRace[1].json().paymentId);
+ check((await post(feeUrl,{...feeBody,bankFeeUsd:'9'})).statusCode,409);
+ const feePaid=await prisma.invoice.findUniqueOrThrow({where:{id:feeInvoice.id},include:{receivable:true}}),feeReceipt=(await get(feeUrl)).json().items[0];
+ check(feePaid.paidAmount.toString(),'993.91');check(feePaid.receivable.outstandingAmount.toString(),'0');check(feePaid.status,'PAID');
+ check(feeReceipt.allocationAmount,'993.91');check(feeReceipt.cashAmount,'25227452');check(feeReceipt.historicalSource.bankFee.amount,'10.00');check(feeReceipt.historicalSource.bankFee.netUsd,'983.91');check(feeReceipt.fxRate,'25640');check(feeReceipt.cashAccountId,null);check(!!feeReceipt.documentId,true);
+ const bankDocRoute='/api/v1/invoice-payments/'+feeReceipt.id+'/document',bankDoc=await get(bankDocRoute);check(bankDoc.statusCode,200);check(bankDoc.headers['content-type'],'image/png');check(bankDoc.rawPayload.equals(png),true);
+ check((await app.inject({method:'GET',url:bankDocRoute})).statusCode,401);
+ check((await app.inject({method:'GET',url:bankDocRoute,headers:{...headers,...foreignHeaders}})).statusCode,404);
+ const docPermission=permissions.find(p=>p.code==='INVOICE_PAYMENT_VIEW');await prisma.rolePermission.delete({where:{roleId_permissionId:{roleId:role.id,permissionId:docPermission.id}}});check((await get(bankDocRoute)).statusCode,403);await prisma.rolePermission.create({data:{roleId:role.id,permissionId:docPermission.id}});
+ await assert.rejects(()=>prisma.$executeRaw`UPDATE invoice_payments SET historical_source=jsonb_set(historical_source,'{bankFee,amount}','"9.00"') WHERE id=${feeReceipt.id}::uuid`);check((await prisma.invoicePayment.findUniqueOrThrow({where:{id:feeReceipt.id}})).historicalSource.bankFee.amount,'10.00');
+ check(await prisma.invoicePayment.count({where:{invoiceId:feeInvoice.id}}),1);
+ const feeAudit=await prisma.auditLog.findFirstOrThrow({where:{entityId:feeReceipt.id,action:'INVOICE_PAYMENT_POST'}});check(feeAudit.newValue.historicalSource.bankFee.amount,'10.00');
+ const usdBody={...feeBody,requestId:randomUUID(),expectedUpdatedAt:usdFeeInvoice.updatedAt.toISOString(),allocationAmount:'50',cashCurrency:'USD',cashAmount:'40',conversionRate:undefined};
+ check((await post(usdFeeUrl,usdBody)).statusCode,200);const usdPartial=await prisma.invoice.findUniqueOrThrow({where:{id:usdFeeInvoice.id}});check(usdPartial.status,'PARTIALLY_PAID');check(usdPartial.paidAmount.toString(),'50');
+ // A later payment has no fee unless explicitly entered; never auto-deduct 10 per Invoice.
+ check((await post(usdFeeUrl,{...usdBody,requestId:randomUUID(),expectedUpdatedAt:usdPartial.updatedAt.toISOString(),cashAmount:'50',bankFeeUsd:undefined,swiftFile:undefined})).statusCode,200);
+ check((await prisma.invoice.findUniqueOrThrow({where:{id:usdFeeInvoice.id}})).status,'PAID');
+ check(await prisma.cashEntry.count(),cashEntriesBefore);check(JSON.stringify(await prisma.cashAccount.findMany({orderBy:{id:'asc'}})),accountBefore);
+ check(JSON.stringify(await prisma.invoicePayment.findUniqueOrThrow({where:{id:receipt.id}})),preservedReceipt);
  console.log('PASS: '+checks+' historical issue/payment, real currency, missing VND/bank, tenant/CSRF/permissions, rollback, duplicate race, Invoice/revenue/AR and stable pagination checks.');
 }finally{await app.close();await prisma.$disconnect();}
