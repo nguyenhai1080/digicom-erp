@@ -7,12 +7,12 @@ import {requirePermission,type AuthConfig} from '../auth/access.js';
 import {audit,code,CommandError,date,parse,timestamp,unchanged,writeGuard} from './commands.js';
 import {checkedFile,persistPdf,persistPaymentImage,rollbackFiles,sha} from './financial-documents.js';
 import {financialPeriodLock} from './recon-finalize.js';
-import {historicalPaymentSchema,ledgerOnlyPaymentSchema,historicalPaymentAmounts,historicalPaymentDate} from './historical-payment.js';
+import {historicalPaymentSchema,ledgerOnlyPaymentSchema,paymentFileSchema,ledgerOnlyPaymentAmounts,historicalPaymentAmounts,historicalPaymentDate} from './historical-payment.js';
 import {invoicePaymentReadPermission,canPostInvoicePayment} from './invoice-payment-access.js';
 import {isSourceReceipt,sourceReceiptView} from './source-receipt.js';
 
 const amount=z.string().regex(/^(0|[1-9]\d{0,13})(\.\d{1,2})?$/);
-const bodySchema=z.object({requestId:z.uuid(),expectedUpdatedAt:timestamp,paymentDate:date,paidUsd:amount,paidVnd:z.string().regex(/^[1-9]\d{0,15}$/),fxRate:z.string().regex(/^(0|[1-9]\d{0,11})(\.\d{1,4})?$/).optional(),swiftNo:z.string().trim().max(200),cashAccountId:z.uuid(),bankAccount:z.string().trim().max(200).default(''),paymentMethod:z.enum(['Bank Transfer','Cash','Other']),note:z.string().trim().max(2000),confirmed:z.literal(true),swiftFile:z.object({filename:z.string().trim().min(1).max(200),base64:z.string().max(7*1024*1024)}).strict().optional()}).strict();
+const bodySchema=z.object({requestId:z.uuid(),expectedUpdatedAt:timestamp,paymentDate:date,paidUsd:amount,paidVnd:z.string().regex(/^[1-9]\d{0,15}$/),fxRate:z.string().regex(/^(0|[1-9]\d{0,11})(\.\d{1,4})?$/).optional(),swiftNo:z.string().trim().max(200),cashAccountId:z.uuid(),bankAccount:z.string().trim().max(200).default(''),paymentMethod:z.enum(['Bank Transfer','Cash','Other']),note:z.string().trim().max(2000),confirmed:z.literal(true),swiftFile:paymentFileSchema.optional()}).strict();
 const id=(p:unknown)=>parse(z.object({id:z.uuid()}).strict(),p).id;
 const D=(v:string|Prisma.Decimal)=>new Prisma.Decimal(v);
 function fail(message:string):never{throw new CommandError(409,message);}
@@ -36,7 +36,7 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
   const items=await prisma.invoicePayment.findMany({where:{companyId:invoice.companyId,invoiceId:invoice.id},orderBy:[{paymentDate:'desc'},{createdAt:'desc'}]});
   const canPost=canPostInvoicePayment(request.auth!);
   const accounts=!cashEnabled(request.auth!.companyCode)||request.auth!.companyCode==='DGC'&&!canPost?[]:await prisma.cashAccount.findMany({where:{companyId:invoice.companyId,status:'ACTIVE',currency:'VND'},select:{id:true,accountCode:true,name:true,kind:true,currency:true,bankName:true,accountNumber:true},orderBy:{accountCode:'asc'},take:1000});
-  return {canPost,cashEnabled:cashEnabled(request.auth!.companyCode),accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items:items.map(p=>({...p,historicalSource:sourceReceiptView(p.historicalSource)}))};
+  return {canPost,documentReadPermission:invoicePaymentReadPermission(request.auth!),cashEnabled:cashEnabled(request.auth!.companyCode),accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items:items.map(p=>({...p,historicalSource:sourceReceiptView(p.historicalSource)}))};
  });
  app.post('/api/v1/invoices/:id/payments',{bodyLimit:8*1024*1024,onRequest:writeGuard('PAYMENT_POST',config)},async request=>{
   const user=request.auth!,invoiceId=id(request.params),body=parse(z.union([bodySchema,historicalPaymentSchema,ledgerOnlyPaymentSchema]),request.body),historical='mode' in body,digest=sha(JSON.stringify({invoiceId,...body}));
@@ -44,9 +44,10 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
   if(!historical&&!cashEnabled(user.companyCode))fail('Quỹ/ngân hàng chưa áp dụng. Chọn ghi nhận thu vào công nợ.');
   if(!['PAYMENT_CREATE','PAYMENT_APPROVE'].every(p=>user.permissions.includes(p)))throw new CommandError(403,'Cần quyền tạo và duyệt thanh toán.');
   let bytes:Buffer|undefined,ext:'pdf'|'png'|'jpg'='pdf';
-  if(!historical&&body.swiftFile){
-   if(!/^[A-Za-z0-9+/]+={0,2}$/.test(body.swiftFile.base64))throw new CommandError(400,'Chứng từ PDF không hợp lệ.');
-   bytes=Buffer.from(body.swiftFile.base64,'base64');
+  const swiftFile='swiftFile' in body?body.swiftFile:undefined;
+  if(swiftFile){
+   if(!/^[A-Za-z0-9+/]+={0,2}$/.test(swiftFile.base64))throw new CommandError(400,'Chứng từ PDF không hợp lệ.');
+   bytes=Buffer.from(swiftFile.base64,'base64');
    if(bytes.length>5*1024*1024)throw new CommandError(400,'Chứng từ tối đa 5 MB.');
    if(bytes.subarray(0,5).equals(Buffer.from('%PDF-'))){
     try{const pdf=await PDFDocument.load(bytes);if(pdf.isEncrypted||pdf.getPageCount()>30)throw new Error();}catch{throw new CommandError(400,'PDF chứng từ bị lỗi hoặc khóa.');}
@@ -72,7 +73,8 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
    const old=await tx.invoicePayment.aggregate({where:{companyId:user.companyId,invoiceId},_sum:{allocationAmount:true}});
    if(!(old._sum.allocationAmount??D('0')).eq(inv.paidAmount))fail('Lịch sử thanh toán không khớp số đã thu.');
    if(!historical&&inv.currency==='VND'&&(!D(body.paidUsd).isZero()||body.fxRate&& !D(body.fxRate).eq(1)))fail('Invoice VND chỉ phân bổ VND, không nhập khoản USD giả.');
-   const a=historical?historicalPaymentAmounts(inv.payableAmount.toString(),inv.paidAmount.toString(),body.allocationAmount,inv.currency,body.cashAmount,body.cashCurrency,body.conversionRate):inv.currency==='VND'?nativeVndPayment(inv.payableAmount.toFixed(0),inv.paidAmount.toFixed(0),body.paidVnd):paymentAmounts(inv.payableAmount.toFixed(2),inv.paidAmount.toFixed(2),body.paidUsd,body.paidVnd,body.fxRate);
+   const feeCalculation=historical&&body.mode==='LEDGER_ONLY'?ledgerOnlyPaymentAmounts(inv.payableAmount.toString(),inv.paidAmount.toString(),body.allocationAmount,inv.currency,body.cashAmount,body.cashCurrency,body.conversionRate,body.bankFeeUsd):undefined;
+   const a=feeCalculation??(historical?historicalPaymentAmounts(inv.payableAmount.toString(),inv.paidAmount.toString(),body.allocationAmount,inv.currency,body.cashAmount,body.cashCurrency,body.conversionRate):inv.currency==='VND'?nativeVndPayment(inv.payableAmount.toFixed(0),inv.paidAmount.toFixed(0),body.paidVnd):paymentAmounts(inv.payableAmount.toFixed(2),inv.paidAmount.toFixed(2),body.paidUsd,body.paidVnd,body.fxRate));
    const allocationAmount=historical?D(body.allocationAmount):D(inv.currency==='VND'?body.paidVnd:body.paidUsd),cashCurrency=historical?body.cashCurrency:'VND',cashAmount=D(historical?body.cashAmount:body.paidVnd);
    let cashAccount;
    if(!historical){
@@ -82,7 +84,7 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
     if(cashAccount.openingDate>new Date(body.paymentDate))fail('Ngày nhận tiền phải từ ngày bắt đầu theo dõi số dư tài khoản.');
     if(body.paymentMethod==='Bank Transfer'&&cashAccount.kind!=='BANK'||body.paymentMethod==='Cash'&&cashAccount.kind!=='CASH')fail('Phương thức thanh toán không khớp loại tài khoản/quỹ.');
    }
-   const history=historical?{...(body.mode==='LEDGER_ONLY'?{sourceKind:'DGC_LEDGER_ONLY_RECEIPT_V1'}:{}),reference:body.sourceReference,dateBasis:body.dateBasis,accountKnown:!!body.bankAccount,rateKind:inv.currency===body.cashCurrency?'NONE':'REPORTING_CONVERSION'}:undefined;
+   const history=historical?{...(body.mode==='LEDGER_ONLY'?{sourceKind:'DGC_LEDGER_ONLY_RECEIPT_V1'}:{}),...(feeCalculation?.bankFee?{bankFee:feeCalculation.bankFee}:{}),reference:body.sourceReference,dateBasis:body.dateBasis,accountKnown:!!body.bankAccount,rateKind:inv.currency===body.cashCurrency?'NONE':'REPORTING_CONVERSION'}:undefined;
    const payment=await tx.invoicePayment.create({data:{companyId:user.companyId,invoiceId,allocationCurrency:inv.currency,allocationAmount,cashCurrency,cashAmount,historicalSource:history,paymentCode:await code(tx,user.companyId,'INVOICE_PAYMENT','PAY'),requestId:body.requestId,requestDigest:digest,paymentDate:new Date(body.paymentDate),paidUsd:historical?(inv.currency==='USD'?allocationAmount:D('0')):D(body.paidUsd),paidVnd:historical?(cashCurrency==='VND'?cashAmount:null):D(body.paidVnd),fxRate:a.rate,swiftNo:historical?'':body.swiftNo,cashAccountId:cashAccount?.id,bankAccount:cashAccount?[cashAccount.accountCode,cashAccount.bankName,cashAccount.accountNumber,cashAccount.name].filter(Boolean).join(' · '):body.bankAccount,paymentMethod:historical?'Other':body.paymentMethod,note:body.note,approvedById:user.userId}});
    if(cashAccount){
     const updated=await tx.cashAccount.update({where:{id:cashAccount.id},data:{balance:{increment:cashAmount}}});
@@ -126,7 +128,7 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
    return {message:'Đã cộng '+payment.cashAmount.toFixed(0)+' VND vào '+account.accountCode+'. Giữ nguyên số đã thu và công nợ.',entryId:entry.id};
   },{timeout:30000});
  });
- app.get('/api/v1/invoice-payments/:id/document',{preHandler:requirePermission('PAYMENT_VIEW')},async(request,reply)=>{
+ app.get('/api/v1/invoice-payments/:id/document',{preHandler:requirePermission(invoicePaymentReadPermission)},async(request,reply)=>{
   const user=request.auth!,payment=await prisma.invoicePayment.findFirst({where:{companyId:user.companyId,id:id(request.params)}});
   if(!payment?.documentId)throw new CommandError(404,'Không có chứng từ.');
   const doc=await prisma.document.findFirst({where:{companyId:user.companyId,id:payment.documentId,entityId:payment.id,entityType:'InvoicePayment',documentType:'PAYMENT_SWIFT',status:'ACTIVE'},include:{attachment:true}});
