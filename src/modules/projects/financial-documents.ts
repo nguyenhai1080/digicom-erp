@@ -61,10 +61,10 @@ export async function persistWorkbook(tx:Prisma.TransactionClient,user:Identity,
  return tx.document.create({data:{companyId:user.companyId,documentCode:await code(tx,user.companyId,'INVOICE_WORKBOOK','INV-XLS'),documentType:'INVOICE_WORKBOOK',entityType:'Invoice',entityId:invoiceId,attachmentId:a.id,createdById:user.userId}});
 }
 
-export async function persistPaymentImage(tx:Prisma.TransactionClient,user:Identity,paymentId:string,filename:string,bytes:Buffer,ext:'png'|'jpg',rollback:string[],expense=false){
+export async function persistPaymentImage(tx:Prisma.TransactionClient,user:Identity,paymentId:string,filename:string,bytes:Buffer,ext:'png'|'jpg',rollback:string[],expense=false,paymentEntity='InvoicePayment'){
  const folder=expense?'expenses':'payments',id=randomUUID(),relative=`${folder}/${user.companyId}/${id}.${ext}`,path=resolve(storageRoot(),relative),temp=path+'.pending';
  await mkdir(resolve(storageRoot(),folder,user.companyId),{recursive:true,mode:0o700});rollback.push(temp);
  const h=await open(temp,'wx',0o600);try{await h.writeFile(bytes);await h.sync();}finally{await h.close();}await rename(temp,path);rollback.push(path);
  const a=await tx.attachment.create({data:{id,companyId:user.companyId,originalFilename:filename,storedFilename:id+'.'+ext,storageProvider:'local',storagePath:relative,mimeType:ext==='png'?'image/png':'image/jpeg',fileSize:BigInt(bytes.length),checksumSha256:sha(bytes),uploadedById:user.userId}});
- return tx.document.create({data:{companyId:user.companyId,documentCode:await code(tx,user.companyId,expense?'EXPENSE_EVIDENCE':'PAYMENT_SWIFT',expense?'EXP-DOC':'SWIFT'),documentType:expense?'EXPENSE_EVIDENCE':'PAYMENT_SWIFT',entityType:expense?'Expense':'InvoicePayment',entityId:paymentId,attachmentId:a.id,createdById:user.userId}});
+ return tx.document.create({data:{companyId:user.companyId,documentCode:await code(tx,user.companyId,expense?'EXPENSE_EVIDENCE':'PAYMENT_SWIFT',expense?'EXP-DOC':'SWIFT'),documentType:expense?'EXPENSE_EVIDENCE':'PAYMENT_SWIFT',entityType:expense?'Expense':paymentEntity,entityId:paymentId,attachmentId:a.id,createdById:user.userId}});
 }

@@ -33,10 +33,10 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
  app.get('/api/v1/invoices/:id/payments',{preHandler:requirePermission(invoicePaymentReadPermission)},async request=>{
   const invoice=await prisma.invoice.findFirst({where:{companyId:request.auth!.companyId,id:id(request.params)},include:{receivable:true}});
   if(!invoice)throw new CommandError(404,'Không tìm thấy Invoice.');
-  const items=await prisma.invoicePayment.findMany({where:{companyId:invoice.companyId,invoiceId:invoice.id},orderBy:[{paymentDate:'desc'},{createdAt:'desc'}]});
+  const items=await prisma.invoicePayment.findMany({where:{companyId:invoice.companyId,invoiceId:invoice.id},orderBy:[{paymentDate:'desc'},{createdAt:'desc'}],include:{receiptGroup:{select:{id:true,receiptCode:true,grossUsd:true,bankFeeUsd:true,cashCurrency:true,cashAmount:true,documentId:true}}}});
   const canPost=canPostInvoicePayment(request.auth!);
   const accounts=!cashEnabled(request.auth!.companyCode)||request.auth!.companyCode==='DGC'&&!canPost?[]:await prisma.cashAccount.findMany({where:{companyId:invoice.companyId,status:'ACTIVE',currency:'VND'},select:{id:true,accountCode:true,name:true,kind:true,currency:true,bankName:true,accountNumber:true},orderBy:{accountCode:'asc'},take:1000});
-  return {canPost,documentReadPermission:invoicePaymentReadPermission(request.auth!),cashEnabled:cashEnabled(request.auth!.companyCode),accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items:items.map(p=>({...p,historicalSource:sourceReceiptView(p.historicalSource)}))};
+  return {canPost,documentReadPermission:invoicePaymentReadPermission(request.auth!),cashEnabled:cashEnabled(request.auth!.companyCode),accounts,invoice:{id:invoice.id,invoiceNumber:invoice.invoiceNumber,period:invoice.period,currency:invoice.currency,status:invoice.status,updatedAt:invoice.updatedAt,payable:invoice.payableAmount.toFixed(2),paid:invoice.paidAmount.toFixed(2),outstanding:invoice.receivable?.outstandingAmount.toFixed(2)??null},items:items.map(p=>({...p,receiptGroup:p.receiptGroup?{...p.receiptGroup,documentUrl:p.receiptGroup.documentId?'/api/v1/invoice-receipt-groups/'+p.receiptGroup.id+'/document':null}:null,historicalSource:sourceReceiptView(p.historicalSource)}))};
  });
  app.post('/api/v1/invoices/:id/payments',{bodyLimit:8*1024*1024,onRequest:writeGuard('PAYMENT_POST',config)},async request=>{
   const user=request.auth!,invoiceId=id(request.params),body=parse(z.union([bodySchema,historicalPaymentSchema,ledgerOnlyPaymentSchema]),request.body),historical='mode' in body,digest=sha(JSON.stringify({invoiceId,...body}));
@@ -105,6 +105,7 @@ export async function invoicePaymentRoutes(app:FastifyInstance,config:AuthConfig
   return prisma.$transaction(async tx=>{
    const initial=await tx.invoicePayment.findFirst({where:{companyId:user.companyId,id:paymentId},include:{invoice:true}});
    if(!initial)throw new CommandError(404,'Không tìm thấy thanh toán.');
+   if(initial.receiptGroupId)fail('Khoản thu chung phải được xử lý ở cấp khoản thu, không cộng tiền lại cho từng Invoice.');
    if(isSourceReceipt(initial.historicalSource))fail('Khoản thu nhập từ nguồn chỉ cập nhật lịch sử Invoice/công nợ; không được ghi vào tài khoản tiền.');
    await financialPeriodLock(tx,user.companyId,initial.invoice.partnerId,initial.invoice.period);
    await tx.$queryRaw`SELECT id FROM invoices WHERE id=${initial.invoiceId}::uuid AND company_id=${user.companyId}::uuid FOR UPDATE`;

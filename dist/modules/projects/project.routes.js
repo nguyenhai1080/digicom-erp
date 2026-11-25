@@ -1,3 +1,4 @@
+import { groupReceiptRoutes } from './group-receipts.js';
 import { inputStatementListRoutes } from './input-statement-list.js';
 import { documentDossierRoutes } from './document-dossier.js';
 import { dossierEmailRoutes } from './document-dossier-email.js';
@@ -70,6 +71,7 @@ export async function projectRoutes(app, config) {
     await app.register(dgcInvoiceProfileRoutes, config);
     await app.register(financeLedgerRoutes, config);
     await app.register(invoicePaymentRoutes, config);
+    await app.register(groupReceiptRoutes, config);
     await app.register(cashAccountRoutes, config);
     await app.register(cashTransferRoutes, config);
     await app.register(expenseRoutes, config);
